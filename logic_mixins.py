@@ -250,13 +250,25 @@ class ActionsMixin:
         sidebar_right.set_class(new_state, "-visible")
 
     async def action_stop_generation(self) -> None:
-        if self.is_loading:
+        """Gracefully stop the AI by setting the flag and waiting for the worker to exit."""
+        if self.is_loading or (hasattr(self, "_inference_worker") and self._inference_worker):
             self.is_loading = False
-            self.status_text = "Stopped"
-            if self._inference_worker is not None:
-                self._inference_worker.cancel()
+            # Wait gracefully for the worker thread to catch the is_loading=False flag and exit its finally block
+            max_waits = 20
+            while (hasattr(self, "_inference_worker") and self._inference_worker) and max_waits > 0:
+                await asyncio.sleep(0.05)
+                max_waits -= 1
+            
+            # If still stuck after graceful wait, then and only then attempt a cancel
+            if hasattr(self, "_inference_worker") and self._inference_worker:
+                try:
+                    self._inference_worker.cancel()
+                    await asyncio.sleep(0.1)
+                except Exception:
+                    pass
                 self._inference_worker = None
-                await asyncio.sleep(0.1)
+                
+            self.status_text = "Stopped"
             self.notify("Generation stopped.")
 
     def action_clear_history(self) -> None:
@@ -271,18 +283,42 @@ class ActionsMixin:
         self.notify("History cleared.")
 
     async def action_reset_chat(self) -> None:
+        # 1. Stop the AI gracefully (same method as Clear/Wipe All)
         await self.action_stop_generation()
         
-        self.action_clear_history()
+        # 2. Safety gap for CUDA to settle
+        await asyncio.sleep(0.2)
         
+        # 3. Clear UI state
+        try:
+            self.query_one("#chat-input").value = ""
+        except Exception:
+            pass
+
+        # 4. Reset messages
+        if self.current_character:
+            self.messages = create_initial_messages(self.current_character, self.user_name)
+        else:
+            style = self.query_one("#select-style").value
+            content = get_style_prompt(style)
+            self.messages = [{"role": "system", "content": content}]
+        
+        # 5. Clear chat window (same method as Clear/Wipe All)
+        self.query_one("#chat-scroll").remove_children()
+        
+        # 6. Restart the inference
         if self.current_character:
             self.is_loading = True
             self._inference_worker = self.run_inference("")
         elif self.first_user_message:
             user_text = self.first_user_message
-            await self.add_message("user", user_text)
-            self.is_loading = True
-            self._inference_worker = self.run_inference(user_text)
+            if user_text:
+                await self.add_message("user", user_text)
+                self.is_loading = True
+                self._inference_worker = self.run_inference(user_text)
+                
+        self.status_text = "Reset complete"
+        self.focus_chat_input()
 
     async def action_rewind(self) -> None:
         if self.is_loading:

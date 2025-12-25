@@ -148,9 +148,7 @@ MessageWidget.-assistant {
 
 
 
-#btn-stop, #btn-continue {
-    display: none;
-}
+/* Visibility for stop and continue buttons is handled in Python code */
 
 #right-sidebar {
     width: 38;

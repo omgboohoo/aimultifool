@@ -163,8 +163,16 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
 
     def watch_is_loading(self, is_loading: bool) -> None:
         """Called when is_loading (inference) changes."""
-        self.query_one("#chat-input").disabled = is_loading
+        # Allow typing while loading
+        self.query_one("#chat-input").disabled = False
         self.query_one("#btn-stop").disabled = not is_loading
+        
+        # Sync visibility
+        try:
+            self.query_one("#btn-stop").display = is_loading
+            self.query_one("#btn-continue").display = not is_loading
+        except Exception:
+            pass
 
     def watch_is_downloading(self, is_downloading: bool) -> None:
         """Called when is_downloading changes."""
@@ -194,8 +202,9 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             select.disabled = is_busy
             
         for inp in self.query(Input):
-            # chat-input has its own watch_is_loading, but if we are downloading, it must be disabled
-            inp.disabled = is_busy or (inp.id == "chat-input" and self.is_loading)
+            # is_busy (loading model/downloading) always disables.
+            # is_loading (inference) no longer disables chat-input.
+            inp.disabled = is_busy
             
         self.query_one("#list-characters").disabled = is_busy or not self.llm
         self.query_one("#list-actions").disabled = is_busy or (not self.llm and not self.is_edit_mode)
@@ -366,6 +375,9 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         if section_name == "System Prompts":
             self.set_system_prompt(prompt, item_name)
         else:
+            if not self.current_character and self.first_user_message is None:
+                self.first_user_message = prompt
+                
             self.notify(f"Action: {item_name}")
             await self.add_message("user", prompt)
             self.is_loading = True
@@ -404,7 +416,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         if event.input.id == "input-username":
             self.user_name = event.value
             self.save_user_settings()
-        elif event.input.id in ["input-temp", "input-topp", "input-topk", "input-repeat"]:
+        elif event.input.id == "input-temp" or event.input.id == "input-topp" or event.input.id == "input-topk" or event.input.id == "input-repeat":
             try:
                 val = float(event.value) if "." in event.value else int(event.value)
                 setattr(self, event.input.id.replace("input-", ""), val)
