@@ -1,0 +1,267 @@
+AiMultiFoolApp {
+    background: $background;
+}
+
+Button {
+    border: tall $background;
+    background: $surface;
+    height: 3;
+    content-align: center middle;
+}
+
+Button:enabled:hover {
+    background: $accent;
+    color: $text;
+}
+
+#main-container {
+    height: 1fr;
+}
+
+#chat-scroll {
+    height: 1fr;
+    padding: 1;
+}
+
+#input-container {
+    height: auto;
+    padding: 1;
+    background: $surface;
+    dock: bottom;
+}
+
+#action-buttons {
+    height: auto;
+    padding-top: 1;
+    align: center middle;
+}
+
+
+
+#sidebar {
+    width: 38;
+    background: $surface;
+    border-right: solid $primary;
+    padding: 1;
+    display: none;
+    overflow-y: auto;
+}
+
+#main-layout {
+    height: 1fr;
+}
+
+#sidebar.-visible {
+    display: block;
+}
+
+.setting-group {
+    height: auto;
+    margin-bottom: 1;
+}
+
+.setting-group Label {
+    padding-left: 1;
+    color: $text-muted;
+    text-style: bold;
+}
+
+.setting-group Input, .setting-group Select {
+    width: 100%;
+    border: none;
+    background: $surface;
+}
+
+.setting-group Input {
+    height: 1;
+    padding: 0 1;
+}
+
+.setting-group Select {
+    height: 3;
+}
+
+Select Static#label {
+    text-overflow: ellipsis;
+}
+
+Select ListItem {
+    text-overflow: ellipsis;
+}
+
+.setting-group Input:focus, .setting-group Select:focus {
+    background: $boost;
+    border-left: solid $accent;
+}
+
+#btn-load-model {
+    width: 100%;
+    margin-top: 0;
+    margin-bottom: 2;
+}
+
+
+#list-characters, #list-actions {
+    height: 1fr;
+    border: none;
+    background: $surface;
+}
+
+MessageWidget {
+    margin-bottom: 1;
+    width: 100%;
+    height: auto;
+    padding: 0 1;
+}
+
+MessageWidget.-user {
+    align: left top;
+}
+
+MessageWidget.-assistant {
+    align: left top;
+}
+
+#status-bar {
+    height: 1;
+    background: $primary;
+    color: $text;
+    text-align: left;
+    padding: 0 1;
+    dock: bottom;
+    text-style: bold;
+}
+
+#action-buttons Button {
+    margin: 0 1;
+    min-width: 16;
+    border: tall $background;
+    background: $surface;
+    text-style: bold;
+}
+
+#action-buttons Button:enabled:hover {
+    background: $accent;
+    color: $text;
+    border: tall $accent;
+}
+
+
+
+#btn-stop, #btn-continue {
+    display: none;
+}
+
+#right-sidebar {
+    width: 38;
+    background: $surface;
+    border-left: solid $primary;
+    padding: 1;
+    display: none;
+    overflow-y: auto;
+}
+
+#select-action-category {
+    width: 100%;
+    margin-bottom: 1;
+}
+
+#right-sidebar.-visible {
+    display: block;
+}
+
+#right-sidebar Select {
+    width: 100%;
+    margin-bottom: 1;
+    border: none;
+    background: $surface;
+}
+
+#right-sidebar Select:focus {
+    background: $boost;
+    border-left: solid $accent;
+}
+
+.section-title {
+    color: $accent;
+    text-style: bold;
+    padding-top: 1;
+    padding-left: 1;
+}
+
+AddActionScreen {
+    align: center middle;
+}
+
+.modal-dialog {
+    layout: vertical;
+    width: 60;
+    height: auto;
+    max-height: 80%;
+    border: thick $primary;
+    background: $surface;
+    padding: 0 2;
+    overflow-y: auto;
+}
+
+.dialog-title {
+    width: 100%;
+    content-align: center middle;
+    text-style: bold;
+    color: $accent;
+    margin-top: 1;
+    margin-bottom: 0;
+}
+
+.modal-dialog .label {
+    margin-top: 1;
+    margin-bottom: 0;
+    color: $text-muted;
+}
+
+.modal-dialog Input {
+    margin-bottom: 0;
+    height: 3;
+}
+
+.modal-dialog TextArea {
+    margin-bottom: 0;
+    height: 5;
+    background: $boost;
+    border: none;
+}
+
+.modal-dialog Select {
+    height: 3;
+    margin-bottom: 0;
+}
+
+.buttons {
+    width: 100%;
+    height: auto;
+    align: center middle;
+    margin-top: 1;
+    margin-bottom: 1;
+}
+
+.buttons Button {
+    margin: 0 1; 
+}
+
+.action-control-buttons {
+    height: auto;
+    align: center middle;
+    padding-top: 1;
+    margin-bottom: 1;
+}
+
+.action-control-buttons Button {
+    margin: 0 1; 
+    width: 14; 
+}
+
+#btn-edit-mode {
+    width: 100%;
+    margin-bottom: 1;
+    margin-top: 1;
+}

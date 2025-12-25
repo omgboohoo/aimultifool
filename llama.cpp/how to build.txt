@@ -1,0 +1,21 @@
+# 3. Clone repo
+git clone https://github.com/abetlen/llama-cpp-python.git
+cd llama-cpp-python
+
+# 4. Pull submodules (this fetches vendor/llama.cpp)
+git submodule update --init --recursive
+
+# 5. Set CUDA build flags
+# 👉 Replace 86 with your GPU architecture:
+#    75 = RTX 20-series, 86 = RTX 30-series, 89 = RTX 40-series
+$env:CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=86"
+$env:FORCE_CMAKE="1"
+
+# 6. Build the wheel into dist\
+python -m pip wheel . --wheel-dir dist
+
+# 7. Install the built wheel
+pip install dist\llama_cpp_python-*.whl --force-reinstall
+
+# 8. Verify CUDA support
+python -c "from llama_cpp import Llama; print(Llama.build_info())"
