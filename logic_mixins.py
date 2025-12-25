@@ -204,6 +204,7 @@ class InferenceMixin:
             self.call_from_thread(self.notify, "requests and tqdm required for download!", severity="error")
             return
 
+        self.call_from_thread(setattr, self, "is_downloading", True)
         models_dir = Path(__file__).parent / "models"
         url = "https://huggingface.co/bartowski/L3-8B-Stheno-v3.2-GGUF/resolve/main/L3-8B-Stheno-v3.2-Q4_K_M.gguf"
         file_path = models_dir / "L3-8B-Stheno-v3.2-Q4_K_M.gguf"
@@ -234,6 +235,8 @@ class InferenceMixin:
         except Exception as e:
             self.call_from_thread(self.notify, f"Download failed: {e}", severity="error")
             self.status_text = "Download Failed"
+        finally:
+            self.call_from_thread(setattr, self, "is_downloading", False)
 
 class ActionsMixin:
     """Mixin for handling application actions."""

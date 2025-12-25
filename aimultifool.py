@@ -60,8 +60,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     status_text = reactive("Ready")
     is_loading = reactive(False)
     is_model_loading = reactive(False)
-    is_loading = reactive(False)
-    is_model_loading = reactive(False)
+    is_downloading = reactive(False)
     is_edit_mode = reactive(False)
     _inference_worker = None
 
@@ -146,6 +145,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         self.query_one("#sidebar").add_class("-visible")
         self.query_one("#right-sidebar").add_class("-visible")
         self.watch_is_loading(self.is_loading)
+        self.watch_is_downloading(self.is_downloading)
+        self.watch_is_model_loading(self.is_model_loading)
         
         models = get_models()
         if not models:
@@ -154,13 +155,47 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         
         new_content = get_style_prompt(self.style)
         self.messages = [{"role": "system", "content": new_content}]
-        self.query_one("#list-characters").disabled = True
-        self.query_one("#list-actions").disabled = True
+        self.disable_character_list() # Start disabled
         self.show_footer = True
+
+    def watch_is_loading(self, is_loading: bool) -> None:
+        """Called when is_loading (inference) changes."""
+        self.query_one("#chat-input").disabled = is_loading
+        self.query_one("#btn-stop").disabled = not is_loading
+
+    def watch_is_downloading(self, is_downloading: bool) -> None:
+        """Called when is_downloading changes."""
+        self.update_ui_state()
+
+    def watch_is_model_loading(self, is_model_loading: bool) -> None:
+        """Called when is_model_loading changes."""
+        self.update_ui_state()
 
     async def on_focus(self, event) -> None:
         if hasattr(self, 'show_footer'):
             self.show_footer = True
+
+    def update_ui_state(self):
+        """Disable or enable UI elements based on app state."""
+        is_busy = self.is_model_loading or self.is_downloading
+        
+        # Disable/Enable all interactive elements
+        for btn in self.query(Button):
+            # Always keep Quit button enabled
+            if btn.id == "btn-quit":
+                btn.disabled = False
+            else:
+                btn.disabled = is_busy
+            
+        for select in self.query(Select):
+            select.disabled = is_busy
+            
+        for inp in self.query(Input):
+            # chat-input has its own watch_is_loading, but if we are downloading, it must be disabled
+            inp.disabled = is_busy or (inp.id == "chat-input" and self.is_loading)
+            
+        self.query_one("#list-characters").disabled = is_busy or not self.llm
+        self.query_one("#list-actions").disabled = is_busy or (not self.llm and not self.is_edit_mode)
 
     def update_model_list(self):
         models = get_models()
