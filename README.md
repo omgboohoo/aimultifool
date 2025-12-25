@@ -34,14 +34,20 @@ The Premium Linux Terminal-Based Sandbox for Private AI Roleplay. Powered by `ll
    ```
 
 > [!TIP]
-> **GPU Acceleration**: On first launch, `run.sh` will automatically download a **Universal Multi-Arch Wheel** (~339MB) to enable CUDA support. This pre-built binary is optimized for GTX 10-series, RTX 20-series, RTX 30-series, and RTX 40-series GPUs.
+> **GPU Acceleration**: On first launch, `run.sh` will automatically download a **Universal Multi-Arch Wheel** (~339MB) to enable CUDA support. This pre-built binary is optimized for GTX 10-series, RTX 20-series, RTX 30-series, and RTX 40-series GPUs. **Note:** You must have NVIDIA Drivers and the CUDA runtime libraries installed on your system (see below).
 
 ## Requirements
 
-- Python 3.12+
-- Linux (Ubuntu/Debian/Mint recommended)
-- Windows (Coming Soon)
-- Compatible GGUF models (Auto-downloads default if missing)
+- **Python 3.12+**
+- **Linux** (Ubuntu/Debian/Mint recommended)
+- **NVIDIA GPU** (Optional, for acceleration)
+  - Requires **NVIDIA Drivers** installed.
+  - Requires **CUDA Runtime** libraries:
+    ```bash
+    sudo apt install nvidia-cuda-toolkit-runtime
+    ```
+- **Windows** (Coming Soon)
+- **Compatible GGUF models** (Auto-downloads default if missing)
 
 ## Usage
 
