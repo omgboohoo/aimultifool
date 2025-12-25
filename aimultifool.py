@@ -144,7 +144,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             except Exception:
                 self.selected_model = ""
 
-        self.title = f"aiMultiFool v0.1.0"
+        self.title = f"aiMultiFool v0.1.2"
         self.query_one("#sidebar").add_class("-visible")
         self.query_one("#right-sidebar").add_class("-visible")
         self.watch_is_loading(self.is_loading)

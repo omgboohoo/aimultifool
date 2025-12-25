@@ -1,4 +1,4 @@
-# aiMultiFool v0.1.0
+# aiMultiFool v0.1.2
 
 The Premium Linux Terminal-Based Sandbox for Private AI Roleplay. Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favorite SillyTavern character cards with zero lag and full privacy.
 
@@ -32,6 +32,9 @@ The Premium Linux Terminal-Based Sandbox for Private AI Roleplay. Powered by `ll
    chmod +x run.sh
    ./run.sh
    ```
+
+> [!TIP]
+> **GPU Acceleration**: On first launch, `run.sh` will automatically download a **Universal Multi-Arch Wheel** (~339MB) to enable CUDA support. This pre-built binary is optimized for GTX 10-series, RTX 20-series, RTX 30-series, and RTX 40-series GPUs.
 
 ## Requirements
 

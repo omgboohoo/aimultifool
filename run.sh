@@ -6,32 +6,73 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="$SCRIPT_DIR/venv"
-WHEEL_FILE="$SCRIPT_DIR/llama.cpp/llama_cpp_python-0.3.16-cp312-cp312-linux_x86_64.whl"
+# Universal Multi-Arch Wheel Configuration
+WHEEL_NAME="llama_cpp_python-0.3.16-cp312-cp312-linux_x86_64.whl"
+WHEEL_URL="https://aimultifool.com/llama_cpp_python-0.3.16-cp312-cp312-linux_x86_64.whl" # Change this to your actual hosting URL
+WHEEL_DIR="$SCRIPT_DIR/llama.cpp"
+WHEEL_PATH="$WHEEL_DIR/$WHEEL_NAME"
 
-echo "Setting up aiMultiFool..."
+echo "----------------------------------------------------------------"
+echo "  aiMultiFool Suite - Setup & Launch Script v0.1.2"
+echo "----------------------------------------------------------------"
+
+# 1. Ensure the llama.cpp directory exists
+if [ ! -d "$WHEEL_DIR" ]; then
+    echo "[SYSTEM] Creating directory for binaries: $WHEEL_DIR"
+    mkdir -p "$WHEEL_DIR"
+fi
+
+# 2. Check if the wheel exists locally, if not attempt download
+if [ -f "$WHEEL_PATH" ]; then
+    echo "[FOUND] Using existing local Multi-Arch wheel: $(basename "$WHEEL_PATH")"
+else
+    echo "[MISSING] Universal wheel not found locally."
+    echo "[NETWORK] Starting download (339MB) to ensure GPU acceleration..."
+    echo "[SOURCE]  $WHEEL_URL"
+    
+    if command -v wget &> /dev/null; then
+        if ! wget --show-progress -O "$WHEEL_PATH" "$WHEEL_URL"; then
+            echo "[ERROR] Download failed with wget."
+            rm -f "$WHEEL_PATH"
+        fi
+    elif command -v curl &> /dev/null; then
+        if ! curl -L -# -o "$WHEEL_PATH" "$WHEEL_URL"; then
+            echo "[ERROR] Download failed with curl."
+            rm -f "$WHEEL_PATH"
+        fi
+    else
+        echo "[CRITICAL] Neither wget nor curl found. Please install one to auto-download the wheel."
+        exit 1
+    fi
+
+    if [ -f "$WHEEL_PATH" ]; then
+        echo "[SUCCESS] Multi-Arch wheel downloaded successfully!"
+    else
+        echo "[ERROR] Download failed. The app may run slowly without GPU acceleration."
+    fi
+fi
+
+# Find the latest wheel
+WHEEL_FILE=$(ls "$WHEEL_DIR/"llama_cpp_python-*.whl 2>/dev/null | head -n 1)
 
 # Check if venv already exists
 if [ -d "$VENV_DIR" ]; then
-    echo "Virtual environment already exists."
-    read -p "Do you want to recreate it? [y/N]: " -n 1 -r
+    echo "[STATUS] Virtual environment detected."
+    read -p "[PROMPT] Recreate environment (fix dependencies)? [y/N]: " -t 5 -n 1 -r
     echo
-    # Default to N (no) if user just presses Enter
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "Removing existing virtual environment..."
+        echo "[CLEANUP] Removing existing virtual environment..."
         rm -rf "$VENV_DIR"
     else
-        echo "Using existing virtual environment."
+        echo "[ACTIVATE] Entering existing environment..."
         source "$VENV_DIR/bin/activate"
-        echo "Virtual environment activated!"
         
-        # Ensure dependencies are up to date
-        echo "Checking/Updating dependencies..."
+        echo "[CHECK] Verifying/Updating core requirements..."
         if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
             pip install -q -r "$SCRIPT_DIR/requirements.txt"
         fi
         
-        echo ""
-        echo "Starting chat app..."
+        echo "[LAUNCH] Starting aiMultiFool TUI..."
         echo ""
         python "$SCRIPT_DIR/aimultifool.py"
         exit 0
@@ -39,39 +80,36 @@ if [ -d "$VENV_DIR" ]; then
 fi
 
 # Create virtual environment
-echo "Creating virtual environment..."
+echo "[STEP 1/4] Creating fresh virtual environment (venv)..."
 python3 -m venv "$VENV_DIR"
 
 # Activate virtual environment
-echo "Activating virtual environment..."
+echo "[STEP 2/4] Activating environment..."
 source "$VENV_DIR/bin/activate"
 
 # Upgrade pip
-echo "Upgrading pip..."
-pip install --upgrade pip
+echo "[STEP 3/4] Upgrading pip to latest version..."
+pip install -q --upgrade pip
 
 # Install llama-cpp-python wheel
-if [ -f "$WHEEL_FILE" ]; then
-    echo "Installing llama-cpp-python from wheel..."
-    pip install "$WHEEL_FILE"
+if [ -n "$WHEEL_FILE" ] && [ -f "$WHEEL_FILE" ]; then
+    echo "[STEP 4/4] Installing Multi-Arch CUDA Backend: $(basename "$WHEEL_FILE")"
+    pip install -q "$WHEEL_FILE"
+    echo "[SUCCESS] CUDA Backend installed."
 else
-    echo "Warning: Wheel file not found at $WHEEL_FILE"
-    echo "Falling back to pip install llama-cpp-python..."
-    pip install llama-cpp-python
+    echo "[WARNING] No pre-built wheel found. Falling back to generic install (CPU only if no toolkit)..."
+    CMAKE_ARGS="-DGGML_CUDA=on" pip install -q llama-cpp-python
 fi
 
 # Install other dependencies
-echo "Installing dependencies..."
+echo "[FINISHING] Finalizing remaining dependencies..."
 if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
-    pip install -r "$SCRIPT_DIR/requirements.txt"
+    pip install -q -r "$SCRIPT_DIR/requirements.txt"
 else
-    pip install rich requests tqdm textual
+    pip install -q rich requests tqdm textual
 fi
 
-echo ""
-echo "Setup complete!"
-echo ""
-echo "Starting chat app..."
+echo "[DONE] Setup complete! Launching..."
 echo ""
 python "$SCRIPT_DIR/aimultifool.py"
 

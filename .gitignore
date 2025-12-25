@@ -97,3 +97,10 @@ Thumbs.db
 old/
 action_menu.json
 website/
+
+# Large Binary Files & Build Artifacts
+*.whl
+llama_cpp_build/
+dist/
+build/
+*.egg-info/

@@ -1,16 +1,16 @@
 #!/bin/bash
 
 # Build llama-cpp-python with CUDA support for Linux
-# Based on the Windows instructions but adapted for Linux
+# Optimized for portability across multiple GPU generations (Fat Binary)
 
 set -e  # Exit on any error
 
-echo "Building llama-cpp-python with CUDA support for Linux..."
-echo "========================================================"
+echo "Building aiMultiFool llama-cpp-python with Multi-Arch CUDA support..."
+echo "===================================================================="
 
-# Check if we're in the right directory
-if [ ! -f "requirements.txt" ]; then
-    echo "Error: Please run this script from the ShitChat root directory"
+# Check if we're in the right directory (check for aimultifool.py or similar)
+if [ ! -f "aimultifool.py" ] && [ ! -f "../aimultifool.py" ]; then
+    echo "Error: Please run this script from the aiMultiFool root directory"
     exit 1
 fi
 
@@ -44,17 +44,12 @@ cd llama-cpp-python
 echo "2. Pulling submodules..."
 git submodule update --init --recursive
 
-echo "3. Setting up CUDA build environment..."
-# Get GPU compute capability
-COMPUTE_CAP=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader,nounits | head -1)
-# Convert to integer (e.g., 6.1 -> 61)
-COMPUTE_CAP_INT=$(echo "$COMPUTE_CAP" | sed 's/\.//')
-
-echo "Detected GPU compute capability: $COMPUTE_CAP (using $COMPUTE_CAP_INT)"
-
-# Set CUDA build flags for Linux
-export CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=$COMPUTE_CAP_INT"
+echo "3. Setting up Multi-Architecture CUDA build environment..."
+# 61 = Pascal (10-series), 75 = Turing (20-series/16-series), 86 = Ampere (30-series), 89 = Ada (40-series)
+export CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=61;75;86;89"
 export FORCE_CMAKE="1"
+
+echo "Using architectures: 6.1, 7.5, 8.6, 8.9"
 
 echo "4. Building the wheel..."
 python3 -m pip wheel . --wheel-dir dist
@@ -69,10 +64,18 @@ else
     echo "You can install it later with: pip install dist/llama_cpp_python-*.whl"
 fi
 
-echo "6. Verifying CUDA support..."
+# Determine destination for the wheel in the main project
+DEST_DIR="../../llama.cpp"
+if [ -d "$DEST_DIR" ]; then
+    echo "6. Copying built wheel to project directory..."
+    cp dist/llama_cpp_python-*.whl "$DEST_DIR/"
+    echo "Wheel copied to $DEST_DIR"
+fi
+
+echo "7. Verifying CUDA support..."
 python3 -c "from llama_cpp import Llama; print('CUDA Support:', 'CUDA' in Llama.build_info())"
 
 echo ""
 echo "Build completed successfully!"
-echo "The wheel file is located in: $(pwd)/dist/"
-echo "You can now use the updated run.sh script to launch ShitChat with CUDA support."
+echo "The wheel file is optimized for GTX 10-series through RTX 40-series."
+echo "You can now run aiMultiFool on different machines with different NVIDIA GPUs."
