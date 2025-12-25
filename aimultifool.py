@@ -86,6 +86,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                         Button("Clear [^W]", id="btn-clear-chat", variant="default"),
                         Button("Quit [^Q]", id="btn-quit", variant="default"),
                         Button("Buy Coffee", id="btn-coffee", variant="default"),
+                        Button("Discord", id="btn-discord", variant="default"),
                         id="action-buttons"
                     ),
                     id="input-container"
@@ -183,8 +184,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         
         # Disable/Enable all interactive elements
         for btn in self.query(Button):
-            # Always keep Quit and Coffee buttons enabled
-            if btn.id in ["btn-quit", "btn-coffee"]:
+            # Always keep Quit, Coffee, and Discord buttons enabled
+            if btn.id in ["btn-quit", "btn-coffee", "btn-discord"]:
                 btn.disabled = False
             else:
                 btn.disabled = is_busy
@@ -462,6 +463,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         elif event.button.id == "btn-clear-chat": await self.action_wipe_all()
         elif event.button.id == "btn-quit": self.exit()
         elif event.button.id == "btn-coffee": webbrowser.open("https://ko-fi.com/aimultifool")
+        elif event.button.id == "btn-discord": webbrowser.open("https://discord.com/invite/J5vzhbmk35")
         elif event.button.id == "btn-add-action":
             self.push_screen(AddActionScreen(), self.add_action_callback)
         elif event.button.id == "btn-delete-action":
