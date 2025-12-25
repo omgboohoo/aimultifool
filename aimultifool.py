@@ -8,6 +8,7 @@ import sys
 import gc
 import asyncio
 import re
+import webbrowser
 from pathlib import Path
 
 from textual.app import App, ComposeResult
@@ -84,6 +85,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                         Button("Restart [^R]", id="btn-restart", variant="default"),
                         Button("Clear [^W]", id="btn-clear-chat", variant="default"),
                         Button("Quit [^Q]", id="btn-quit", variant="default"),
+                        Button("Buy Coffee", id="btn-coffee", variant="default"),
                         id="action-buttons"
                     ),
                     id="input-container"
@@ -181,8 +183,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         
         # Disable/Enable all interactive elements
         for btn in self.query(Button):
-            # Always keep Quit button enabled
-            if btn.id == "btn-quit":
+            # Always keep Quit and Coffee buttons enabled
+            if btn.id in ["btn-quit", "btn-coffee"]:
                 btn.disabled = False
             else:
                 btn.disabled = is_busy
@@ -459,6 +461,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         elif event.button.id == "btn-rewind": await self.action_rewind()
         elif event.button.id == "btn-clear-chat": await self.action_wipe_all()
         elif event.button.id == "btn-quit": self.exit()
+        elif event.button.id == "btn-coffee": webbrowser.open("https://ko-fi.com/aimultifool")
         elif event.button.id == "btn-add-action":
             self.push_screen(AddActionScreen(), self.add_action_callback)
         elif event.button.id == "btn-delete-action":

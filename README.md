@@ -68,5 +68,11 @@ Place your `.gguf` files in `models/` and SillyTavern cards in `cards/`.
     - `i1-Q6_K` (10.2 GB) - Highest quality
   - Source: [mradermacher/MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF](https://huggingface.co/mradermacher/MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF)
 
+## Support the Developer
+
+If you find aiMultiFool useful and want to support its development, you can buy me a coffee! Your support helps keep the project alive and growing.
+
+https://ko-fi.com/aimultifool
+
 ## License
 GPLv3
