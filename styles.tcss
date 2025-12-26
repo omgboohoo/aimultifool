@@ -61,7 +61,6 @@ Button:enabled:hover {
     border-right: solid $primary;
     padding: 1;
     display: none;
-    overflow-y: auto;
 }
 
 #main-layout {
@@ -118,7 +117,13 @@ Select ListItem {
 }
 
 
-#list-characters, .action-list {
+#list-characters {
+    height: 1fr;
+    border: none;
+    background: $surface;
+}
+
+.action-list {
     height: auto;
     border: none;
     background: $surface;
