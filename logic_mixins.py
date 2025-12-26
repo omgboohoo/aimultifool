@@ -302,6 +302,8 @@ class ActionsMixin:
         # 4. Reset messages
         if self.current_character:
             self.messages = create_initial_messages(self.current_character, self.user_name)
+            if hasattr(self, "update_system_prompt_style"):
+                self.update_system_prompt_style(self.style)
         else:
             style = self.query_one("#select-style").value
             content = get_style_prompt(style)
@@ -312,8 +314,13 @@ class ActionsMixin:
         
         # 6. Restart the inference
         if self.current_character:
+            # For character cards, we send 'continue' to trigger the character's first response
+            if self.messages and self.messages[-1]["role"] == "user":
+                self.messages[-1]["content"] = "continue"
+            else:
+                self.messages.append({"role": "user", "content": "continue"})
             self.is_loading = True
-            self._inference_worker = self.run_inference("")
+            self._inference_worker = self.run_inference("continue")
         elif self.first_user_message:
             user_text = self.first_user_message
             if user_text:
