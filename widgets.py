@@ -133,6 +133,7 @@ class Sidebar(Vertical):
             classes="setting-group"
         )
         yield ListView(id="list-characters")
+        yield Button("Enter Edit Mode", id="btn-char-edit-mode", variant="default")
 
 class AddActionScreen(ModalScreen):
     """Screen for adding or editing an action."""
@@ -175,6 +176,50 @@ class AddActionScreen(ModalScreen):
             if name and prompt:
                 new_data = {"itemName": name, "prompt": prompt, "isSystem": is_system}
                 self.dismiss({"original": self.edit_data, "new": new_data})
+        elif event.button.id == "cancel":
+            self.dismiss(None)
+
+class EditCharacterScreen(ModalScreen):
+    """Screen for editing character PNG metadata."""
+    def __init__(self, chara_json, chara_path):
+        super().__init__()
+        self.chara_json = chara_json
+        self.chara_path = chara_path
+
+    def compose(self) -> ComposeResult:
+        try:
+            # Try to pretty print the JSON
+            parsed = json.loads(self.chara_json)
+            pretty_json = json.dumps(parsed, indent=4)
+        except Exception:
+            pretty_json = self.chara_json
+
+        yield Vertical(
+            Label(f"Edit Character: {self.chara_path.name}", classes="dialog-title"),
+            Label("Metadata (JSON)", classes="label"),
+            TextArea(pretty_json, id="metadata-text"),
+            Horizontal(
+                Button("Cancel", variant="default", id="cancel"),
+                Button("Save to PNG", variant="default", id="save"),
+                classes="buttons"
+            ),
+            id="edit-character-dialog",
+            classes="modal-dialog"
+        )
+
+    def on_mount(self) -> None:
+        self.query_one("#metadata-text").focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "save":
+            metadata_str = self.query_one("#metadata-text").text
+            try:
+                # Validate JSON
+                metadata_obj = json.loads(metadata_str)
+                self.dismiss(metadata_obj)
+            except json.JSONDecodeError as e:
+                self.app.notify(f"Invalid JSON: {e}", severity="error")
+                pass
         elif event.button.id == "cancel":
             self.dismiss(None)
 

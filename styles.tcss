@@ -110,10 +110,16 @@ Select ListItem {
     border-left: solid $accent;
 }
 
+
 #btn-load-model {
     width: 100%;
     margin-top: 0;
     margin-bottom: 2;
+}
+
+#btn-char-edit-mode {
+    width: 100%;
+    margin-top: 1;
 }
 
 
@@ -259,6 +265,20 @@ AddActionScreen {
 
 DebugContextScreen {
     align: center middle;
+}
+
+EditCharacterScreen {
+    align: center middle;
+}
+
+#edit-character-dialog {
+    width: 80;
+    height: 80%;
+}
+
+#edit-character-dialog TextArea {
+    height: 1fr;
+    margin: 1 0;
 }
 
 #debug-dialog {

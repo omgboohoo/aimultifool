@@ -24,9 +24,9 @@ from ui_mixin import UIMixin
 
 # Module Functions
 from utils import _get_action_menu_data, load_settings, save_settings, DOWNLOAD_AVAILABLE, get_style_prompt, save_action_menu_data
-from character_manager import extract_chara_metadata, process_character_metadata, create_initial_messages
+from character_manager import extract_chara_metadata, process_character_metadata, create_initial_messages, write_chara_metadata
 from ai_engine import get_models
-from widgets import MessageWidget, Sidebar, AddActionScreen
+from widgets import MessageWidget, Sidebar, AddActionScreen, EditCharacterScreen
 
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     """The main aiMultiFool application."""
@@ -63,6 +63,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     is_model_loading = reactive(False)
     is_downloading = reactive(False)
     is_edit_mode = reactive(False)
+    is_char_edit_mode = reactive(False)
     _inference_worker = None
     _last_action_list = None
 
@@ -153,7 +154,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             except Exception:
                 self.selected_model = ""
 
-        self.title = f"aiMultiFool v0.1.3"
+        self.title = f"aiMultiFool v0.1.4"
         self.query_one("#sidebar").add_class("-visible")
         self.query_one("#right-sidebar").add_class("-visible")
         self.watch_is_loading(self.is_loading)
@@ -191,6 +192,14 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         """Called when is_model_loading changes."""
         self.update_ui_state()
 
+    def watch_is_edit_mode(self, is_edit_mode: bool) -> None:
+        """Called when is_edit_mode changes."""
+        self.update_ui_state()
+        
+    def watch_is_char_edit_mode(self, is_char_edit_mode: bool) -> None:
+        """Called when is_char_edit_mode changes."""
+        self.update_ui_state()
+
     async def on_focus(self, event) -> None:
         if hasattr(self, 'show_footer'):
             self.show_footer = True
@@ -225,7 +234,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             else:
                 inp.disabled = is_busy
             
-        self.query_one("#list-characters").disabled = is_busy or not self.llm
+        self.query_one("#list-characters").disabled = is_busy or (not self.llm and not self.is_char_edit_mode)
+        self.query_one("#btn-char-edit-mode").disabled = is_busy
         for lv in self.query(".action-list"):
             lv.disabled = is_busy or (not self.llm and not self.is_edit_mode)
         for collapsible in self.query(Collapsible):
@@ -386,7 +396,14 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             if event.list_view.id == "list-characters":
                 card_path = getattr(event.item, "name", "")
                 if card_path:
-                    await self.load_character_from_path(card_path)
+                    if self.is_char_edit_mode:
+                        chara_json = extract_chara_metadata(card_path)
+                        if chara_json:
+                            self.push_screen(EditCharacterScreen(chara_json, Path(card_path)), self.edit_character_callback)
+                        else:
+                            self.notify("Could not extract metadata from this PNG!", severity="error")
+                    else:
+                        await self.load_character_from_path(card_path)
                     self.focus_chat_input()
             elif event.list_view.has_class("action-list"):
                 data_packed = getattr(event.item, "name", "")
@@ -587,7 +604,34 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                 if not self.llm:
                     for lv in self.query(".action-list"):
                         lv.disabled = True
+        elif event.button.id == "btn-char-edit-mode":
+            self.is_char_edit_mode = not self.is_char_edit_mode
+            btn = self.query_one("#btn-char-edit-mode", Button)
+            btn.label = "Exit Edit Mode" if self.is_char_edit_mode else "Enter Edit Mode"
+            if self.is_char_edit_mode:
+                self.notify("Character Edit Mode: Click a card to edit its metadata")
         self.focus_chat_input()
+
+    def edit_character_callback(self, result):
+        if not result:
+            return
+        
+        # Result is the new metadata object
+        selected_item = self.query_one("#list-characters", ListView).highlighted_child
+        if not selected_item:
+            return
+        
+        card_path = getattr(selected_item, "name", "")
+        if not card_path:
+            return
+            
+        success = write_chara_metadata(card_path, result)
+        if success:
+            self.notify(f"Successfully updated metadata in {Path(card_path).name}")
+            # If this is the current character, we might want to reload it, 
+            # but usually the user would just click it again to start a new chat.
+        else:
+            self.notify("Failed to write metadata to PNG!", severity="error")
 
     def add_action_callback(self, result):
         if not result:

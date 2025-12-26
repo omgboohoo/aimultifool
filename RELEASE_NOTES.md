@@ -1,5 +1,12 @@
 # Release Notes
 
+## v0.1.4
+
+- **Character Card Metadata Editor**: A brand new feature to view and modify SillyTavern PNG metadata directly within the app.
+- **Improved Card Interaction**: Includes a toggle-able "Edit Mode" for character cards. When active, clicking a card opens the editor instead of loading the character.
+- **Manual PNG Chunk Manipulation**: The app now handles `zTXt` chunk injection manually, ensuring character card compatibility without bloated dependencies.
+- **UI Enhancements**: Added "Enter/Exit Edit Mode" button to the sidebar for a streamlined editing workflow.
+
 ## v0.1.3
 
 - **Action Menu Search & Filtering**: Real-time search across action names and prompts with auto-expanding categories.

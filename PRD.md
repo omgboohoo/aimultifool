@@ -1,10 +1,10 @@
 # Product Requirements Document (PRD)
-## aiMultiFool v0.1.3
+## aiMultiFool v0.1.4
 
 ### Document Information
 - **Product Name**: aiMultiFool
-- **Version**: 0.1.3
-- **Document Version**: 1.5
+- **Version**: 0.1.4
+- **Document Version**: 1.6
 - **Date**: 2025-12-26
 - **Author**: Dan Bailey
 - **Status**: Updated
@@ -50,6 +50,8 @@ aiMultiFool provides a sophisticated Textual-based TUI that:
 
 ### 3.3 Chat & Character Management
 - **PNG Metadata**: Extracts character name, personality, description, scenario, and prompts from SillyTavern cards.
+- **In-App Card Editor**: Users can toggle "Character Edit Mode" to view and modify SillyTavern PNG metadata directly through a TUI modal.
+- **PNG Metadata Injection**: Supports updating original PNG character cards by injecting updated JSON into `zTXt` chunks, maintaining cross-app compatibility.
 - **Style Blending**: Users choose from 20 narrative styles. The app dynamically blends the selected style with character instructions into a unified system prompt.
 - **Input Logic**: A smart input box that handles sub-second interruptions (typing while AI speaks stops the AI) and automatically manages focus.
 
@@ -82,8 +84,8 @@ aiMultiFool provides a sophisticated Textual-based TUI that:
     - `logic_mixins.py`: Functional logic for Inference and Actions.
     - `ui_mixin.py`: UI synchronization and status management.
     - `ai_engine.py`: Core tokenization and model loading logic.
-    - `character_manager.py`: PNG card parser.
-    - `widgets.py`: Custom TUI widgets and Modal screens (Sidebar, AddAction, DebugContext).
+    - `character_manager.py`: PNG card parser and metadata injector (using manual binary chunk handling).
+    - `widgets.py`: Custom TUI widgets and Modal screens (Sidebar, AddAction, DebugContext, EditCharacter).
     - `utils.py`: JSON persistent storage and narrative style definitions.
 - **Data Schema**:
     - `settings.json`: Stores username, selected model, context size, and sampling parameters.
