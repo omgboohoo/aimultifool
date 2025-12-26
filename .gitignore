@@ -104,3 +104,7 @@ llama_cpp_build/
 dist/
 build/
 *.egg-info/
+
+# Backups
+backup.sh
+backups/

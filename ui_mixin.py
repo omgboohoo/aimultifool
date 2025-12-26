@@ -53,7 +53,7 @@ class UIMixin:
 
     def watch_user_name(self, name):
         if hasattr(self, "title"):
-            self.title = f"aiMultiFool v0.1.2 - {name}"
+            self.title = f"aiMultiFool v0.1.3 - {name}"
 
     def watch_is_model_loading(self, loading: bool) -> None:
         try:

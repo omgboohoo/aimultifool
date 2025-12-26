@@ -17,6 +17,9 @@ default_action_menu_json = [
     {"itemName": "action: add random complication", "prompt": "introduce a sudden, unexpected problem that the characters must deal with immediately."},
     {"itemName": "action: flashback sequence", "prompt": "trigger a flashback for the current characters, showing a pivotal moment from their shared or individual past."},
     {"itemName": "action: dream sequence", "prompt": "the current scene fades into a surreal dream world based on the characters' deepest fears or desires."},
+    {"itemName": "action: change weather", "prompt": "ask the user what weather they want to change the scene to, then describe the immediate shift."},
+    {"itemName": "action: reveal secret", "prompt": "one character reveals a deep, dark secret that they have been hiding from everyone else in the scene."},
+    {"itemName": "action: perspective swap", "prompt": "swap the perspectives of two characters. they now see the world through each others eyes."},
 
     # --- SPAWNS: CELEBRITIES & PUBLIC FIGURES ---
     {"itemName": "spawn: donald trump", "prompt": "donald trump appears in front of us, he's got a lot to say and wants to be part of any conversation. he refuses to leave us and won't shut up about how great he is"},
@@ -33,6 +36,9 @@ default_action_menu_json = [
     {"itemName": "spawn: male superhero", "prompt": "list 20 random male movie superheros and assign a number to them. ask user which super hero to spawn in the scene as a extra. force them to speak english and spawn them as their superhero role, clothes and all the associated powers"},
     {"itemName": "spawn: historical tycoon", "prompt": "list 20 random tycoons from history and assign a number to them. ask user which tycoon to spawn in the scene as a extra. force them to speak english"},
     {"itemName": "spawn: nobel prize winner", "prompt": "list 20 random nobel prize winners from history and assign a number to them. ask user which nobel prize winner to spawn in the scene as a extra. force them to speak english"},
+    {"itemName": "spawn: bill gates", "prompt": "bill gates appears, trying to fix everyone's 'operating system' while talking about vaccination and philanthropy."},
+    {"itemName": "spawn: mad max", "prompt": "mad max roars in on a post-apocalyptic muscle car, looking for water and fuel."},
+    {"itemName": "spawn: the rock", "prompt": "dwayne 'the rock' johnson appears, providing intense motivation and asking everyone if they can smell what he is cooking."},
 
     # --- SPAWNS: ARCHETYPES & FANTASY ---
     {"itemName": "spawn: goth girlfriend", "prompt": "a stunning, brooding goth girl with dark makeup and a cynical attitude appears and becomes deeply interested in {{user}}."},
@@ -46,6 +52,8 @@ default_action_menu_json = [
     {"itemName": "spawn: succubus / incubus", "prompt": "a breathtakingly attractive being with subtle horns and wings appears, radiating an aura of irresistible desire."},
     {"itemName": "spawn: ninja assassin", "prompt": "an expert assassin clad in black appears silently, awaiting orders from {{user}} to eliminate a target."},
     {"itemName": "spawn: grumpy bartender", "prompt": "a full bar suddenly appears with a grumpy bartender who insists everyone orders a drink before they continue their drama."},
+    {"itemName": "spawn: cosmic traveler", "prompt": "a being made of pure starlight appears, offering cryptic wisdom about the nature of the multiverse."},
+    {"itemName": "spawn: Victorian ghost", "prompt": "a pale, translucent figure from the 1800s appears, looking for their lost locket and rattling chains."},
 
     # --- SPAWNS: CREATURES ---
     {"itemName": "spawn: loyal golden retriever", "prompt": "a friendly golden retriever appears and decides {{user}} is its new best friend."},
@@ -56,6 +64,8 @@ default_action_menu_json = [
     {"itemName": "spawn: swarm of fireflies", "prompt": "thousands of glowing fireflies fill the air, creating a magical and romantic atmosphere."},
     {"itemName": "spawn: sentient slime", "prompt": "a translucent, squishy jelly creature oozes in, attempting to mimic the shapes and speech of the characters."},
     {"itemName": "spawn: unicorn", "prompt": "a majestic unicorn gallops in, radiating purity and occasionally poking things with its horn to see if they turn into candy."},
+    {"itemName": "spawn: phoenix", "prompt": "a bird of living flame perches nearby, its song bringing a sense of hope to everyone who hears it."},
+    {"itemName": "spawn: mechanical owl", "prompt": "a clockwork owl sootily clicks and whirrs, recording everything said for a mysterious master."},
 
     # --- EMOTIONS: CORE ---
     {"itemName": "emotion: custom emotion", "prompt": "list all the characters in scene assigning a number to each one. ask user which character to apply a emotion to. after the user has replied then ask user what emotion type to apply, they will type one. then once user has replied ask user how strong the emotion should be on a scale of 1 - 10, with 10 being the strongest emotion ever felt that cannot be ignored"},
@@ -74,6 +84,8 @@ default_action_menu_json = [
     {"itemName": "emotion: deeply jealous", "prompt": "pick a character; they become intensely jealous of {{user}} or another character's attention."},
     {"itemName": "emotion: suddenly fearful", "prompt": "pick a character; they are struck by an irrational, paralyzing fear of something in the room."},
     {"itemName": "emotion: heroic resolve", "prompt": "a character is filled with an unshakeable sense of purpose and courage."},
+    {"itemName": "emotion: overwhelmingly paranoid", "prompt": "list all characters in scene. ask user which character should suddenly feel overwhelmingly paranoid about everyone else."},
+    {"itemName": "emotion: overwhelmingly nostalgic", "prompt": "list all characters in scene. ask user which character should suddenly feel overwhelmingly nostalgic for a past that never was."},
 
     # --- EMOTIONS: EROTIC & INTIMATE ---
     {"itemName": "erotic: primal lust", "prompt": "every character in the scene is suddenly overcome by an intense, undeniable animalistic urge for physical contact."},
@@ -99,6 +111,8 @@ default_action_menu_json = [
     {"itemName": "erotic: lap sitting order", "prompt": "a character is commanded to sit on {{user}}'s lap and remain there for the rest of the conversation."},
     {"itemName": "erotic: sensory overload", "prompt": "every touch feels a thousand times more intense than normal, making even simple contact feel like an explosion of pleasure."},
     {"itemName": "erotic: public display urge", "prompt": "characters feel a sudden, reckless desire to engage in intimate acts where they might be discovered at any moment."},
+    {"itemName": "erotic: shared secret fantasy", "prompt": "characters find themselves sharing their deepest, most hidden sexual fantasies with each other with startling honesty."},
+    {"itemName": "erotic: playful nibble", "prompt": "a character gives {{user}} a playful, suggestive nibble on the ear or neck, their breath warm and inviting."},
 
     # --- EVENTS: FUNNY & ABSURD ---
     {"itemName": "funny: everyone is a chicken", "prompt": "every character except {{user}} is suddenly transformed into a chicken, but they keep trying to continue the conversation with clucks."},
@@ -111,6 +125,8 @@ default_action_menu_json = [
     {"itemName": "funny: bad accents only", "prompt": "every character suddenly starts speaking in a different, poorly executed accent (british, french, texan, etc.)."},
     {"itemName": "funny: sentient food", "prompt": "whatever characters were eating or drinking starts talking back to them, complaining about being consumed."},
     {"itemName": "funny: clown shoes event", "prompt": "everyone's footwear is replaced by massive, squeaky clown shoes that make a loud 'honk' with every step."},
+    {"itemName": "funny: floor is bouncy", "prompt": "the floor becomes a giant trampoline. characters must bounce and stumble while trying to have a serious conversation."},
+    {"itemName": "funny: everything is a pun", "prompt": "for the next 5 minutes, every character must communicate exclusively using terrible puns related to their current situation."},
 
     # --- EVENTS: CATASTROPHIC ---
     {"itemName": "event: zombie horde", "prompt": "a zombie horde approaches"},
@@ -122,6 +138,8 @@ default_action_menu_json = [
     {"itemName": "event: volcanic eruption", "prompt": "the ground nearby explodes as a new volcano forms, spewing lava and choking ash into the air."},
     {"itemName": "event: meteor strike", "prompt": "a massive meteor streaks across the sky and impacts nearby, creating a colossal crater and shockwave."},
     {"itemName": "event: black hole formation", "prompt": "a tiny singularity forms in the center of the room, slowly pulling in furniture and light."},
+    {"itemName": "event: solar eclipse", "prompt": "the sun is suddenly blocked out by the moon, creating an eerie midday darkness and a drop in temperature."},
+    {"itemName": "event: zero-G ballroom", "prompt": "the room loses gravity and elegant ballroom music starts playing from nowhere as characters begin to drift."},
 
     # --- EVENTS: SURREAL/MAGICAL ---
     {"itemName": "event: gravity fails", "prompt": "gravity no longer exists and everyone floats upwards"},
@@ -147,6 +165,8 @@ default_action_menu_json = [
     {"itemName": "enviro: heavy rain (indoor)", "prompt": "it starts raining heavily, but only inside the building/room the characters are in."},
     {"itemName": "enviro: neon cyberpunk rain", "prompt": "the scenery shifts to a futuristic city at night, with neon lights reflecting off constant, oily rain."},
     {"itemName": "enviro: anti-gravity field", "prompt": "loose objects begin to drift around the room, making navigation difficult."},
+    {"itemName": "enviro: underwater bubble", "prompt": "the room is now at the bottom of the ocean, protected by a massive glass dome showing sea life outside."},
+    {"itemName": "enviro: candy land", "prompt": "the entire environment is made of edible candy and sweets, from chocolate rivers to lollipop trees."},
 
     # --- ITEMS: USEABLE ---
     {"itemName": "item: 12\" german sausage", "prompt": "{{user}} now has a 12 inch german sausage in hand"},
@@ -164,6 +184,8 @@ default_action_menu_json = [
     {"itemName": "item: translation fish", "prompt": "a small fish {{user}} can put in their ear to understand every language in the universe."},
     {"itemName": "item: box of random costumes", "prompt": "a giant crate appears; characters must pick a random costume (maid, knight, dinosaur, etc.) and wear it."},
     {"itemName": "item: instant home cinema", "prompt": "the wall becomes a giant screen, popcorn appears, and everyone sits down to watch a movie of {{user}}'s choice."},
+    {"itemName": "item: shrinking ray", "prompt": "the {{user}} now has a ray gun that can shrink any object or person to 1 inch tall for a brief duration."},
+    {"itemName": "item: invisible ink pen", "prompt": "a pen that writes messages only visible under a special 'truth' light which {{user}} also possesses."},
 
     # --- WEAPONS ---
     {"itemName": "weapon: equip hk mp5", "prompt": "{{user}} now has a loaded heckler and koch mp5 in hand"},
@@ -177,6 +199,8 @@ default_action_menu_json = [
     {"itemName": "weapon: freeze ray", "prompt": "a bulky gun that instantly encases targets in a block of ice."},
     {"itemName": "weapon: golden desert eagle", "prompt": "a ridiculously flashy, gold-plated .50 caliber pistol."},
     {"itemName": "weapon: chainsaw sword", "prompt": "a heavy blade with a motorized cutting edge that roars with mechanical fury."},
+    {"itemName": "weapon: lightning staff", "prompt": "a wooden staff that can crackle with electricity and fire bolts of lightning at {{user}}'s command."},
+    {"itemName": "weapon: gravity grenade", "prompt": "a grenade that creates a localized black hole for 5 seconds when thrown, pulling everything nearby toward it."},
 
     # --- ABILITIES: SUPERNATURAL ---
     {"itemName": "ability: psychokinesis", "prompt": "the unseen forces of the world now respond solely to the will of {{user}}. {{user}} can manipulate objects, move them through space, or apply force without physical contact. these actions occur seamlessly, without visible cause, leaving others unaware of {{user}}'s influence. to all other characters, the movements and effects appear natural, coincidental, or inexplicable. explain to {{user}} the new power and what is can do"},
@@ -189,7 +213,9 @@ default_action_menu_json = [
     {"itemName": "ability: shapeshifting", "prompt": "{{user}} can instantly change their appearance to look like any other person or animal."},
     {"itemName": "ability: x-ray vision", "prompt": "{{user}} can see through walls and clothing at will."},
     {"itemName": "ability: photographic memory", "prompt": "{{user}} now remembers every single detail they have ever seen or heard perfectly."},
-    {"itemName": "ability: reality warping", "prompt": "{{user}} can rewrite small details of the physical world just by thinking about them. explain to {{user}}."},
+    {"itemName": "ability: reality warping", "prompt": "you can rewrite small details of the physical world just by thinking about them. explain to {{user}}."},
+    {"itemName": "ability: technopathy", "prompt": "{{user}} can talk to and control any electronic device with their mind. explain to {{user}} the new power."},
+    {"itemName": "ability: echo location", "prompt": "{{user}} can see perfectly in total darkness using sound waves. explain to {{user}} the new power."},
 
     # --- COMPANIONS: COMMENTARY ---
     {"itemName": "companion: sassy ai cube", "prompt": "spawn a hovering device with a holographic face that provides sassy commentary to anything going on around it to the {{user}}. only the {{user}} can see it or hear it. whenever face talks precede it with text 'holographic face'"},
@@ -204,6 +230,8 @@ default_action_menu_json = [
     {"itemName": "companion: noir narrator", "prompt": "the voice of a gritty detective begins narrating {{user}}'s life in the style of a film noir masterpiece. only {{user}} can hear it. precede text with 'narrator'"},
     {"itemName": "companion: hype man", "prompt": "a tiny person appears on {{user}}'s shoulder and yells 'yeah!', 'lets go!', and other hype phrases after everything {{user}} says."},
     {"itemName": "companion: high-pitched squirrel", "prompt": "a squirrel that talks incredibly fast and gives frantic summaries of the characters' actions."},
+    {"itemName": "companion: tiny philosopher", "prompt": "a miniature 3-inch tall version of socrates appears on {{user}}'s shoulder to question their life choices and logic."},
+    {"itemName": "companion: literal 'inner child'", "prompt": "a ghost-like child version of {{user}} appears to give brutally honest and innocent opinions on current events."},
 
     # --- GLITCH / SURREAL ---
     {"itemName": "glitch: lower graphic quality", "prompt": "the world suddenly looks like a low-resolution ps1 game. everything is blocky and pixelated."},
@@ -212,6 +240,123 @@ default_action_menu_json = [
     {"itemName": "glitch: subtitles appear", "prompt": "large yellow subtitles appear in the air whenever anyone speaks."},
     {"itemName": "glitch: lag spike", "prompt": "characters start stuttering and repeating their last three words as if the universe is lagging."},
     {"itemName": "glitch: debug mode enabled", "prompt": "glowing blue boxes and technical data appear over every object, describing their 'properties' and 'scripts'."},
+    {"itemName": "glitch: infinite loop", "prompt": "the characters find that the last 10 seconds of time keep repeating in a loop until {{user}} stops it."},
+    {"itemName": "glitch: texture swap", "prompt": "all materials in the room swap textures (e.g., walls look like fur, characters look like stone)."},
+
+    # --- HORROR: UNSETTLING ---
+    {"itemName": "horror: weeping angel", "prompt": "a stone statue of an angel appears. it only moves when no one is looking at it, getting closer and closer with every blink."},
+    {"itemName": "horror: blood on walls", "prompt": "crimson liquid begins to seep from the walls, forming cryptic words and warnings."},
+    {"itemName": "horror: mirror doppleganger", "prompt": "a character's reflection in a nearby mirror stops mimicking them and begins acting on its own, staring out with malice."},
+    {"itemName": "horror: lights flicker and die", "prompt": "the lighting becomes erratic, and with every flicker, something small about the room changes or moves."},
+    {"itemName": "horror: unidentifiable scratching", "prompt": "the sound of thousands of tiny claws scratching against the walls and ceiling fills the room, getting louder and louder."},
+    {"itemName": "horror: shadows detach", "prompt": "everyone's shadows suddenly detach from their feet and begin prowling around the room as independent entities."},
+    {"itemName": "horror: jumpscare", "prompt": "an terrifying, distorted face suddenly flashes in front of the characters for a fraction of a second, accompanied by a piercing scream."},
+    {"itemName": "horror: the smiling man", "prompt": "a tall, thin man with a wide, fixed grin and unnaturally large eyes appears in a dark corner, standing perfectly still while staring at {{user}}."},
+    {"itemName": "horror: static whispers", "prompt": "the air becomes thick with static noise, and within it, one character hears their own voice whispering their deepest regrets."},
+
+    # --- MAGIC: SPELLS ---
+    {"itemName": "magic: fireball", "prompt": "{{user}} hurls a massive ball of fire that explodes upon impact."},
+    {"itemName": "magic: mass levitation", "prompt": "everyone and everything in the room suddenly floats six feet off the ground, drifting helplessly."},
+    {"itemName": "magic: polymorph (sheep)", "prompt": "{{user}} turns a character into a confused, fluffy white sheep for the next few minutes."},
+    {"itemName": "magic: zone of truth", "prompt": "a shimmering blue circle appears on the floor. anyone inside it is physically unable to tell a lie."},
+    {"itemName": "magic: summon rain of gold", "prompt": "the ceiling disappears and thousands of gold coins rain down, making a deafening clinking noise."},
+    {"itemName": "magic: arcane lock", "prompt": "all exits are sealed with glowing purple runes. they cannot be opened by any physical means."},
+    {"itemName": "magic: mirror image", "prompt": "{{user}} creates three identical illusions of themselves that mimic their every move."},
+    {"itemName": "magic: turn to stone", "prompt": "{{user}} briefly transforms a target character into a solid, unmoving stone statue. they retain their consciousness but cannot move or speak."},
+    {"itemName": "magic: shadow step", "prompt": "{{user}} can instantly teleport between any two shadows in the room, appearing silently behind their target."},
+
+    # --- NATURE: WILDLIFE & WEATHER ---
+    {"itemName": "nature: overgrown vines", "prompt": "thick, thorny vines rapidly grow from the floor, winding around furniture and trapping characters."},
+    {"itemName": "nature: earthquake tremor", "prompt": "a powerful tremor shakes the ground, throwing everyone off balance and breaking fragile objects."},
+    {"itemName": "nature: blooming flowers", "prompt": "the room is suddenly filled with thousands of vibrant, exotic flowers that emit a sweet, intoxicating scent."},
+    {"itemName": "nature: swarm of bees", "prompt": "a massive swarm of angry bees enters the scene, forcing everyone to duck for cover."},
+    {"itemName": "nature: lightning strike", "prompt": "a bolt of lightning strikes exactly where {{user}} is pointing, even if indoors."},
+    {"itemName": "nature: fog of mystery", "prompt": "a thick, pea-soup fog rolls in, making it impossible to see further than arm's length."},
+    {"itemName": "nature: carnivorous plants", "prompt": "the decorative plants in the room suddenly grow teeth and become aggressive, snapping at anyone who gets too close."},
+    {"itemName": "nature: spirit of the storm", "prompt": "a humanoid figure made of wind and rain appears, demanding that the characters respect the power of nature."},
+
+    # --- SCIFI: FUTURE TECH ---
+    {"itemName": "scifi: tractor beam", "prompt": "a blue beam descends from above, pulling a character or object slowly into the sky."},
+    {"itemName": "scifi: holographic disguise", "prompt": "{{user}} activates a device that makes them look exactly like another character present."},
+    {"itemName": "scifi: plasma shield", "prompt": "a shimmering dome of energy surrounds {{user}}, protecting them from all physical and energy attacks."},
+    {"itemName": "scifi: nanobot repair", "prompt": "a cloud of silver dust swarms over a broken object or wounded character, rapidly fixing/healing them."},
+    {"itemName": "scifi: jetpack flight", "prompt": "a mechanical pack appears on {{user}}'s back, blasting them into the air with pillars of blue flame."},
+    {"itemName": "scifi: brain-link", "prompt": "two characters' minds are temporarily linked, allowing them to share thoughts and memories instantly."},
+    {"itemName": "scifi: stasis field", "prompt": "a shimmering blue field freezes time for anything inside it, suspended in a perfect state of stasis until deactivated."},
+    {"itemName": "scifi: gravity boots", "prompt": "{{user}} receives a pair of boots that allow them to walk on walls and ceilings as if they were the floor."},
+
+    # --- OUTFIT: FASHION & ARMOR ---
+    {"itemName": "outfit: maid / butler uniform", "prompt": "a character's clothing is instantly replaced by a crisp, formal maid or butler outfit."},
+    {"itemName": "outfit: heavy plate armor", "prompt": "a character is suddenly encased in thick, glowing steel armor that clanks loudly with every movement."},
+    {"itemName": "outfit: elegant ballgown", "prompt": "a character is now wearing an impossibly beautiful, shimmering ballgown suitable for royalty."},
+    {"itemName": "outfit: superhero spandex", "prompt": "a character's outfit becomes a tight, colorful superhero costume with a dramatic cape."},
+    {"itemName": "outfit: invisibility cloak", "prompt": "{{user}} receives a shimmering, water-like fabric that makes whatever it covers disappear."},
+    {"itemName": "outfit: wet t-shirt effect", "prompt": "a character's clothing becomes soaking wet and translucent, clinging to their body."},
+    {"itemName": "outfit: space suit", "prompt": "characters are suddenly encased in bulky, white high-tech space suits, complete with reflective helmets."},
+    {"itemName": "outfit: royal robes", "prompt": "a character's outfit is replaced by heavy, ornate robes of fur and silk, making them look like a medieval monarch."},
+
+    # --- SOCIAL: STATUS & RELATIONSHIPS ---
+    {"itemName": "social: sudden fame", "prompt": "every character in the scene suddenly recognizes {{user}} as their favorite world-famous celebrity."},
+    {"itemName": "social: irreconcilable debt", "prompt": "a character becomes convinced they owe {{user}} a life-debt that can never be repaid."},
+    {"itemName": "social: scandalous rumor", "prompt": "a shocking and false rumor about a character present becomes common knowledge to everyone else."},
+    {"itemName": "social: marriage proposal", "prompt": "a character suddenly drops to one knee and proposes to {{user}} with a massive diamond ring."},
+    {"itemName": "social: intense rivalry", "prompt": "two characters who were previously friendly suddenly develop an intense, bitter rivalry over a trivial matter."},
+    {"itemName": "social: family reunion", "prompt": "a long-lost and slightly eccentric relative of one of the characters suddenly walks into the scene, acting as if they were invited."},
+    {"itemName": "social: secret twin reveal", "prompt": "a character reveals they have an identical twin who has been impersonating them for half the conversation."},
+
+    # --- MUSIC: SOUNDSCAPE ---
+    {"itemName": "music: dramatic orchestral swell", "prompt": "a massive, cinematic orchestra begins playing a triumphant score that perfectly matches the moment."},
+    {"itemName": "music: 8-bit chiptune", "prompt": "the world's 'sound' becomes crunchy 8-bit music, and every action makes a 'beep' or 'boop' sound."},
+    {"itemName": "music: heavy metal riff", "prompt": "an aggressive electric guitar riff blares out whenever {{user}} speaks or moves."},
+    {"itemName": "music: romantic lo-fi", "prompt": "relaxing, jazzy beats fill the room, making everyone feel mellow and affectionate."},
+    {"itemName": "music: elevator music", "prompt": "the most boring, repetitive instrumental music starts playing, making every dramatic moment feel awkward."},
+    {"itemName": "music: suspenseful heartbeat", "prompt": "a low, rhythmic thumping like a giant heartbeat begins to play, getting louder and faster as the tension in the room rises."},
+    {"itemName": "music: ethereal choir", "prompt": "an angelic, haunting choir begins singing in a language no one understands, making the scene feel divine or otherworldly."},
+
+    # --- FOOD: CULINARY ---
+    {"itemName": "food: endless pizza", "prompt": "a stack of pizza boxes appears, and no matter how many slices are eaten, the boxes are always full."},
+    {"itemName": "food: poison apple", "prompt": "a beautiful, shiny red apple appears in a character's hand. it looks delicious but is incredibly sleep-inducing."},
+    {"itemName": "food: molecular gastronomy", "prompt": "the characters are served a meal that looks like marbles and foam but tastes like a full five-course dinner."},
+    {"itemName": "food: giant birthday cake", "prompt": "a six-foot tall cake appears. someone is hiding inside it, waiting to jump out."},
+    {"itemName": "food: talking cupcake", "prompt": "a single, perfectly frosted cupcake appears that can talk. it begs not to be eaten and offers surprisingly profound life advice."},
+    {"itemName": "food: feast of illusions", "prompt": "a table is filled with incredible food that smells delicious, but anyone who tries to eat it finds their hands passing through it like smoke."},
+
+    # --- TRAVEL: MOVEMENT ---
+    {"itemName": "travel: portal to paris", "prompt": "a shimmering doorway opens, showing a view of the eiffel tower at sunset."},
+    {"itemName": "travel: space elevator", "prompt": "the current room begins to rise rapidly, and the windows show the characters leaving earth's atmosphere."},
+    {"itemName": "travel: ghost ship", "prompt": "a tattered, spectral wooden ship sails through the air, offering to take the characters to the 'underworld'."},
+    {"itemName": "travel: wormhole", "prompt": "a spinning vortex of light and sound appears, threatening to pull everyone to a random point in time and space."},
+    {"itemName": "travel: flying carpet", "prompt": "a luxurious, intricately woven persian rug floats into the room, capable of carrying up to four people through the air."},
+    {"itemName": "travel: ghost train", "prompt": "an ethereal, steam-powered train whistles through the room, its cars filled with shadows who invite the characters to climb aboard."},
+
+    # --- CRIME: UNDERWORLD ---
+    {"itemName": "crime: bank heist plan", "prompt": "blueprints for a major bank appear on the table, and everyone suddenly knows exactly how to rob it."},
+    {"itemName": "crime: bag of stolen jewels", "prompt": "a heavy velvet bag filled with glowing, stolen diamonds appears in {{user}}'s hand."},
+    {"itemName": "crime: police raid", "prompt": "sirens wail as armed police officers kick in the doors and demand everyone put their hands up."},
+    {"itemName": "crime: shady deal", "prompt": "a briefcase full of cash is exchanged between two characters, but one of them is clearly planning a betrayal."},
+    {"itemName": "crime: undercover agent reveal", "prompt": "a character dramatically reveals a badge and a wire, informing everyone they have been an undercover agent the entire time."},
+    {"itemName": "crime: smoke bomb escape", "prompt": "a character throws a smoke bomb, creating a thick cloud that allows them to 'disappear' even if they are still in the same spot."},
+
+    # --- MEDICAL: HEALTH ---
+    {"itemName": "medical: miracle cure", "prompt": "a glowing vial of liquid that can heal any wound or cure any disease instantly."},
+    {"itemName": "medical: amnesia dust", "prompt": "a character is hit with a cloud of sparkling dust that makes them forget the last hour of their life."},
+    {"itemName": "medical: truth serum injection", "prompt": "a character is forcibly injected with a serum that makes them spill their deepest, darkest secrets."},
+    {"itemName": "medical: truth gas", "prompt": "a thick green fog fills the room that makes everyone physically unable to tell a lie, no matter how hard they try."},
+    {"itemName": "medical: x-ray goggles", "prompt": "{{user}} receives goggles that allow them to see through walls, objects, and even the characters' skin to see their internal anatomy."},
+
+    # --- SPORT: ATHLETIC ---
+    {"itemName": "sport: sudden wrestling match", "prompt": "a professional wrestling ring appears, and two characters are forced into a high-flying match with commentary."},
+    {"itemName": "sport: extreme parkour", "prompt": "the environment shifts to a series of rooftops and cranes, and everyone is suddenly an expert at parkour."},
+    {"itemName": "sport: zero-gravity football", "prompt": "the room loses gravity and a glowing ball appears; characters must play a high-speed game to settle an argument."},
+    {"itemName": "sport: mid-air tennis", "prompt": "characters are given glowing rackets and must play an intense match of tennis while hovering 20 feet above the ground."},
+    {"itemName": "sport: gladiatorial combat", "prompt": "the surroundings shift into a roman colosseum, and the characters are given traditional weapons and forced to fight for the crowd's amusement."},
+
+    # --- TOY: PLAYFUL ---
+    {"itemName": "toy: giant ball pit", "prompt": "the floor of the room is suddenly replaced with a deep pit filled with millions of colorful plastic balls."},
+    {"itemName": "toy: sentient lego", "prompt": "thousands of lego bricks crawl together to form a tiny, walking robot that tries to 'build' things out of the furniture."},
+    {"itemName": "toy: remote control car", "prompt": "a tiny, super-fast car appears that {{user}} can control; it seems capable of tripping anyone who walks near it."},
+    {"itemName": "toy: giant slinky", "prompt": "a massive, building-sized metal slinky bounces through the scene, creating a loud clanging noise and knocking over everything in its path."},
+    {"itemName": "toy: bubble wand of trapping", "prompt": "a bubble wand that creates massive, indestructible bubbles capable of trapping characters inside when they are blown on them."},
 
     # --- SYSTEM: PERSONAS ---
     {"itemName": "system: default (no override)", "prompt": "", "isSystem": True},

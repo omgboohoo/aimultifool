@@ -190,13 +190,17 @@ class InferenceMixin:
             self.gpu_layers = actual_layers
             self.call_from_thread(self.notify, f"Model loaded successfully with {actual_layers} layers!")
             self.call_from_thread(self.enable_character_list)
-            self.call_from_thread(self.focus_chat_input)
             self.status_text = "Model Ready"
         else:
             self.call_from_thread(self.notify, "Failed to load model!", severity="error")
             self.status_text = "Load Failed"
-        
+
+        # Setting this False triggers update_ui_state via the reactive watcher.
+        # It must happen AFTER self.llm is set.
         self.call_from_thread(setattr, self, "is_model_loading", False)
+        
+        if self.llm:
+            self.call_from_thread(self.focus_chat_input)
 
     @work(exclusive=True, thread=True)
     def download_default_model(self):

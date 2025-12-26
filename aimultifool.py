@@ -13,7 +13,7 @@ from pathlib import Path
 
 from textual.app import App, ComposeResult
 from textual.containers import Vertical, Horizontal, ScrollableContainer, Container
-from textual.widgets import Header, Input, Static, Label, Button, Select, ListView, ListItem
+from textual.widgets import Header, Input, Static, Label, Button, Select, ListView, ListItem, Collapsible
 from textual.reactive import reactive
 from textual.binding import Binding
 import llama_cpp
@@ -64,6 +64,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     is_downloading = reactive(False)
     is_edit_mode = reactive(False)
     _inference_worker = None
+    _last_action_list = None
 
     def notify(self, message: str, *, title: str = "", severity: str = "information", timeout: float = 1.5) -> None:
         """Override notify to halve the default display time."""
@@ -71,6 +72,10 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
 
     def compose(self) -> ComposeResult:
         yield Header()
+        yield Horizontal(
+            Button("Debug", id="btn-debug", variant="default"),
+            id="top-menu-bar"
+        )
         yield Horizontal(
             Sidebar(id="sidebar"),
             Vertical(
@@ -80,13 +85,13 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                     Horizontal(
                         Button("Stop [^S]", id="btn-stop", variant="default"),
                         Button("Continue [^Enter]", id="btn-continue", variant="default"),
-                        Button("Sidebar [^B]", id="btn-toggle-sidebar", variant="default"),
                         Button("Rewind [^Z]", id="btn-rewind", variant="default"),
                         Button("Restart [^R]", id="btn-restart", variant="default"),
                         Button("Clear [^W]", id="btn-clear-chat", variant="default"),
-                        Button("Quit [^Q]", id="btn-quit", variant="default"),
                         Button("Buy Coffee", id="btn-coffee", variant="default"),
                         Button("Discord", id="btn-discord", variant="default"),
+                        Button("Sidebar [^B]", id="btn-toggle-sidebar", variant="default"),
+                        Button("Quit [^Q]", id="btn-quit", variant="default"),
                         id="action-buttons"
                     ),
                     id="input-container"
@@ -94,12 +99,16 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                 id="main-container"
             ),
             Vertical(
-                Select([], id="select-action-category", prompt="Filter Category"),
-                ListView(id="list-actions"),
-                Button("Enter Edit Mode", id="btn-edit-mode", variant="default"),
                 Horizontal(
+                    Input(placeholder="Search actions...", id="input-action-search"),
+                    Button("Clear", id="btn-clear-search", variant="default", disabled=True),
+                    id="search-container"
+                ),
+                Vertical(id="action-sections"),
+                Vertical(
+                    Button("Enter Edit Mode", id="btn-edit-mode", variant="default"),
                     Button("Add New", id="btn-add-action", variant="default", disabled=True),
-                    Button("Delete", id="btn-delete-action", variant="default", disabled=True),
+                    Button("Delete Selected", id="btn-delete-action", variant="default", disabled=True),
                     classes="action-control-buttons"
                 ),
                 id="right-sidebar"
@@ -144,7 +153,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             except Exception:
                 self.selected_model = ""
 
-        self.title = f"aiMultiFool v0.1.2"
+        self.title = f"aiMultiFool v0.1.3"
         self.query_one("#sidebar").add_class("-visible")
         self.query_one("#right-sidebar").add_class("-visible")
         self.watch_is_loading(self.is_loading)
@@ -190,11 +199,20 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         """Disable or enable UI elements based on app state."""
         is_busy = self.is_model_loading or self.is_downloading
         
-        # Disable/Enable all interactive elements
         for btn in self.query(Button):
             # Always keep Quit, Coffee, and Discord buttons enabled
             if btn.id in ["btn-quit", "btn-coffee", "btn-discord"]:
                 btn.disabled = False
+            elif btn.id in ["btn-add-action", "btn-delete-action"]:
+                # These are only enabled if in edit mode AND not busy
+                btn.disabled = is_busy or not self.is_edit_mode
+            elif btn.id in ["btn-continue", "btn-rewind", "btn-restart", "btn-clear-chat"]:
+                # Disable if busy OR if no model is loaded
+                btn.disabled = is_busy or not self.llm
+            elif btn.id == "btn-clear-search":
+                # Only enabled if there is text in the search box
+                search_val = self.query_one("#input-action-search").value
+                btn.disabled = not bool(search_val.strip())
             else:
                 btn.disabled = is_busy
             
@@ -202,12 +220,16 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             select.disabled = is_busy
             
         for inp in self.query(Input):
-            # is_busy (loading model/downloading) always disables.
-            # is_loading (inference) no longer disables chat-input.
-            inp.disabled = is_busy
+            if inp.id == "chat-input":
+                inp.disabled = is_busy or not self.llm
+            else:
+                inp.disabled = is_busy
             
         self.query_one("#list-characters").disabled = is_busy or not self.llm
-        self.query_one("#list-actions").disabled = is_busy or (not self.llm and not self.is_edit_mode)
+        for lv in self.query(".action-list"):
+            lv.disabled = is_busy or (not self.llm and not self.is_edit_mode)
+        for collapsible in self.query(Collapsible):
+            collapsible.disabled = is_busy
 
     def update_model_list(self):
         models = get_models()
@@ -229,11 +251,13 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     
     def enable_character_list(self):
         self.query_one("#list-characters").disabled = False
-        self.query_one("#list-actions").disabled = False
+        for lv in self.query(".action-list"):
+            lv.disabled = False
     
     def disable_character_list(self):
         self.query_one("#list-characters").disabled = True
-        self.query_one("#list-actions").disabled = True
+        for lv in self.query(".action-list"):
+            lv.disabled = True
     
     def focus_chat_input(self):
         try:
@@ -241,10 +265,13 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         except Exception:
             pass
 
-    def populate_right_sidebar(self, filter_category: str = None):
+    def populate_right_sidebar(self, filter_text="", highlight_item_name=None):
+        filter_text = filter_text.lower()
         right_sidebar = self.query_one("#right-sidebar", Vertical)
-        list_view = self.query_one("#list-actions", ListView)
-        list_view.clear()
+        action_sections = self.query_one("#action-sections", Vertical)
+        
+        # Clear existing sections
+        action_sections.remove_children()
         
         if not self.action_menu_data:
             right_sidebar.remove_class("-visible")
@@ -252,10 +279,10 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             
         right_sidebar.add_class("-visible")
         
+        # Format and categorize data
         if isinstance(self.action_menu_data, list) and len(self.action_menu_data) > 0:
             first_item = self.action_menu_data[0]
             if isinstance(first_item, dict) and "sectionName" in first_item:
-                # Handle legacy nested format
                 flattened = []
                 for section in self.action_menu_data:
                     section_name = section.get("sectionName", "")
@@ -264,49 +291,92 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                         if item.get("itemName") != "-":
                             if section_name == "System Prompts":
                                 item["isSystem"] = True
-                            # Extract category from name if possible (e_g_ "Action: Describe" -> "Action")
                             name = item.get("itemName", "")
                             if ":" in name:
                                 item["category"] = name.split(":", 1)[0].strip()
                             flattened.append(item)
                 self.action_menu_data = flattened
 
-        # Ensure all items have categories extracted
         categories = set()
         for item in self.action_menu_data:
             name = item.get("itemName", "")
             if ":" in name:
                 cat = name.split(":", 1)[0].strip()
                 item["category"] = cat
-                categories.add(cat)
             else:
                 cat = "Other"
                 item["category"] = cat
-                categories.add(cat)
+            categories.add(item["category"])
 
-        # Update category select if not already set or if data changed
-        cat_select = self.query_one("#select-action-category", Select)
-        if not cat_select._options or len(cat_select._options) <= 1:
-            cat_options = [("All", "All")] + sorted([(c, c) for c in categories])
-            cat_select.set_options(cat_options)
-            cat_select.set_options(cat_options)
-            cat_select.value = "All"
-
-        # Sort data alphabetically by itemName
+        # Sort all data
         self.action_menu_data.sort(key=lambda x: x.get("itemName", "").lower())
 
+        # Group by category
+        from collections import defaultdict
+        grouped = defaultdict(list)
         for item in self.action_menu_data:
-            item_name = item.get("itemName", "None")
-            prompt = item.get("prompt", "")
-            is_system = item.get("isSystem", False)
             category = item.get("category", "Other")
+            grouped[category].append(item)
+
+        # Create collapsibles for each category
+        for cat in sorted(grouped.keys()):
+            items = grouped[cat]
+            # Determine if this category contains any matching items
+            list_items = []
+            for item in items:
+                item_name = item.get("itemName", "None")
+                display_name = item_name
+                if ":" in display_name:
+                    display_name = display_name.split(":", 1)[1].strip()
+                
+                prompt = item.get("prompt", "")
+                
+                # Filter logic
+                if filter_text and filter_text not in item_name.lower() and filter_text not in prompt.lower():
+                    continue
+                
+                is_system = item.get("isSystem", False)
+                data_packed = f"{item_name}:::{prompt}:::{is_system}"
+                list_items.append(ListItem(Label(display_name), name=data_packed))
             
-            if filter_category and filter_category != "All" and category != filter_category:
+            if not list_items:
                 continue
 
-            # Pack all data into name attribute to avoid querying children
-            data_packed = f"{item_name}:::{prompt}:::{is_system}"
-            list_view.append(ListItem(Label(item_name), name=data_packed))
+            list_view = ListView(*list_items, classes="action-list")
+            list_view.can_focus = True 
+            
+            # Highlight logic (just to expand the category)
+            is_highlighted_cat = False
+            if highlight_item_name:
+                for li in list_items:
+                    if li.name.startswith(f"{highlight_item_name}:::"):
+                        is_highlighted_cat = True
+                        break
+
+            # Collapse if no filter and not the highlighted category
+            is_collapsed = not bool(filter_text) and not is_highlighted_cat
+            collapsible = Collapsible(list_view, title=cat, collapsed=is_collapsed)
+            action_sections.mount(collapsible)
+            
+            if is_highlighted_cat:
+                self._last_action_list = list_view
+            
+        # Refresh UI state to disable items if no model is loaded
+        self.update_ui_state()
+
+    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
+        """Track which action list was last interacted with."""
+        if event.list_view.has_class("action-list"):
+            self._last_action_list = event.list_view
+
+    def on_collapsible_expanded(self, event: Collapsible.Expanded) -> None:
+        """Allow multiple sections to stay open during search."""
+        # Only enforce single-open behavior if NOT searching
+        search_val = self.query_one("#input-action-search").value
+        if not search_val:
+            for collapsible in self.query(Collapsible):
+                if collapsible != event.collapsible:
+                    collapsible.collapsed = True
 
     async def on_list_view_selected(self, event: ListView.Selected) -> None:
         if not event.item:
@@ -318,7 +388,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                 if card_path:
                     await self.load_character_from_path(card_path)
                     self.focus_chat_input()
-            elif event.list_view.id == "list-actions":
+            elif event.list_view.has_class("action-list"):
                 data_packed = getattr(event.item, "name", "")
                 if ":::" in data_packed:
                     parts = data_packed.split(":::", 2)
@@ -353,6 +423,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                 return
             self.current_character = chara_obj
             self.messages = create_initial_messages(chara_obj, self.user_name)
+            self.update_system_prompt_style(self.style)
             self.query_one("#chat-scroll").remove_children()
             self.notify(f"Loaded character: {Path(card_path).name}")
             if self.llm:
@@ -392,10 +463,6 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             self.notify(f"System prompt added: {name}")
 
     async def on_select_changed(self, event: Select.Changed) -> None:
-        if event.select.id == "select-action-category":
-            self.populate_right_sidebar(event.value)
-            return
-
         has_started = len(self.messages) > 1
         if event.select.id == "select-style":
             self.style = event.value
@@ -425,17 +492,29 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         elif event.input.id == "chat-input":
             if self.is_loading and event.value.strip():
                 await self.action_stop_generation()
+        elif event.input.id == "input-action-search":
+            self.populate_right_sidebar(event.value)
+            self.query_one("#btn-clear-search").disabled = not bool(event.value.strip())
 
     def update_system_prompt_style(self, style: str) -> None:
         if not self.messages: return
         has_started = len(self.messages) > 1
+        
+        style_instruction = get_style_prompt(style)
+        
         if self.current_character:
-            if has_started: self.notify("Style changes don't affect character cards.", severity="information")
-            return
-        new_content = get_style_prompt(style)
+            # We must re-import here to avoid circular imports if any, 
+            # and to safely re-generate the base prompt without style pollution.
+            from character_manager import create_initial_messages
+            temp_msgs = create_initial_messages(self.current_character, self.user_name)
+            base_prompt = temp_msgs[0]["content"]
+            new_content = f"{base_prompt}\n\n[Style Instruction: {style_instruction}]"
+        else:
+            new_content = style_instruction
+
         if self.messages and self.messages[0]["role"] == "system":
             self.messages[0]["content"] = new_content
-            if has_started: self.notify(f"System style updated to: {style.capitalize()}")
+            if has_started: self.notify(f"Style updated: {style.capitalize()}")
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "chat-input":
@@ -480,25 +559,34 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             self.push_screen(AddActionScreen(), self.add_action_callback)
         elif event.button.id == "btn-delete-action":
             self.delete_selected_action()
+        elif event.button.id == "btn-debug":
+            from widgets import DebugContextScreen
+            self.push_screen(DebugContextScreen(self.messages))
+        elif event.button.id == "btn-clear-search":
+            search_input = self.query_one("#input-action-search", Input)
+            search_input.value = ""
+            # The on_input_changed will trigger the re-population
+            search_input.focus()
         elif event.button.id == "btn-edit-mode":
             self.is_edit_mode = not self.is_edit_mode
             btn_edit = self.query_one("#btn-edit-mode", Button)
             btn_add = self.query_one("#btn-add-action", Button)
             btn_del = self.query_one("#btn-delete-action", Button)
-            list_actions = self.query_one("#list-actions")
             
             if self.is_edit_mode:
                 btn_edit.label = "Exit Edit Mode"
                 btn_add.disabled = False
                 btn_del.disabled = False
                 if not self.llm:
-                    list_actions.disabled = False
+                    for lv in self.query(".action-list"):
+                        lv.disabled = False
             else:
                 btn_edit.label = "Enter Edit Mode"
                 btn_add.disabled = True
                 btn_del.disabled = True
                 if not self.llm:
-                    list_actions.disabled = True
+                    for lv in self.query(".action-list"):
+                        lv.disabled = True
         self.focus_chat_input()
 
     def add_action_callback(self, result):
@@ -529,13 +617,21 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             self.action_menu_data.append(new_data)
             self.notify(f"Added action: {new_data['itemName']}")
             
-        self.action_menu_data.sort(key=lambda x: x.get("itemName", "").lower())
         save_action_menu_data(self.action_menu_data)
-        self.populate_right_sidebar(self.query_one("#select-action-category").value)
+        self.populate_right_sidebar(highlight_item_name=new_data.get("itemName"))
 
     def delete_selected_action(self):
-        list_view = self.query_one("#list-actions", ListView)
-        selected_item = list_view.highlighted_child
+        # Find which ListView has the highlighted child
+        selected_item = None
+        if self._last_action_list and self._last_action_list.highlighted_child:
+            selected_item = self._last_action_list.highlighted_child
+        else:
+            # Fallback
+            for lv in self.query(".action-list"):
+                if lv.highlighted_child:
+                    selected_item = lv.highlighted_child
+                    break
+                
         if not selected_item:
              self.notify("No action selected to delete!", severity="warning")
              return
@@ -555,7 +651,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                     break
             
             if found:
-                self.populate_right_sidebar(self.query_one("#select-action-category").value)
+                self.populate_right_sidebar()
             else:
                 self.notify("Could not find action in data!", severity="error")
 

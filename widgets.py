@@ -1,4 +1,5 @@
 import re
+import json
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.screen import ModalScreen
@@ -164,6 +165,7 @@ class AddActionScreen(ModalScreen):
             self.query_one("#name").value = self.edit_data.get("itemName", "")
             self.query_one("#prompt").text = self.edit_data.get("prompt", "") # TextArea uses .text
             self.query_one("#type").value = self.edit_data.get("isSystem", False)
+        self.query_one("#name").focus()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "save":
@@ -176,3 +178,25 @@ class AddActionScreen(ModalScreen):
         elif event.button.id == "cancel":
             self.dismiss(None)
 
+class DebugContextScreen(ModalScreen):
+    """Screen for showing the current chat context."""
+    def __init__(self, messages):
+        super().__init__()
+        self.messages = messages
+
+    def compose(self) -> ComposeResult:
+        context_text = json.dumps(self.messages, indent=2)
+        yield Vertical(
+            Label("Debug: Current Context", classes="dialog-title"),
+            TextArea(context_text, id="debug-text", read_only=True),
+            Horizontal(
+                Button("Close", variant="default", id="close"),
+                classes="buttons"
+            ),
+            id="debug-dialog",
+            classes="modal-dialog"
+        )
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "close":
+            self.dismiss()
