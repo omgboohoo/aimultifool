@@ -27,7 +27,7 @@ from ui_mixin import UIMixin
 from utils import _get_action_menu_data, load_settings, save_settings, DOWNLOAD_AVAILABLE, get_style_prompt, save_action_menu_data
 from character_manager import extract_chara_metadata, process_character_metadata, create_initial_messages, write_chara_metadata
 from ai_engine import get_models
-from widgets import MessageWidget, Sidebar, AddActionScreen, EditCharacterScreen, CharactersScreen, ParametersScreen, AboutScreen, ActionsManagerScreen
+from widgets import MessageWidget, AddActionScreen, EditCharacterScreen, CharactersScreen, ParametersScreen, AboutScreen, ActionsManagerScreen, ModelScreen
 
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     """The main aiMultiFool application."""
@@ -36,7 +36,6 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
 
     BINDINGS = [
-        Binding("ctrl+b", "toggle_sidebar", "Toggle Sidebars"),
         Binding("ctrl+r", "reset_chat", "Restart from first prompt"),
         Binding("ctrl+z", "rewind", "Rewind last exchange"),
         Binding("ctrl+shift+w", "wipe_all", "Clear Chat"),
@@ -75,15 +74,14 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     def compose(self) -> ComposeResult:
         yield Header()
         yield Horizontal(
-            Button("Sidebar", id="btn-toggle-sidebar", variant="default"),
-            Button("Cards", id="btn-cards", variant="default"),
+            Button("Model", id="btn-model-settings", variant="default"),
             Button("Parameters", id="btn-parameters", variant="default"),
+            Button("Cards", id="btn-cards", variant="default"),
             Button("Actions", id="btn-manage-actions", variant="default"),
             Button("About", id="btn-about", variant="default"),
             id="top-menu-bar"
         )
         yield Horizontal(
-            Sidebar(id="sidebar"),
             Vertical(
                 ScrollableContainer(id="chat-scroll"),
                 Container(
@@ -127,26 +125,24 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         self.minp = settings.get("minp", 0.0)
         self.selected_model = settings.get("selected_model", "")
 
-        self.update_model_list()
+
         # Defer character list update until Cards screen is opened
         
         self.action_menu_data = _get_action_menu_data()
         self.populate_right_sidebar()
         
         # Apply UI values
-        self.query_one("#input-username").value = self.user_name
-        self.query_one("#select-context").value = self.context_size
-        self.query_one("#select-gpu-layers").value = self.gpu_layers
-        self.query_one("#select-style").value = self.style
+        # self.query_one("#input-username").value = self.user_name
+        # self.query_one("#select-context").value = self.context_size
+        # self.query_one("#select-gpu-layers").value = self.gpu_layers
+        # self.query_one("#select-style").value = self.style
 
         if self.selected_model:
-            try:
-                self.query_one("#select-model").value = self.selected_model
-            except Exception:
-                self.selected_model = ""
+            # We don't set the widget value here anymore as the modal handles it
+            pass
 
-        self.title = f"aiMultiFool v0.1.5"
-        self.query_one("#sidebar").add_class("-visible")
+        self.title = f"aiMultiFool v0.1.6"
+        # Sidebar is gone
         self.query_one("#right-sidebar").add_class("-visible")
         self.watch_is_loading(self.is_loading)
         self.watch_is_downloading(self.is_downloading)
@@ -161,6 +157,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         self.messages = [{"role": "system", "content": new_content}]
         self.disable_character_list() # Start disabled
         self.show_footer = True
+        
+        self.push_screen(ModelScreen())
 
     def watch_is_loading(self, is_loading: bool) -> None:
         """Called when is_loading (inference) changes."""
@@ -198,7 +196,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         
         for btn in self.query(Button):
             # Always keep these top menu buttons enabled
-            if btn.id in ["btn-about", "btn-cards", "btn-parameters", "btn-toggle-sidebar", "btn-manage-actions"]:
+            if btn.id in ["btn-about", "btn-cards", "btn-parameters", "btn-model-settings", "btn-manage-actions"]:
                 btn.disabled = False
             elif btn.id in ["btn-continue", "btn-rewind", "btn-restart", "btn-clear-chat"]:
                 # Disable if busy OR if no model is loaded
@@ -229,13 +227,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         for collapsible in self.query(Collapsible):
             collapsible.disabled = is_busy
 
-    def update_model_list(self):
-        models = get_models()
-        select = self.query_one("#select-model", Select)
-        options = [(m.name, str(m)) for m in models]
-        select.set_options(options)
-        if options:
-            select.value = options[0][1]
+    # update_model_list moved to ModelScreen
+
 
     def get_card_list(self):
         cards_dir = Path(__file__).parent / "cards"
@@ -488,7 +481,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             self.selected_model = str(event.value)
             if has_started: self.notify(f"Model selected: {Path(event.value).name}")
         self.save_user_settings()
-        self.focus_chat_input()
+        if hasattr(self.screen, "id") and self.screen.id != "model-dialog":
+             self.focus_chat_input()
 
     async def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "input-username":
@@ -534,26 +528,28 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             self.is_loading = True
             self._inference_worker = self.run_inference(user_text)
 
+    def start_model_load(self, model_path, ctx, gpu):
+        """Helper to safely start model loading from modals."""
+        if not model_path:
+            self.notify("Please select a model first!", severity="warning")
+            return
+
+        if self.llm:
+            self.disable_character_list()
+            llama_cpp.llama_backend_free()
+            del self.llm
+            gc.collect()
+            llama_cpp.llama_backend_init()
+            
+        self.is_model_loading = True
+        self.load_model_task(model_path, ctx, gpu)
+
     async def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "btn-load-model":
-            model_path = self.query_one("#select-model").value
-            if not model_path:
-                self.notify("Please select a model first!", severity="warning")
-                return
-            ctx = int(self.query_one("#select-context").value)
-            gpu = int(self.query_one("#select-gpu-layers").value)
-            self.user_name = self.query_one("#input-username").value
-            if self.llm:
-                self.disable_character_list()
-                llama_cpp.llama_backend_free()
-                del self.llm
-                gc.collect()
-                llama_cpp.llama_backend_init()
-            self.is_model_loading = True
-            self.load_model_task(model_path, ctx, gpu)
-        elif event.button.id == "btn-stop": await self.action_stop_generation()
+        if event.button.id == "btn-stop": await self.action_stop_generation()
         elif event.button.id == "btn-continue": await self.action_continue_chat()
-        elif event.button.id == "btn-toggle-sidebar": self.action_toggle_sidebar()
+        # elif event.button.id == "btn-toggle-sidebar": self.action_toggle_sidebar() # Sidebar is gone
+        elif event.button.id == "btn-model-settings":
+             self.push_screen(ModelScreen())
         elif event.button.id == "btn-restart": await self.action_reset_chat()
         elif event.button.id == "btn-rewind": await self.action_rewind()
         elif event.button.id == "btn-clear-chat": await self.action_wipe_all()
@@ -574,9 +570,14 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             self.is_char_edit_mode = not self.is_char_edit_mode
             btn = self.query_one("#btn-char-edit-mode", Button)
             btn.label = "Exit Edit Mode" if self.is_char_edit_mode else "Enter Edit Mode"
+            
             if self.is_char_edit_mode:
                 self.notify("Character Edit Mode: Click a card to edit its metadata")
-        self.focus_chat_input()
+        
+        # Only focus if not in a modal
+        # Check current screen. If it is the App (Screen), then focus.
+        if len(self.screen_stack) <= 1: 
+             self.focus_chat_input()
 
     async def cards_screen_callback(self, result):
         if not result:

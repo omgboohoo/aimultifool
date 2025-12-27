@@ -61,56 +61,126 @@ class MessageWidget(Static):
         else:
             return create_styled_text(self.content)
 
-class Sidebar(Vertical):
-    """The sidebar containing settings and character info."""
+class ModelScreen(ModalScreen):
+    """The modal for model selection and settings."""
     def compose(self) -> ComposeResult:
-        yield Container(
-            Label("Username"),
-            Input(placeholder="Enter your name", id="input-username"),
-            classes="setting-group"
+        yield Vertical(
+            Label("Model Settings", classes="dialog-title"),
+            Container(
+                Label("Username"),
+                Input(placeholder="Enter your name", id="input-username"),
+                classes="setting-group"
+            ),
+            Container(
+                Label("Model"),
+                Select([], id="select-model", prompt="Select a model"),
+                classes="setting-group"
+            ),
+            Container(
+                Label("Context Size"),
+                Select([(str(x), x) for x in [2048, 4096, 8192, 16384, 32768]], id="select-context", value=4096),
+                classes="setting-group"
+            ),
+            Container(
+                Label("GPU Layers"),
+                Select([("All (-1)", -1), ("CPU Only (0)", 0)] + [(str(x), x) for x in range(8, 129, 8)], id="select-gpu-layers", value=-1),
+                classes="setting-group"
+            ),
+            Container(
+                Label("Style"),
+                Select([
+                    ("Concise", "concise"), 
+                    ("Descriptive", "descriptive"),
+                    ("Dramatic", "dramatic"),
+                    ("Action-Oriented", "action"),
+                    ("Internalized", "internalized"),
+                    ("Hardboiled", "hardboiled"),
+                    ("Creative", "creative"),
+                    ("Erotic", "erotic"),
+                    ("Flowery", "flowery"),
+                    ("Minimalist", "minimalist"),
+                    ("Humorous", "humorous"),
+                    ("Dark Fantasy", "dark_fantasy"),
+                    ("Scientific", "scientific"),
+                    ("Casual", "casual"),
+                    ("Historical", "historical"),
+                    ("Horror", "horror"),
+                    ("Surreal", "surreal"),
+                    ("Philosophical", "philosophical"),
+                    ("Gritty", "gritty"),
+                    ("Whimsical", "whimsical")
+                ], id="select-style", value="concise", prompt=""),
+                classes="setting-group"
+            ),
+            Button("Load Model", variant="default", id="btn-load-model"),
+            Horizontal(
+                Button("Close", variant="default", id="btn-close-model"),
+                classes="buttons"
+            ),
+            id="model-dialog",
+            classes="modal-dialog"
         )
-        yield Container(
-            Label("Model"),
-            Select([], id="select-model", prompt="Select a model"),
-            classes="setting-group"
-        )
-        yield Container(
-            Label("Context Size"),
-            Select([(str(x), x) for x in [2048, 4096, 8192, 16384, 32768]], id="select-context", value=4096),
-            classes="setting-group"
-        )
-        yield Container(
-            Label("GPU Layers"),
-            Select([("All (-1)", -1), ("CPU Only (0)", 0)] + [(str(x), x) for x in range(8, 129, 8)], id="select-gpu-layers", value=-1),
-            classes="setting-group"
-        )
-        yield Container(
-            Label("Style"),
-            Select([
-                ("Concise", "concise"), 
-                ("Descriptive", "descriptive"),
-                ("Dramatic", "dramatic"),
-                ("Action-Oriented", "action"),
-                ("Internalized", "internalized"),
-                ("Hardboiled", "hardboiled"),
-                ("Creative", "creative"),
-                ("Erotic", "erotic"),
-                ("Flowery", "flowery"),
-                ("Minimalist", "minimalist"),
-                ("Humorous", "humorous"),
-                ("Dark Fantasy", "dark_fantasy"),
-                ("Scientific", "scientific"),
-                ("Casual", "casual"),
-                ("Historical", "historical"),
-                ("Horror", "horror"),
-                ("Surreal", "surreal"),
-                ("Philosophical", "philosophical"),
-                ("Gritty", "gritty"),
-                ("Whimsical", "whimsical")
-            ], id="select-style", value="concise", prompt=""),
-            classes="setting-group"
-        )
-        yield Button("Load Model", variant="default", id="btn-load-model")
+
+    def on_mount(self) -> None:
+        # Populate fields from app state
+        app = self.app
+        self.query_one("#input-username").value = app.user_name
+        # Validate and set Context Size
+        try:
+            self.query_one("#select-context").value = app.context_size
+        except Exception:
+            self.query_one("#select-context").value = 4096
+
+        # Validate and set GPU Layers
+        try:
+            self.query_one("#select-gpu-layers").value = app.gpu_layers
+        except Exception:
+            self.query_one("#select-gpu-layers").value = -1
+
+        try:
+            self.query_one("#select-style").value = app.style
+        except Exception:
+             self.query_one("#select-style").value = "concise"
+        
+        # Populate models
+        from ai_engine import get_models
+        models = get_models()
+        select_model = self.query_one("#select-model", Select)
+        options = [(m.name, str(m)) for m in models]
+        select_model.set_options(options)
+        
+        if app.selected_model:
+            try:
+                # check if selected model is in options
+                if any(opt[1] == app.selected_model for opt in options):
+                    select_model.value = app.selected_model
+                elif options:
+                    select_model.value = options[0][1]
+            except Exception:
+                pass
+        elif options:
+            select_model.value = options[0][1]
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-close-model":
+            self.dismiss()
+        elif event.button.id == "btn-load-model":
+            try:
+                model_path = self.query_one("#select-model").value
+                ctx = int(self.query_one("#select-context").value)
+                gpu = int(self.query_one("#select-gpu-layers").value)
+                
+                # Update app user name just in case (as Textual might not trigger onChange if focusing away immediately)
+                user_name = self.query_one("#input-username").value
+                self.app.user_name = user_name
+                
+                self.dismiss()
+                self.app.start_model_load(model_path, ctx, gpu)
+            except Exception as e:
+                self.app.notify(f"Error gathering settings: {e}", severity="error")
+        # btn-load-model is handled by the main app via bubbling or we delegate it here?
+        # Standard pattern in this app is bubbling for main actions, but we need to ensure the app can read values.
+        # Since on_select_changed updates app state, bubbling is fine IF app reads from app state, not widgets.
 
 class AddActionScreen(ModalScreen):
     """Screen for adding or editing an action."""

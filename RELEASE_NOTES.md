@@ -1,5 +1,11 @@
 # Release Notes
 
+## v0.1.6
+- **UX**: Moved the sidebar into a "Model" modal that launches on startup for a cleaner interface.
+- **UX**: Reordered top menu items for better flow (Model, Parameters, Cards, Actions, About).
+- **Fix**: Resolved crash when loading settings with invalid/outdated options.
+- **Internal**: Refactored logic to support modal-based parameter loading.
+
 ## v0.1.5: Workflow & Bug Fixes
 - **Action Management Refinement**: 
     - Fixed crash when filtering categories in the Manage Actions modal. 
