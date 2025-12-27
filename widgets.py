@@ -52,12 +52,16 @@ class MessageWidget(Static):
     def on_mount(self):
         if self.role == "user":
             self.add_class("-user")
+        elif self.role == "system":
+            self.add_class("-system")
         else:
             self.add_class("-assistant")
 
     def render(self):
         if self.role == "user":
             return Text(self.content, style="green")
+        elif self.role == "system":
+            return Text(self.content, style="italic #888888")
         else:
             return create_styled_text(self.content)
 
@@ -81,8 +85,8 @@ class ModelScreen(ModalScreen):
                 Select([("All (-1)", -1), ("CPU Only (0)", 0)] + [(str(x), x) for x in range(8, 129, 8)], id="select-gpu-layers", value=-1),
                 classes="setting-group"
             ),
-            Button("Load Model", variant="default", id="btn-load-model"),
             Horizontal(
+                Button("Load Model", variant="default", id="btn-load-model"),
                 Button("Close", variant="default", id="btn-close-model"),
                 classes="buttons"
             ),
@@ -685,8 +689,8 @@ class ActionsManagerScreen(ModalScreen):
         if idx < 0: return
         
         try:
-            category = self.query_one("#input-action-category", Input).value.strip().lower()
-            item_name = self.query_one("#input-action-name", Input).value.strip().lower()
+            category = self.query_one("#input-action-category", Input).value.strip()
+            item_name = self.query_one("#input-action-name", Input).value.strip()
             prompt = self.query_one("#input-action-prompt", TextArea).text
             is_system_val = self.query_one("#select-action-type", Select).value
             is_system = (is_system_val == "true")
@@ -775,7 +779,7 @@ class ActionsManagerScreen(ModalScreen):
             sel = self.query_one("#select-mgmt-filter", Select)
             cat = "custom"
             if sel.value != Select.BLANK:
-                cat = str(sel.value).lower()
+                cat = str(sel.value)
             
             name = "new action"
             

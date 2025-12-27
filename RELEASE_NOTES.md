@@ -1,5 +1,12 @@
 # Release Notes
 
+## v0.1.7: Styling & Transparency
+- **Expanded Style Library**: More than doubled the available narrative styles to 44 distinct presets, including new "Super Dark", "Degenerate", and "Roleplay" themes.
+- **Improved Default Persona**: Replaced the default system prompt with a highly optimized, friendly, and adaptive instruction set.
+- **Transparent System Prompts**: Active system prompts and style instructions are now visible directly in the chat window as informational messages (without polluting the AI context).
+- **Default Style Priority**: The "Default" style is now pinned to the top of the selection list for easy access.
+- **Action Menu Polish**: Improved capitalization and formatting for all default action menu items and prompts.
+
 ## v0.1.6
 - **UX**: Moved the sidebar into a "Model" modal that launches on startup for a cleaner interface.
 - **UX**: Reordered top menu items for better flow (Model, Parameters, Cards, Actions, About).

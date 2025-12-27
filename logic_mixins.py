@@ -305,16 +305,15 @@ class ActionsMixin:
         # 4. Reset messages
         if self.current_character:
             self.messages = create_initial_messages(self.current_character, self.user_name)
-            if hasattr(self, "update_system_prompt_style"):
-                self.update_system_prompt_style(self.style)
         else:
-            style = self.query_one("#select-style").value
-            content = get_style_prompt(style)
-            self.messages = [{"role": "system", "content": content}]
+            self.messages = [{"role": "system", "content": ""}]
         
-        # 5. Clear chat window (same method as Clear/Wipe All)
+        # 5. Clear chat window
         self.query_one("#chat-scroll").remove_children()
         
+        # 6. Apply style and print instructions
+        if hasattr(self, "update_system_prompt_style"):
+            await self.update_system_prompt_style(self.style)
         # 6. Restart the inference
         if self.current_character:
             # For character cards, we send 'continue' to trigger the character's first response
@@ -365,10 +364,13 @@ class ActionsMixin:
         
         self.current_character = None
         self.first_user_message = None
-        style = self.query_one("#select-style").value
-        content = get_style_prompt(style)
-        self.messages = [{"role": "system", "content": content}]
+        self.messages = [{"role": "system", "content": ""}]
+        
         self.query_one("#chat-scroll").remove_children()
+        
+        if hasattr(self, "update_system_prompt_style"):
+            await self.update_system_prompt_style(self.style)
+            
         self.notify("Chat wiped clean.")
 
     async def action_continue_chat(self) -> None:

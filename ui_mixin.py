@@ -12,6 +12,14 @@ class UIMixin:
         chat_scroll.scroll_end(animate=False)
         return msg_widget
 
+    async def add_info_message(self, content: str):
+        """Displays a message in the chat that is NOT added to the LLM context."""
+        chat_scroll = self.query_one("#chat-scroll")
+        msg_widget = MessageWidget("system", content, user_name=self.user_name)
+        await chat_scroll.mount(msg_widget)
+        chat_scroll.scroll_end(animate=False)
+        return msg_widget
+
     def sync_add_assistant_widget(self, content):
         chat_scroll = self.query_one("#chat-scroll")
         msg_widget = MessageWidget("assistant", content, user_name=self.user_name)
@@ -53,7 +61,7 @@ class UIMixin:
 
     def watch_user_name(self, name):
         if hasattr(self, "title"):
-            self.title = f"aiMultiFool v0.1.6 - {name}"
+            self.title = f"aiMultiFool v0.1.7 - {name}"
 
     def watch_is_model_loading(self, loading: bool) -> None:
         try:

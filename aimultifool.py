@@ -108,25 +108,49 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                     Label("Style", classes="sidebar-label"),
                     Select([
                         ("Default", "Default"),
-                        ("Concise", "concise"), 
+                        ("Action-Oriented", "action"),
+                        ("Apocalyptic", "apocalyptic"),
+                        ("Arcane", "arcane"),
+                        ("Biblical", "biblical"),
+                        ("Brutal", "brutal"),
+                        ("Casual", "casual"),
+                        ("Cerebral", "cerebral"),
+                        ("Concise", "concise"),
+                        ("Creative", "creative"),
+                        ("Cyberpunk", "cyberpunk"),
+                        ("Dark Fantasy", "dark_fantasy"),
+                        ("Decadent", "decadent"),
+                        ("Degenerate", "degenerate"),
                         ("Descriptive", "descriptive"),
                         ("Dramatic", "dramatic"),
-                        ("Action-Oriented", "action"),
-                        ("Internalized", "internalized"),
-                        ("Hardboiled", "hardboiled"),
-                        ("Creative", "creative"),
+                        ("Eldritch", "eldritch"),
+                        ("Epic", "epic"),
                         ("Erotic", "erotic"),
                         ("Flowery", "flowery"),
-                        ("Minimalist", "minimalist"),
-                        ("Humorous", "humorous"),
-                        ("Dark Fantasy", "dark_fantasy"),
-                        ("Scientific", "scientific"),
-                        ("Casual", "casual"),
+                        ("Frenzied", "frenzied"),
+                        ("Gritty", "gritty"),
+                        ("Hardboiled", "hardboiled"),
                         ("Historical", "historical"),
                         ("Horror", "horror"),
-                        ("Surreal", "surreal"),
+                        ("Humorous", "humorous"),
+                        ("Idiosyncratic", "idiosyncratic"),
+                        ("Internalized", "internalized"),
+                        ("Lovecraftian", "lovecraftian"),
+                        ("Melancholic", "melancholic"),
+                        ("Minimalist", "minimalist"),
+                        ("Nihilistic", "nihilistic"),
+                        ("Noir", "noir"),
                         ("Philosophical", "philosophical"),
-                        ("Gritty", "gritty"),
+                        ("Psycho Thriller", "psycho_thriller"),
+                        ("Raw", "raw"),
+                        ("Savage", "savage"),
+                        ("Scientific", "scientific"),
+                        ("Shakespearean", "shakespearean"),
+                        ("Sinister", "sinister"),
+                        ("Slang Heavy", "slang_heavy"),
+                        ("Surreal", "surreal"),
+                        ("Twisted", "twisted"),
+                        ("Victorian", "victorian"),
                         ("Whimsical", "whimsical")
                     ], id="select-style", value="Default", allow_blank=False),
                     classes="sidebar-setting-group"
@@ -173,7 +197,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             # We don't set the widget value here anymore as the modal handles it
             pass
 
-        self.title = f"aiMultiFool v0.1.6"
+        self.title = f"aiMultiFool v0.1.7"
         # Sidebar is gone
         self.query_one("#right-sidebar").add_class("-visible")
         self.watch_is_loading(self.is_loading)
@@ -460,7 +484,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                 return
             self.current_character = chara_obj
             self.messages = create_initial_messages(chara_obj, self.user_name)
-            self.update_system_prompt_style(self.style)
+            await self.update_system_prompt_style(self.style)
             self.query_one("#chat-scroll").remove_children()
             self.notify(f"Loaded character: {Path(card_path).name}")
             if self.llm:
@@ -481,7 +505,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         prompt = re.sub(r'\{\{user\}\}', self.user_name, prompt, flags=re.IGNORECASE)
 
         if section_name == "System Prompts":
-            self.set_system_prompt(prompt, item_name)
+            await self.set_system_prompt(prompt, item_name)
         else:
             if not self.current_character and self.first_user_message is None:
                 self.first_user_message = prompt
@@ -491,30 +515,23 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             self.is_loading = True
             self._inference_worker = self.run_inference(prompt)
 
-    def set_system_prompt(self, prompt: str, name: str):
+    async def set_system_prompt(self, prompt: str, name: str):
         if self.messages and self.messages[0]["role"] == "system":
             self.messages[0]["content"] = prompt
             self.notify(f"System prompt set to: {name}")
         else:
             self.messages = [{"role": "system", "content": prompt}, *self.messages]
             self.notify(f"System prompt added: {name}")
+        
+        await self.add_info_message(f"[System Prompt: {name}]\n\n{prompt}")
 
     async def on_select_changed(self, event: Select.Changed) -> None:
-        has_started = len(self.messages) > 1
         if event.select.id == "select-style":
             self.style = event.value
-            self.update_system_prompt_style(event.value)
-        elif event.select.id == "select-context":
-            self.context_size = int(event.value)
-            if has_started: self.notify(f"Context size set to: {event.value}")
-        elif event.select.id == "select-gpu-layers":
-            self.gpu_layers = int(event.value)
-            if has_started: self.notify(f"GPU layers set to: {event.value}")
-        elif event.select.id == "select-model":
-            self.selected_model = str(event.value)
-            if has_started: self.notify(f"Model selected: {Path(event.value).name}")
-        self.save_user_settings()
-        if hasattr(self.screen, "id") and self.screen.id != "model-dialog":
+            await self.update_system_prompt_style(event.value)
+            self.save_user_settings()
+        
+        if len(self.screen_stack) <= 1: 
              self.focus_chat_input()
 
     async def on_input_changed(self, event: Input.Changed) -> None:
@@ -528,7 +545,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             self.populate_right_sidebar(event.value)
             self.query_one("#btn-clear-search").disabled = not bool(event.value.strip())
 
-    def update_system_prompt_style(self, style: str) -> None:
+    async def update_system_prompt_style(self, style: str) -> None:
         if not self.messages: return
         has_started = len(self.messages) > 1
         
@@ -548,6 +565,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             self.messages[0]["content"] = new_content
             if has_started: self.notify(f"Style updated: {style.capitalize()}")
 
+        await self.add_info_message(f"[Style: {style.capitalize()}]\n\n{new_content}")
+
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "chat-input":
             if self.is_loading:
@@ -566,6 +585,12 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         if not model_path:
             self.notify("Please select a model first!", severity="warning")
             return
+
+        # Update app state and persist settings
+        self.selected_model = str(model_path)
+        self.context_size = int(ctx)
+        self.gpu_layers = int(gpu)
+        self.save_user_settings()
 
         if self.llm:
             self.disable_character_list()
