@@ -55,6 +55,8 @@ class InferenceMixin:
         try:
             from llama_cpp import Llama  # Local import to avoid top-level issues if any
             
+            self.call_from_thread(setattr, self, "status_text", f"Thinking (T:{self.temp} P:{self.topp})...")
+            
             stream = self.llm.create_chat_completion(
                 messages=messages_to_use,
                 max_tokens=self.context_size - 100,
@@ -62,6 +64,7 @@ class InferenceMixin:
                 top_p=self.topp,
                 top_k=self.topk,
                 repeat_penalty=self.repeat,
+                min_p=self.minp,
                 stream=True
             )
             
@@ -380,6 +383,11 @@ class ActionsMixin:
             "user_name": self.user_name,
             "context_size": self.context_size,
             "style": self.style,
-            "selected_model": self.selected_model
+            "selected_model": self.selected_model,
+            "temp": self.temp,
+            "topp": self.topp,
+            "topk": self.topk,
+            "repeat": self.repeat,
+            "minp": self.minp
         }
         save_settings(settings)

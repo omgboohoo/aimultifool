@@ -48,11 +48,14 @@ Button:enabled:hover {
 #top-menu-bar Button {
     height: 3;
     border: none;
-    min-width: 10;
+    min-width: 12;
+    margin: 0 1;
+    text-style: bold;
 }
 
 #top-menu-bar Button:hover {
-    background: $boost;
+    background: $accent;
+    color: $text;
 }
 
 #sidebar {
@@ -170,7 +173,7 @@ MessageWidget.-assistant {
 
 #action-buttons Button {
     margin: 0 1;
-    min-width: 16;
+    min-width: 12;
     border: tall $background;
     background: $surface;
     text-style: bold;
@@ -263,12 +266,121 @@ AddActionScreen {
     overflow-y: auto;
 }
 
-DebugContextScreen {
+ContextWindowScreen {
+    align: center middle;
+}
+
+CharactersScreen {
     align: center middle;
 }
 
 EditCharacterScreen {
     align: center middle;
+}
+
+ParametersScreen {
+    align: center middle;
+}
+
+AboutScreen {
+    align: center middle;
+}
+
+ActionsManagerScreen {
+    align: center middle;
+}
+
+#actions-dialog {
+    width: 80%;
+    height: 80%;
+    max-height: 90%;
+}
+
+#about-dialog {
+    width: 50;
+    height: auto;
+    padding: 1;
+}
+
+.about-buttons-list {
+    margin: 1 0;
+    height: auto;
+    align: center middle;
+}
+
+.about-btn {
+    margin-bottom: 1;
+    width: 42;
+}
+
+#characters-dialog {
+    width: 80%;
+    height: 80%;
+    max-height: 90%;
+}
+
+#parameters-dialog {
+    width: 60;
+    height: auto;
+    padding: 1;
+}
+
+#parameters-dialog .setting-group {
+    height: auto;
+    margin-bottom: 0;
+}
+
+#parameters-dialog .setting-group Input {
+    height: 1;
+    border: none;
+    padding: 0 1;
+    margin-bottom: 1;
+}
+
+#management-split {
+    height: 1fr;
+    margin: 1 0;
+}
+
+.pane-left {
+    width: 35;
+    background: $boost;
+    padding: 1;
+    border-right: solid $primary;
+}
+
+.pane-right {
+    width: 1fr;
+    background: $boost;
+    padding: 1;
+}
+
+#characters-dialog ListView {
+    height: 1fr;
+    background: transparent;
+}
+
+#characters-dialog TextArea {
+    height: 1fr;
+    border: none;
+    background: transparent;
+}
+
+#search-replace-container {
+    height: auto;
+    margin-bottom: 1;
+    padding: 0;
+}
+
+#search-replace-container Input {
+    width: 1fr;
+    height: 3;
+    margin-right: 1;
+}
+
+#search-replace-container Button {
+    width: 15;
+    height: 3;
 }
 
 #edit-character-dialog {
@@ -281,13 +393,13 @@ EditCharacterScreen {
     margin: 1 0;
 }
 
-#debug-dialog {
+#context-window-dialog {
     width: 80%;
     height: 80%;
     max-height: 90%;
 }
 
-#debug-text {
+#context-text {
     height: 1fr;
     margin: 1 0;
     border: solid $primary;
@@ -300,6 +412,11 @@ EditCharacterScreen {
     color: $accent;
     margin-top: 1;
     margin-bottom: 0;
+}
+
+.dialog-title:focus {
+    text-style: bold;
+    color: $accent;
 }
 
 .modal-dialog .label {

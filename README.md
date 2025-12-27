@@ -1,88 +1,98 @@
 # aiMultiFool v0.1.4
 
-The Premium Linux Terminal-Based Sandbox for Private AI Roleplay. Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favorite SillyTavern character cards with zero lag and full privacy.
+**The Premium Linux Terminal-Based Sandbox for Private AI Roleplay.** 
+Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favorite SillyTavern character cards with zero lag and full privacy.
 
 *Vibe coded in Antigravity with Gemini 3 Flash using Linux Mint*
 
-## Features
+---
 
-- 🎭 **Character Card Support**: Load SillyTavern PNG cards directly from the sidebar. Includes a built-in **Metadata Editor** to view and modify character data without leaving the app.
+## ✨ Features
+
+- 🎭 **Character Card Support**: Load SillyTavern PNG cards directly from the top menu. Includes a built-in **Metadata Editor** to modify character data without leaving the app. Supports raw text metadata for maximum compatibility.
 - ⚡ **Real-time Metrics**: Live TPS, Token counts, and Context % usage.
-- 💾 **Smart Pruning**: Automatically manages context window by trimming old history.
-- 💻 **GPU/CPU Auto-Detection**: Optimized layer loading with configuration caching.
+- 💾 **Smart Pruning**: Automatically manages context window by trimming middle-history while preserving the System Prompt and latest messages.
+- � **GPU/CPU Auto-Detection**: Optimized layer loading with configuration caching for faster subsequent loads.
 - 🎨 **Minimalist TUI**: Pure Textual interface styled via external `.tcss` for fast, clean roleplay aesthetics.
-- 🏗️ **Advanced Modular Architecture**: State-of-the-art codebase using Mixins, separate logic/UI modules, and external styling for maximum maintainability.
-- 🎭 **Narrative Styles**: Choose from 20 custom presets covering a wide range of tones including Concise, Descriptive, Dramatic, Horror, Whimsical, Erotic, and more.
-- 🔧 **Sidebar Controls**: Left Sidebar for Model selection, Context Size, GPU layers, and AI sampling.
-- 💬 **Action Sidebar**: Right Sidebar (Action Menu) containing roleplay tools and system prompts. Features a full in-app **Editor** to add, modify, or delete custom actions instantly. Includes **Real-time Search** and auto-expanding categories.
-- 🪲 **Debug Tools**: Built-in **Debug Context Viewer** to inspect the raw JSON context and system prompts being sent to the LLM.
-- ✨ **Dynamic Messaging**: Instant message mounting and rendering with automatic scroll-to-bottom for a fluid roleplay experience.
-- 💾 **Settings Persistence**: Your Username, Model, and UI preferences are saved and reloaded automatically.
-- ⌨️ **Keyboard Guided**: Fast shortcuts for Rewinding, Stopping, and Sidebars toggle.
+- 🏗️ **Advanced Modular Architecture**: State-of-the-art codebase using Mixins and separate UI/Logic modules for maximum maintainability.
+- 🎭 **Narrative Styles**: Choose from 20 custom presets covering a wide range of tones including Concise, Descriptive, Dramatic, Horror, Whimsical, and more.
+- 🔧 **Advanced AI Parameters**: Precise control over Temperature, Top P, Top K, Repeat Penalty, and the modern **Min P**.
+- 💬 **Action Sidebar**: Right Sidebar containing roleplay tools and system prompts. Features a full in-app **Action Manager** with real-time search and category filtering.
+- 🪲 **Context Window Viewer**: Inspect the raw JSON context and system prompts being sent to the LLM (via the About menu).
 
-## Installation
+---
 
-1. Clone and enter the directory:
+## 🚀 Installation & Quick Start
+
+1. **Clone and Enter**:
    ```bash
    git clone https://github.com/omgboohoo/aimultifool.git
    cd aiMultiFool
    ```
 
-2. Run the launch script:
+2. **Launch**:
    ```bash
    chmod +x run.sh
    ./run.sh
    ```
 
 > [!TIP]
-> **GPU Acceleration**: On first launch, `run.sh` will automatically download a **Universal Multi-Arch Wheel** (~339MB) from our website to enable CUDA support. This pre-built binary is optimized for GTX 10-series, RTX 20-series, RTX 30-series, and RTX 40-series GPUs. **Note:** You must have NVIDIA Drivers and the CUDA runtime libraries installed on your system (see below).
+> **GPU Acceleration**: On first launch, `run.sh` will automatically download a **Universal Multi-Arch Wheel** (~339MB) to enable CUDA support across GTX 10-series through RTX 40-series GPUs.
 
-## Requirements
+---
+
+## ⌨️ Essential Shortcuts
+
+| Shortcut | Action |
+| :--- | :--- |
+| **Ctrl+B** | Toggle Sidebars (Settings & Action Menu) |
+| **Ctrl+S** | Stop AI generation |
+| **Ctrl+Enter** | Send prompt or trigger AI "Continue" |
+| **Ctrl+Z** | Rewind (Undo last user/assistant interaction) |
+| **Ctrl+R** | Restart conversation from the beginning |
+| **Ctrl+Shift+W** | Clear chat history completely |
+| **Ctrl+Q** | Quit Application |
+
+---
+
+## 🧠 Understanding Sampling (Chaos Mode)
+
+If you've ever set **Temperature** to 2.0 and noticed the AI still sounds perfectly sane, it's because of the **Sampling Order**. Parameters act like a series of filters (or "Bouncers").
+
+1. **The Bouncers (Top P / Top K)**: These act first. If Top P is 0.9 and Top K is 40, they "execute" 99.9% of possible word choices before the dice are even rolled. Usually, only a few "safe" words remain.
+2. **The Dice (Temperature)**: Temperature then tries to "scramble" the remaining choices. But if the Bouncers only left a few boring words, Temperature has nothing to work with.
+
+### To Induce Chaos:
+1. Open the **Parameters** modal (top menu).
+2. Set **Top P** to `1.0` and **Top K** to `0` (stands down the bouncers).
+3. Set **Temperature** to `1.8` or higher.
+4. Set **Min P** to `0.05` for "smart" chaos.
+
+---
+
+## 🛠️ Requirements
 
 - **Python 3.12+**
 - **Linux** (Ubuntu/Debian/Mint recommended)
-- **NVIDIA GPU** (Optional, for acceleration)
-  - Requires **NVIDIA Drivers** installed.
-  - Requires **CUDA Runtime** libraries:
-    ```bash
-    sudo apt install nvidia-cuda-toolkit-runtime
-    ```
-- **Windows** (Coming Soon)
-- **Compatible GGUF models** (Auto-downloads default if missing)
+- **NVIDIA GPU** (Optional) - Requires Drivers and CUDA Runtime:
+  ```bash
+  sudo apt install nvidia-cuda-toolkit-runtime
+  ```
+- **Models**: GGUF format (Auto-downloads **L3-8B-Stheno-v3.2** as default)
 
-## Usage
+---
 
-- **Sidebars (Ctrl+B)**: Toggle both Settings/Character selection (left) and Action Menu (right).
-- **Stop (Ctrl+S)**: Interrupt the AI while it's typing.
-- **Continue (Ctrl+Enter)**: Trigger the AI to continue its thought or respond to an empty prompt.
-- **Rewind (Ctrl+Z)**: Remove the last interaction (your prompt and the AI's reply).
-- **Restart (Ctrl+R)**: Reset conversation to the start.
-- **Clear (Ctrl+Shift+W)**: Wipe chat history completely.
-- **Quit (Ctrl+Q)**: Exit application.
+## 📦 Recommended Models
 
-Place your `.gguf` files in `models/` and SillyTavern cards in `cards/`.
+- **Default**: [L3-8B-Stheno-v3.2-Q4_K_M](https://huggingface.co/bartowski/L3-8B-Stheno-v3.2-GGUF) (~5.2 GB)
+- **High Quality**: [MN-12B-Mag-Mell-R1](https://huggingface.co/mradermacher/MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF) (i1-Q4_K_M recommended)
 
-#### Recommended Models
+---
 
-**Default Model:**
-- **L3-8B-Stheno-v3.2-Q4_K_M** - Automatically downloaded if no models are found
-  - Size: ~5.2 GB
-  - Source: [bartowski/L3-8B-Stheno-v3.2-GGUF](https://huggingface.co/bartowski/L3-8B-Stheno-v3.2-GGUF)
+## ❤️ Support & Community
 
-**Recommended 12B Model:**
-- **MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF** - High-quality 12B parameter model
-  - Recommended quants:
-    - `i1-Q4_K_S` (7.2 GB) - Optimal size/speed/quality balance
-    - `i1-Q4_K_M` (7.6 GB) - Fast, recommended
-    - `i1-Q5_K_M` (8.8 GB) - Higher quality option
-    - `i1-Q6_K` (10.2 GB) - Highest quality
-  - Source: [mradermacher/MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF](https://huggingface.co/mradermacher/MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF)
+- ☕ **Support**: [Buy me a coffee on Ko-fi](https://ko-fi.com/aimultifool)
+- 💬 **Discord**: [Join our community](https://discord.com/invite/J5vzhbmk35)
 
-## Support the Developer
+**License**: GPLv3
 
-If you find aiMultiFool useful and want to support its development, you can buy me a coffee! Your support helps keep the project alive and growing.
-
-https://ko-fi.com/aimultifool
-
-## License
-GPLv3

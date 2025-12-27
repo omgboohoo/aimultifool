@@ -11,9 +11,17 @@ aiMultiFool is designed with a "Privacy First" architecture. All Large Language 
 
 ### ✅ Model Download (User-Initiated)
 - **Scope**: Only triggered if the `models/` directory is empty.
-- **Action**: Downloads the default GGUF model from Hugging Face via HTTPS.
-- **Privacy**: No user-specific data, chat history, or identifiers are transmitted during this request.
-- **Control**: User is notified via the TUI when a download starts.
+- **Action**: Downloads the default GGUF model (`L3-8B-Stheno`) from Hugging Face via HTTPS.
+- **Privacy**: No user-specific data, chat history, or identifiers are transmitted.
+
+### ✅ Binary Delivery (First Launch)
+- **Action**: The `run.sh` script downloads a Universal Multi-Arch CUDA Wheel (~339MB) from `aimultifool.com`.
+- **Purpose**: Strictly for delivering the pre-compiled `llama-cpp-python` backend to ensure GPU acceleration.
+- **Privacy**: This is a direct file download with no telemetry attached.
+
+### ✅ External Integration (Links)
+- **Action**: Clicking community links (Discord, Ko-fi, Website) opens the target URL in your **system's default web browser**.
+- **Control**: The app itself does not possess an internal web engine and does not track click-through rates.
 
 ### ✅ Zero Telemetry/Analytics
 - No background pings, heartbeat checks, or usage tracking.
@@ -24,35 +32,30 @@ aiMultiFool is designed with a "Privacy First" architecture. All Large Language 
 
 ## 3. Data Persistence & Storage
 
-### 📁 `model_cache.json` (Local Only)
-- **Content**: Technical configuration mappings between model filenames and the optimal number of GPU layers.
-- **Privacy**: Contains no personal data or conversation fragments.
-- **Risk**: Low. Stores local file paths of model files.
+### 📁 Technical Config (Local Only)
+- **`model_cache.json`**: Maps model paths to successful GPU layer counts to speed up loading.
+- **`settings.json`**: Persists UI preferences (Username, Context Size, Sampling Params).
+- **`action_menu.json`**: Stores your custom roleplay prompts.
+- **Git Protection**: These files are automatically ignored by Git to prevent accidental sharing of local settings.
 
-### 📁 `settings.json` (Local Only)
-- **Content**: Persists user UI preferences including:
-    - Username
-    - Preferred Model
-    - Context Size
-    - GPU Layer settings
-    - Narrative Style choice
-- **Git Protection**: Both `settings.json` and `action_menu.json` are automatically added to `.gitignore` to prevent accidental sharing of local configuration or persona-specific actions.
+### 🎭 Character Metadata (Local Only)
+- **Metadata Editing**: The built-in character editor operates strictly on local PNG files.
+- **In-App Processing**: Metadata extraction and injection handle binary `zTXt/tEXt` chunks locally using standard Python libraries.
 
 ### 🧠 In-Memory Conversation
 - **Chat History**: Held strictly in system RAM during the session.
-- **Persistence**: **Zero**. Chat history is not saved to disk or exported unless manually copied by the user. Closing the application wipes the current session permanently.
+- **Persistence**: **Zero**. Chat history is not saved to disk. Closing the application permanently wipes the current session.
 
 ---
 
 ## 4. Dependencies Review
-
-All core dependencies are industry-standard, open-source libraries:
 - **`llama-cpp-python`**: Local C++ bindings for inference.
-- **`textual` / `rich`**: TUI framework and console styling (Terminal-only).
-- **`requests` / `tqdm`**: Only used for the optional model download phase.
-- **`advanced modular architecture`**: Core logic is isolated into specialized Mixins (`logic_mixins.py`, `ui_mixin.py`) and modules, allowing for granular security audits of inference, character handling, and UI event logic.
+- **`textual` / `rich`**: TUI framework (Terminal-only).
+- **`requests`**: Only used for initiated model downloads.
+- **`advanced modular architecture`**: Logic is isolated into Mixins, allowing for transparent auditing of how data flows between the UI and the AI engine.
 
 ---
 
 ## 5. Privacy Guarantee
 aiMultiFool **cannot** see, read, or store your conversations. Your roleplay sessions are entirely your own and exist only as long as the application window is open.
+

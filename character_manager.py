@@ -37,8 +37,10 @@ def extract_chara_metadata(png_path):
 def write_chara_metadata(png_path, metadata_json):
     """Write character metadata back to SillyTavern PNG card"""
     try:
-        # Convert metadata to JSON and then to Base64
-        json_str = json.dumps(metadata_json)
+        if isinstance(metadata_json, str):
+            json_str = metadata_json
+        else:
+            json_str = json.dumps(metadata_json)
         b64_data = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
 
         with open(png_path, 'rb') as f:
@@ -104,28 +106,51 @@ def process_character_metadata(chara_json, user_name):
     try:
         # Replace {{user}} with the user's name, case-insensitive
         chara_json_processed = re.sub(r'\{\{user\}\}', user_name, chara_json, flags=re.IGNORECASE)
-        chara_obj = json.loads(chara_json_processed)
+        try:
+            chara_obj = json.loads(chara_json_processed)
+        except Exception:
+            # Fallback: treat raw text as description if not valid JSON
+            chara_obj = {"name": "Imported Card", "description": chara_json_processed}
         
         # Simplified processing
         talk_prompt = chara_obj.get("talk_prompt", "")
         depth_prompt = chara_obj.get("depth_prompt", "")
         return chara_obj, talk_prompt, depth_prompt
     except Exception:
-        return None, None, None
+        return {"description": chara_json}, "", ""
 
 def create_initial_messages(chara_obj, user_name):
     """Creates initial system message from character object."""
-    chara_json_str = json.dumps(chara_obj)
-    chara_json_processed = re.sub(r'\{\{user\}\}', user_name, chara_json_str, flags=re.IGNORECASE)
-    chara_obj_processed = json.loads(chara_json_processed)
-    
-    talk_prompt = chara_obj_processed.get("talk_prompt", "")
-    depth_prompt = chara_obj_processed.get("depth_prompt", "")
-    data_section = chara_obj_processed.get('data', chara_obj_processed)
-    modified_data_json_string = json.dumps(data_section)
-    
-    system_prompt = f"{talk_prompt}{depth_prompt}roleplay the following scene defined in the json. do not break from your character\n{modified_data_json_string}"
-    return [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": ""}
-    ]
+    try:
+        if isinstance(chara_obj, dict):
+            chara_json_str = json.dumps(chara_obj)
+        else:
+            chara_json_str = str(chara_obj)
+            
+        chara_json_processed = re.sub(r'\{\{user\}\}', user_name, chara_json_str, flags=re.IGNORECASE)
+        
+        try:
+            chara_obj_processed = json.loads(chara_json_processed)
+        except Exception:
+            # If still not JSON, use the processed string directly
+            return [
+                {"role": "system", "content": f"Roleplay the following: {chara_json_processed}"},
+                {"role": "user", "content": ""}
+            ]
+        
+        talk_prompt = chara_obj_processed.get("talk_prompt", "")
+        depth_prompt = chara_obj_processed.get("depth_prompt", "")
+        data_section = chara_obj_processed.get('data', chara_obj_processed)
+        
+        if isinstance(data_section, dict):
+            modified_data_json_string = json.dumps(data_section)
+        else:
+            modified_data_json_string = str(data_section)
+        
+        system_prompt = f"{talk_prompt}{depth_prompt}roleplay the following scene defined in the data. do not break from your character\n{modified_data_json_string}"
+        return [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": ""}
+        ]
+    except Exception as e:
+        return [{"role": "system", "content": f"Roleplay error: {e}"}, {"role": "user", "content": ""}]

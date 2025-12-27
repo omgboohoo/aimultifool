@@ -9,6 +9,7 @@ import gc
 import asyncio
 import re
 import webbrowser
+import json
 from pathlib import Path
 
 from textual.app import App, ComposeResult
@@ -26,7 +27,7 @@ from ui_mixin import UIMixin
 from utils import _get_action_menu_data, load_settings, save_settings, DOWNLOAD_AVAILABLE, get_style_prompt, save_action_menu_data
 from character_manager import extract_chara_metadata, process_character_metadata, create_initial_messages, write_chara_metadata
 from ai_engine import get_models
-from widgets import MessageWidget, Sidebar, AddActionScreen, EditCharacterScreen
+from widgets import MessageWidget, Sidebar, AddActionScreen, EditCharacterScreen, CharactersScreen, ParametersScreen, AboutScreen, ActionsManagerScreen
 
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     """The main aiMultiFool application."""
@@ -55,6 +56,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     topp = reactive(0.9)
     topk = reactive(40)
     repeat = reactive(1.0)
+    minp = reactive(0.0)
     selected_model = reactive("")
     current_character = reactive(None)
     first_user_message = reactive(None)
@@ -62,7 +64,6 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     is_loading = reactive(False)
     is_model_loading = reactive(False)
     is_downloading = reactive(False)
-    is_edit_mode = reactive(False)
     is_char_edit_mode = reactive(False)
     _inference_worker = None
     _last_action_list = None
@@ -74,7 +75,11 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     def compose(self) -> ComposeResult:
         yield Header()
         yield Horizontal(
-            Button("Debug", id="btn-debug", variant="default"),
+            Button("Sidebar", id="btn-toggle-sidebar", variant="default"),
+            Button("Cards", id="btn-cards", variant="default"),
+            Button("Parameters", id="btn-parameters", variant="default"),
+            Button("Actions", id="btn-manage-actions", variant="default"),
+            Button("About", id="btn-about", variant="default"),
             id="top-menu-bar"
         )
         yield Horizontal(
@@ -84,15 +89,11 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                 Container(
                     Input(placeholder="Type your message here...", id="chat-input"),
                     Horizontal(
-                        Button("Stop [^S]", id="btn-stop", variant="default"),
-                        Button("Continue [^Enter]", id="btn-continue", variant="default"),
-                        Button("Rewind [^Z]", id="btn-rewind", variant="default"),
-                        Button("Restart [^R]", id="btn-restart", variant="default"),
-                        Button("Clear [^W]", id="btn-clear-chat", variant="default"),
-                        Button("Buy Coffee", id="btn-coffee", variant="default"),
-                        Button("Discord", id="btn-discord", variant="default"),
-                        Button("Sidebar [^B]", id="btn-toggle-sidebar", variant="default"),
-                        Button("Quit [^Q]", id="btn-quit", variant="default"),
+                        Button("Stop", id="btn-stop", variant="default"),
+                        Button("Continue", id="btn-continue", variant="default"),
+                        Button("Rewind", id="btn-rewind", variant="default"),
+                        Button("Restart", id="btn-restart", variant="default"),
+                        Button("Clear", id="btn-clear-chat", variant="default"),
                         id="action-buttons"
                     ),
                     id="input-container"
@@ -106,12 +107,6 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                     id="search-container"
                 ),
                 Vertical(id="action-sections"),
-                Vertical(
-                    Button("Enter Edit Mode", id="btn-edit-mode", variant="default"),
-                    Button("Add New", id="btn-add-action", variant="default", disabled=True),
-                    Button("Delete Selected", id="btn-delete-action", variant="default", disabled=True),
-                    classes="action-control-buttons"
-                ),
                 id="right-sidebar"
             ),
             id="main-layout"
@@ -125,14 +120,15 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         self.context_size = settings.get("context_size", 4096)
         self.gpu_layers = -1
         self.style = settings.get("style", "concise")
-        self.temp = 0.8
-        self.topp = 0.9
-        self.topk = 40
-        self.repeat = 1.0
+        self.temp = settings.get("temp", 0.8)
+        self.topp = settings.get("topp", 0.9)
+        self.topk = settings.get("topk", 40)
+        self.repeat = settings.get("repeat", 1.0)
+        self.minp = settings.get("minp", 0.0)
         self.selected_model = settings.get("selected_model", "")
 
         self.update_model_list()
-        self.update_character_list()
+        # Defer character list update until Cards screen is opened
         
         self.action_menu_data = _get_action_menu_data()
         self.populate_right_sidebar()
@@ -142,11 +138,6 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         self.query_one("#select-context").value = self.context_size
         self.query_one("#select-gpu-layers").value = self.gpu_layers
         self.query_one("#select-style").value = self.style
-        
-        self.query_one("#input-temp").value = f"{self.temp:.2f}"
-        self.query_one("#input-topp").value = f"{self.topp:.2f}"
-        self.query_one("#input-topk").value = str(self.topk)
-        self.query_one("#input-repeat").value = f"{self.repeat:.2f}"
 
         if self.selected_model:
             try:
@@ -192,9 +183,6 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         """Called when is_model_loading changes."""
         self.update_ui_state()
 
-    def watch_is_edit_mode(self, is_edit_mode: bool) -> None:
-        """Called when is_edit_mode changes."""
-        self.update_ui_state()
         
     def watch_is_char_edit_mode(self, is_char_edit_mode: bool) -> None:
         """Called when is_char_edit_mode changes."""
@@ -209,12 +197,9 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         is_busy = self.is_model_loading or self.is_downloading
         
         for btn in self.query(Button):
-            # Always keep Quit, Coffee, and Discord buttons enabled
-            if btn.id in ["btn-quit", "btn-coffee", "btn-discord"]:
+            # Always keep these top menu buttons enabled
+            if btn.id in ["btn-about", "btn-cards", "btn-parameters", "btn-toggle-sidebar", "btn-manage-actions"]:
                 btn.disabled = False
-            elif btn.id in ["btn-add-action", "btn-delete-action"]:
-                # These are only enabled if in edit mode AND not busy
-                btn.disabled = is_busy or not self.is_edit_mode
             elif btn.id in ["btn-continue", "btn-rewind", "btn-restart", "btn-clear-chat"]:
                 # Disable if busy OR if no model is loaded
                 btn.disabled = is_busy or not self.llm
@@ -234,10 +219,13 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             else:
                 inp.disabled = is_busy
             
-        self.query_one("#list-characters").disabled = is_busy or (not self.llm and not self.is_char_edit_mode)
-        self.query_one("#btn-char-edit-mode").disabled = is_busy
+        try:
+            self.query_one("#list-characters").disabled = is_busy or (not self.llm and not self.is_char_edit_mode)
+            self.query_one("#btn-char-edit-mode").disabled = is_busy
+        except Exception:
+            pass
         for lv in self.query(".action-list"):
-            lv.disabled = is_busy or (not self.llm and not self.is_edit_mode)
+            lv.disabled = is_busy or not self.llm
         for collapsible in self.query(Collapsible):
             collapsible.disabled = is_busy
 
@@ -249,23 +237,35 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         if options:
             select.value = options[0][1]
 
-    def update_character_list(self):
+    def get_card_list(self):
         cards_dir = Path(__file__).parent / "cards"
         if not cards_dir.exists():
             cards_dir.mkdir(parents=True, exist_ok=True)
-        cards = list(cards_dir.glob("*.png"))
-        list_view = self.query_one("#list-characters", ListView)
-        list_view.clear()
-        for card in sorted(cards):
-            list_view.append(ListItem(Label(card.name), name=str(card)))
+        return sorted(list(cards_dir.glob("*.png")))
+
+    def update_character_list(self):
+        cards = self.get_card_list()
+        # Try to find the list-characters widget on the current screen
+        lvs = self.query("#list-characters")
+        if lvs:
+            list_view = lvs.first()
+            list_view.clear()
+            for card in cards:
+                list_view.append(ListItem(Label(card.name), name=str(card)))
     
     def enable_character_list(self):
-        self.query_one("#list-characters").disabled = False
+        try:
+            self.query_one("#list-characters").disabled = False
+        except Exception:
+            pass
         for lv in self.query(".action-list"):
             lv.disabled = False
     
     def disable_character_list(self):
-        self.query_one("#list-characters").disabled = True
+        try:
+            self.query_one("#list-characters").disabled = True
+        except Exception:
+            pass
         for lv in self.query(".action-list"):
             lv.disabled = True
     
@@ -303,7 +303,9 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                                 item["isSystem"] = True
                             name = item.get("itemName", "")
                             if ":" in name:
-                                item["category"] = name.split(":", 1)[0].strip()
+                                parts = name.split(":", 1)
+                                item["category"] = parts[0].strip()
+                                item["itemName"] = parts[1].strip()
                             flattened.append(item)
                 self.action_menu_data = flattened
 
@@ -311,15 +313,16 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         for item in self.action_menu_data:
             name = item.get("itemName", "")
             if ":" in name:
-                cat = name.split(":", 1)[0].strip()
-                item["category"] = cat
-            else:
-                cat = "Other"
-                item["category"] = cat
-            categories.add(item["category"])
+                parts = name.split(":", 1)
+                item["category"] = parts[0].strip()
+                item["itemName"] = parts[1].strip()
+            elif "category" not in item:
+                item["category"] = "Other"
+            
+            categories.add(item.get("category", "Other"))
 
-        # Sort all data
-        self.action_menu_data.sort(key=lambda x: x.get("itemName", "").lower())
+        # Sort all data: Category (A-Z) then Item Name (A-Z)
+        self.action_menu_data.sort(key=lambda x: (x.get("category", "Other").lower(), x.get("itemName", "").lower()))
 
         # Group by category
         from collections import defaultdict
@@ -394,17 +397,9 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
 
         try:
             if event.list_view.id == "list-characters":
-                card_path = getattr(event.item, "name", "")
-                if card_path:
-                    if self.is_char_edit_mode:
-                        chara_json = extract_chara_metadata(card_path)
-                        if chara_json:
-                            self.push_screen(EditCharacterScreen(chara_json, Path(card_path)), self.edit_character_callback)
-                        else:
-                            self.notify("Could not extract metadata from this PNG!", severity="error")
-                    else:
-                        await self.load_character_from_path(card_path)
-                    self.focus_chat_input()
+                # Character loading is now handled by the Play button in CharactersScreen.
+                # Selection here doesn't trigger AI, only highlights and loads metadata (handled in on_list_view_highlighted).
+                pass
             elif event.list_view.has_class("action-list"):
                 data_packed = getattr(event.item, "name", "")
                 if ":::" in data_packed:
@@ -413,11 +408,6 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                         item_name, prompt, is_system_str = parts
                         is_system = is_system_str == "True"
                         
-                        if self.is_edit_mode:
-                            # Open edit modal
-                            edit_data = {"itemName": item_name, "prompt": prompt, "isSystem": is_system}
-                            self.push_screen(AddActionScreen(edit_data), self.add_action_callback)
-                            return
 
                         section = "System Prompts" if is_system else "Actions"
                         await self.handle_menu_action(section, item_name, prompt)
@@ -425,12 +415,16 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         except Exception as e:
             self.notify(f"Selection error: {e}", severity="error")
 
-    async def load_character_from_path(self, card_path):
+    async def load_character_from_path(self, card_path, chara_json_obj=None):
         if self.is_loading:
             await self.action_stop_generation()
 
         try:
-            chara_json = extract_chara_metadata(card_path)
+            if chara_json_obj:
+                chara_json = json.dumps(chara_json_obj)
+            else:
+                chara_json = extract_chara_metadata(card_path)
+            
             if not chara_json:
                 self.notify("No metadata found in PNG!", severity="error")
                 return
@@ -500,12 +494,6 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         if event.input.id == "input-username":
             self.user_name = event.value
             self.save_user_settings()
-        elif event.input.id == "input-temp" or event.input.id == "input-topp" or event.input.id == "input-topk" or event.input.id == "input-repeat":
-            try:
-                val = float(event.value) if "." in event.value else int(event.value)
-                setattr(self, event.input.id.replace("input-", ""), val)
-                self.save_user_settings()
-            except ValueError: pass
         elif event.input.id == "chat-input":
             if self.is_loading and event.value.strip():
                 await self.action_stop_generation()
@@ -569,41 +557,19 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         elif event.button.id == "btn-restart": await self.action_reset_chat()
         elif event.button.id == "btn-rewind": await self.action_rewind()
         elif event.button.id == "btn-clear-chat": await self.action_wipe_all()
-        elif event.button.id == "btn-quit": self.exit()
-        elif event.button.id == "btn-coffee": webbrowser.open("https://ko-fi.com/aimultifool")
-        elif event.button.id == "btn-discord": webbrowser.open("https://discord.com/invite/J5vzhbmk35")
-        elif event.button.id == "btn-add-action":
-            self.push_screen(AddActionScreen(), self.add_action_callback)
-        elif event.button.id == "btn-delete-action":
-            self.delete_selected_action()
-        elif event.button.id == "btn-debug":
-            from widgets import DebugContextScreen
-            self.push_screen(DebugContextScreen(self.messages))
+        elif event.button.id == "btn-manage-actions":
+            self.push_screen(ActionsManagerScreen(), self.actions_mgmt_callback)
+        elif event.button.id == "btn-cards":
+            self.push_screen(CharactersScreen(), self.cards_screen_callback)
+        elif event.button.id == "btn-parameters":
+            self.push_screen(ParametersScreen())
+        elif event.button.id == "btn-about":
+            self.push_screen(AboutScreen())
         elif event.button.id == "btn-clear-search":
             search_input = self.query_one("#input-action-search", Input)
             search_input.value = ""
             # The on_input_changed will trigger the re-population
             search_input.focus()
-        elif event.button.id == "btn-edit-mode":
-            self.is_edit_mode = not self.is_edit_mode
-            btn_edit = self.query_one("#btn-edit-mode", Button)
-            btn_add = self.query_one("#btn-add-action", Button)
-            btn_del = self.query_one("#btn-delete-action", Button)
-            
-            if self.is_edit_mode:
-                btn_edit.label = "Exit Edit Mode"
-                btn_add.disabled = False
-                btn_del.disabled = False
-                if not self.llm:
-                    for lv in self.query(".action-list"):
-                        lv.disabled = False
-            else:
-                btn_edit.label = "Enter Edit Mode"
-                btn_add.disabled = True
-                btn_del.disabled = True
-                if not self.llm:
-                    for lv in self.query(".action-list"):
-                        lv.disabled = True
         elif event.button.id == "btn-char-edit-mode":
             self.is_char_edit_mode = not self.is_char_edit_mode
             btn = self.query_one("#btn-char-edit-mode", Button)
@@ -611,6 +577,47 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             if self.is_char_edit_mode:
                 self.notify("Character Edit Mode: Click a card to edit its metadata")
         self.focus_chat_input()
+
+    async def cards_screen_callback(self, result):
+        if not result:
+            return
+        
+        action = result.get("action")
+        path = result.get("path")
+        
+        if action == "play":
+            meta = result.get("meta")
+            await self.load_character_from_path(path, chara_json_obj=meta)
+        elif action == "duplicate":
+            new_path = self.duplicate_character_card(path)
+            if new_path:
+                self.notify(f"Duplicated: {os.path.basename(new_path)}")
+        
+    async def actions_mgmt_callback(self, result):
+        # Always refresh sidebar after mgmt modal
+        self.populate_right_sidebar()
+        
+        self.focus_chat_input()
+
+    def duplicate_character_card(self, original_path):
+        import shutil
+        orig = Path(original_path)
+        base = orig.stem
+        ext = orig.suffix
+        parent = orig.parent
+        
+        counter = 2
+        new_path = parent / f"{base}_{counter}{ext}"
+        while new_path.exists():
+            counter += 1
+            new_path = parent / f"{base}_{counter}{ext}"
+        
+        try:
+            shutil.copy2(orig, new_path)
+            return new_path
+        except Exception as e:
+            self.notify(f"Duplication failed: {e}", severity="error")
+            return None
 
     def edit_character_callback(self, result):
         if not result:
