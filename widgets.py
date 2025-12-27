@@ -514,14 +514,41 @@ class ActionsManagerScreen(ModalScreen):
         title.can_focus = True
         title.focus()
         self.current_data_idx = -1 # Reset on mount
+        self.refresh_action_list()
 
     def compose(self) -> ComposeResult:
+        # Clean and sort data immediately so we can populate the Select
+        # ensuring it is never empty to prevent EmptySelectError
+        if hasattr(self.app, "action_menu_data"):
+             for item in self.app.action_menu_data:
+                name = item.get("itemName", "")
+                if ":" in name:
+                    parts = name.split(":", 1)
+                    item["category"] = parts[0].strip()
+                    item["itemName"] = parts[1].strip()
+                elif "category" not in item:
+                    item["category"] = "Other"
+             
+             self.app.action_menu_data.sort(key=lambda x: (x.get("category", "Other").lower(), x.get("itemName", "").lower()))
+        
+        # Build options
+        cats = set()
+        if hasattr(self.app, "action_menu_data"):
+            for act in self.app.action_menu_data:
+                cats.add(act.get('category', 'Other'))
+        
+        options = [(c, c) for c in sorted(list(cats))]
+        if not options:
+            options = [("Other", "Other")]
+            
+        default_val = options[0][1]
+
         yield Vertical(
             Label("Action Management", classes="dialog-title"),
             Horizontal(
                 Vertical(
                     Label("Filter Category", classes="label"),
-                    Select([], prompt="All Categories", id="select-mgmt-filter"),
+                    Select(options, id="select-mgmt-filter", allow_blank=False, value=default_val),
                     Label("Actions", classes="label"),
                     ListView(id="list-actions-mgmt"),
                     classes="pane-left"
@@ -534,6 +561,8 @@ class ActionsManagerScreen(ModalScreen):
                     Input(id="input-action-name"),
                     Label("Prompt", classes="label"),
                     TextArea(id="input-action-prompt"),
+                    Label("Action Type", classes="label"),
+                    Select([("Regular Action / User", "false"), ("System Prompt", "true")], id="select-action-type", allow_blank=False, value="false"),
                     classes="pane-right"
                 ),
                 id="management-split"
@@ -583,24 +612,13 @@ class ActionsManagerScreen(ModalScreen):
             self.query_one("#input-action-category", Input).value = ""
             self.query_one("#input-action-name", Input).value = ""
             self.query_one("#input-action-prompt", TextArea).text = ""
+            self.query_one("#select-action-type", Select).value = "false"
+        elif event.select.id == "select-action-type":
+             if self.current_data_idx >= 0:
+                self.save_current_edit()
 
 
-    def on_show(self) -> None:
-        # Pre-clean data: ensure Category and Name are separated and colons are stripped
-        for item in self.app.action_menu_data:
-            name = item.get("itemName", "")
-            if ":" in name:
-                parts = name.split(":", 1)
-                item["category"] = parts[0].strip()
-                item["itemName"] = parts[1].strip()
-            elif "category" not in item:
-                item["category"] = "Other"
-
-        # Always sort by Category (A-Z) then itemName (A-Z)
-        self.app.action_menu_data.sort(key=lambda x: (x.get("category", "Other").lower(), x.get("itemName", "").lower()))
-        self.update_filter_options()
-        self.refresh_action_list()
-        self.current_data_idx = -1 # Ensure it's reset when screen is shown
+    # on_show logic moved to on_mount
 
     def update_filter_options(self) -> None:
         sel = self.query_one("#select-mgmt-filter", Select)
@@ -617,6 +635,8 @@ class ActionsManagerScreen(ModalScreen):
         # Restore selection if it still exists
         if current_val != Select.BLANK and any(current_val == o[1] for o in options):
             sel.value = current_val
+        elif options:
+            sel.value = options[0][1]
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id in ["input-action-category", "input-action-name"]:
@@ -636,10 +656,13 @@ class ActionsManagerScreen(ModalScreen):
             category = self.query_one("#input-action-category", Input).value.strip().lower()
             item_name = self.query_one("#input-action-name", Input).value.strip().lower()
             prompt = self.query_one("#input-action-prompt", TextArea).text
+            is_system_val = self.query_one("#select-action-type", Select).value
+            is_system = (is_system_val == "true")
             
             self.app.action_menu_data[idx]['category'] = category
             self.app.action_menu_data[idx]['itemName'] = item_name
             self.app.action_menu_data[idx]['prompt'] = prompt
+            self.app.action_menu_data[idx]['isSystem'] = is_system
             save_action_menu_data(self.app.action_menu_data)
             
             # Update list label without full refresh to avoid focus/scroll jumps
@@ -667,22 +690,26 @@ class ActionsManagerScreen(ModalScreen):
                         self.query_one("#input-action-category", Input).value = act.get('category', 'Other')
                         self.query_one("#input-action-name", Input).value = act_name
                         self.query_one("#input-action-prompt", TextArea).text = act.get('prompt', '')
+                        self.query_one("#select-action-type", Select).value = "true" if act.get('isSystem', False) else "false"
                     else:
                         self.current_data_idx = -1
                         # Clear fields if index is out of bounds (shouldn't happen with valid name)
                         self.query_one("#input-action-category", Input).value = ""
                         self.query_one("#input-action-name", Input).value = ""
                         self.query_one("#input-action-prompt", TextArea).text = ""
+                        self.query_one("#select-action-type", Select).value = "false"
                 except ValueError: # if idx_str is not an int
                     self.current_data_idx = -1
                     self.query_one("#input-action-category", Input).value = ""
                     self.query_one("#input-action-name", Input).value = ""
                     self.query_one("#input-action-prompt", TextArea).text = ""
+                    self.query_one("#select-action-type", Select).value = "false"
             else:
                 self.current_data_idx = -1
                 self.query_one("#input-action-category", Input).value = ""
                 self.query_one("#input-action-name", Input).value = ""
                 self.query_one("#input-action-prompt", TextArea).text = ""
+                self.query_one("#select-action-type", Select).value = "false"
 
     def select_item_by_data_index(self, data_idx: int) -> None:
         """Helper to reliably select a list item after a refresh."""
@@ -704,6 +731,7 @@ class ActionsManagerScreen(ModalScreen):
                 self.query_one("#input-action-category", Input).value = act.get('category', 'Other')
                 self.query_one("#input-action-name", Input).value = act_name
                 self.query_one("#input-action-prompt", TextArea).text = act.get('prompt', '')
+                self.query_one("#select-action-type", Select).value = "true" if act.get('isSystem', False) else "false"
                 break
         lv.focus()
 
@@ -719,7 +747,12 @@ class ActionsManagerScreen(ModalScreen):
             
             name = "new action"
             
-            new_act = {"category": cat, "itemName": name, "prompt": "Your instruction here...", "isSystem": False}
+            # Auto-detect system prompt category
+            is_system = False
+            if "system" in cat.lower():
+                is_system = True
+                
+            new_act = {"category": cat, "itemName": name, "prompt": "Your instruction here...", "isSystem": is_system}
             self.app.action_menu_data.append(new_act)
             
             # Sort after adding: Category then Name

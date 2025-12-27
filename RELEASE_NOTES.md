@@ -1,5 +1,13 @@
 # Release Notes
 
+## v0.1.5: Workflow & Bug Fixes
+- **Action Management Refinement**: 
+    - Fixed crash when filtering categories in the Manage Actions modal. 
+    - Removed redundant "All Categories" view for cleaner navigation.
+    - Added explicit **"Action Type"** selector to toggle between User Actions and System Prompts.
+    - Intelligent auto-detection of System Prompts based on category name.
+- **Improved Action Sorting**: Action lists now strictly adhere to Category > Name sorting across the entire application.
+
 ## v0.1.4: Character & Management Update
 - **Character Card Management**: A comprehensive modal for SillyTavern PNG metadata management.
 - **Dedicated Parameters Modal**: Centralized AI sampling controls
