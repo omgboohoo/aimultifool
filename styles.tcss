@@ -498,3 +498,37 @@ ActionsManagerScreen {
     width: 10;
     margin-left: 1;
 }
+
+/* Sidebar Settings */
+.sidebar-setting-group {
+    height: auto;
+    margin-bottom: 1;
+}
+
+.sidebar-label {
+    padding-left: 1;
+    color: $text-muted;
+    text-style: bold;
+    margin-bottom: 0;
+}
+
+.sidebar-setting-group Input {
+    width: 100%;
+    height: 1;
+    border: none;
+    background: $surface;
+    padding: 0 1; 
+}
+
+.sidebar-setting-group Select {
+    width: 100%;
+    margin-bottom: 0;
+    border: none;
+    background: $surface;
+}
+
+.sidebar-setting-group Input:focus, .sidebar-setting-group Select:focus {
+    background: $boost;
+    border-left: solid $accent;
+}
+

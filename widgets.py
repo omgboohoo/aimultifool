@@ -67,11 +67,6 @@ class ModelScreen(ModalScreen):
         yield Vertical(
             Label("Model Settings", classes="dialog-title"),
             Container(
-                Label("Username"),
-                Input(placeholder="Enter your name", id="input-username"),
-                classes="setting-group"
-            ),
-            Container(
                 Label("Model"),
                 Select([], id="select-model", prompt="Select a model"),
                 classes="setting-group"
@@ -86,32 +81,6 @@ class ModelScreen(ModalScreen):
                 Select([("All (-1)", -1), ("CPU Only (0)", 0)] + [(str(x), x) for x in range(8, 129, 8)], id="select-gpu-layers", value=-1),
                 classes="setting-group"
             ),
-            Container(
-                Label("Style"),
-                Select([
-                    ("Concise", "concise"), 
-                    ("Descriptive", "descriptive"),
-                    ("Dramatic", "dramatic"),
-                    ("Action-Oriented", "action"),
-                    ("Internalized", "internalized"),
-                    ("Hardboiled", "hardboiled"),
-                    ("Creative", "creative"),
-                    ("Erotic", "erotic"),
-                    ("Flowery", "flowery"),
-                    ("Minimalist", "minimalist"),
-                    ("Humorous", "humorous"),
-                    ("Dark Fantasy", "dark_fantasy"),
-                    ("Scientific", "scientific"),
-                    ("Casual", "casual"),
-                    ("Historical", "historical"),
-                    ("Horror", "horror"),
-                    ("Surreal", "surreal"),
-                    ("Philosophical", "philosophical"),
-                    ("Gritty", "gritty"),
-                    ("Whimsical", "whimsical")
-                ], id="select-style", value="concise", prompt=""),
-                classes="setting-group"
-            ),
             Button("Load Model", variant="default", id="btn-load-model"),
             Horizontal(
                 Button("Close", variant="default", id="btn-close-model"),
@@ -124,7 +93,7 @@ class ModelScreen(ModalScreen):
     def on_mount(self) -> None:
         # Populate fields from app state
         app = self.app
-        self.query_one("#input-username").value = app.user_name
+
         # Validate and set Context Size
         try:
             self.query_one("#select-context").value = app.context_size
@@ -136,11 +105,6 @@ class ModelScreen(ModalScreen):
             self.query_one("#select-gpu-layers").value = app.gpu_layers
         except Exception:
             self.query_one("#select-gpu-layers").value = -1
-
-        try:
-            self.query_one("#select-style").value = app.style
-        except Exception:
-             self.query_one("#select-style").value = "concise"
         
         # Populate models
         from ai_engine import get_models
@@ -170,9 +134,7 @@ class ModelScreen(ModalScreen):
                 ctx = int(self.query_one("#select-context").value)
                 gpu = int(self.query_one("#select-gpu-layers").value)
                 
-                # Update app user name just in case (as Textual might not trigger onChange if focusing away immediately)
-                user_name = self.query_one("#input-username").value
-                self.app.user_name = user_name
+
                 
                 self.dismiss()
                 self.app.start_model_load(model_path, ctx, gpu)

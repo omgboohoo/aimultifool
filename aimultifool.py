@@ -47,7 +47,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     llm = None
     action_menu_data = []
     messages = reactive([])
-    user_name = reactive("Dan")
+    user_name = reactive("User")
     context_size = reactive(4096)
     gpu_layers = reactive(-1)
     style = reactive("concise")
@@ -99,6 +99,37 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                 id="main-container"
             ),
             Vertical(
+                Container(
+                    Label("User Name", classes="sidebar-label"),
+                    Input(placeholder="Name", id="input-username"),
+                    classes="sidebar-setting-group"
+                ),
+                Container(
+                    Label("Style", classes="sidebar-label"),
+                    Select([
+                        ("Concise", "concise"), 
+                        ("Descriptive", "descriptive"),
+                        ("Dramatic", "dramatic"),
+                        ("Action-Oriented", "action"),
+                        ("Internalized", "internalized"),
+                        ("Hardboiled", "hardboiled"),
+                        ("Creative", "creative"),
+                        ("Erotic", "erotic"),
+                        ("Flowery", "flowery"),
+                        ("Minimalist", "minimalist"),
+                        ("Humorous", "humorous"),
+                        ("Dark Fantasy", "dark_fantasy"),
+                        ("Scientific", "scientific"),
+                        ("Casual", "casual"),
+                        ("Historical", "historical"),
+                        ("Horror", "horror"),
+                        ("Surreal", "surreal"),
+                        ("Philosophical", "philosophical"),
+                        ("Gritty", "gritty"),
+                        ("Whimsical", "whimsical")
+                    ], id="select-style", value="concise", allow_blank=False),
+                    classes="sidebar-setting-group"
+                ),
                 Horizontal(
                     Input(placeholder="Search actions...", id="input-action-search"),
                     Button("Clear", id="btn-clear-search", variant="default", disabled=True),
@@ -114,7 +145,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     async def on_mount(self) -> None:
         # Load persisted settings
         settings = load_settings()
-        self.user_name = settings.get("user_name", "Dan")
+        self.user_name = settings.get("user_name", "User")
         self.context_size = settings.get("context_size", 4096)
         self.gpu_layers = -1
         self.style = settings.get("style", "concise")
@@ -132,10 +163,10 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         self.populate_right_sidebar()
         
         # Apply UI values
-        # self.query_one("#input-username").value = self.user_name
+        self.query_one("#input-username").value = self.user_name
         # self.query_one("#select-context").value = self.context_size
         # self.query_one("#select-gpu-layers").value = self.gpu_layers
-        # self.query_one("#select-style").value = self.style
+        self.query_one("#select-style").value = self.style
 
         if self.selected_model:
             # We don't set the widget value here anymore as the modal handles it
@@ -276,11 +307,12 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         # Clear existing sections
         action_sections.remove_children()
         
+        right_sidebar.add_class("-visible")
+
         if not self.action_menu_data:
-            right_sidebar.remove_class("-visible")
             return
             
-        right_sidebar.add_class("-visible")
+
         
         # Format and categorize data
         if isinstance(self.action_menu_data, list) and len(self.action_menu_data) > 0:
