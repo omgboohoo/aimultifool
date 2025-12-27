@@ -382,7 +382,6 @@ class ActionsMixin:
         settings = {
             "user_name": self.user_name,
             "context_size": self.context_size,
-            "style": self.style,
             "selected_model": self.selected_model,
             "temp": self.temp,
             "topp": self.topp,

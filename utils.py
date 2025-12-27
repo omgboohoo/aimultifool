@@ -63,6 +63,7 @@ except ImportError:
 
 def get_style_prompt(style: str) -> str:
     styles = {
+        "Default": "you are a helpful AI.",
         "concise": "Keep your replies concise.",
         "descriptive": "Be descriptive at all times.",
         "dramatic": "Use evocative, flowery language and place heavy emphasis on character emotions and high stakes.",
@@ -84,5 +85,5 @@ def get_style_prompt(style: str) -> str:
         "gritty": "Focus on the dirty, realistic details of life. Show the world as it is, warts and all.",
         "whimsical": "Use a playful, fairy-tale tone. Focus on wonder, magic, and light-hearted fun."
     }
-    prompt = styles.get(style, "Keep your replies concise.")
+    prompt = styles.get(style, "you are a helpful AI.")
     return f"Do not reply on behalf of user. {prompt}"

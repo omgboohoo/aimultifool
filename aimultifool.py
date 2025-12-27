@@ -50,7 +50,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     user_name = reactive("User")
     context_size = reactive(4096)
     gpu_layers = reactive(-1)
-    style = reactive("concise")
+    style = reactive("Default")
     temp = reactive(0.8)
     topp = reactive(0.9)
     topk = reactive(40)
@@ -107,6 +107,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                 Container(
                     Label("Style", classes="sidebar-label"),
                     Select([
+                        ("Default", "Default"),
                         ("Concise", "concise"), 
                         ("Descriptive", "descriptive"),
                         ("Dramatic", "dramatic"),
@@ -127,7 +128,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                         ("Philosophical", "philosophical"),
                         ("Gritty", "gritty"),
                         ("Whimsical", "whimsical")
-                    ], id="select-style", value="concise", allow_blank=False),
+                    ], id="select-style", value="Default", allow_blank=False),
                     classes="sidebar-setting-group"
                 ),
                 Horizontal(
@@ -148,7 +149,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         self.user_name = settings.get("user_name", "User")
         self.context_size = settings.get("context_size", 4096)
         self.gpu_layers = -1
-        self.style = settings.get("style", "concise")
+        self.style = "Default"
         self.temp = settings.get("temp", 0.8)
         self.topp = settings.get("topp", 0.9)
         self.topk = settings.get("topk", 40)
