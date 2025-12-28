@@ -897,7 +897,7 @@ class PasswordPromptScreen(ModalScreen):
     def compose(self) -> ComposeResult:
         yield Vertical(
             Label("Encrypted Chat Detected", classes="dialog-title"),
-            Input(placeholder="Password / Passphrase", id="input-password", password=True),
+            Input(placeholder="Password / Passphrase", id="input-password", password=False),
             Horizontal(
                 Button("Unlock & Load", variant="primary", id="btn-unlock"),
                 Button("Cancel", variant="default", id="btn-cancel-unlock"),
@@ -961,7 +961,7 @@ class ChatManagerScreen(ModalScreen):
                     Label("Save Current Chat", classes="label"),
                     Input(placeholder="Filename (optional)...", id="input-save-name"),
                     Label("Password / Passphrase", classes="label"),
-                    Input(placeholder="Password / Passphrase (optional)..", id="input-save-password", password=True),
+                    Input(placeholder="Password / Passphrase (optional)..", id="input-save-password", password=False),
                     Horizontal(
                         Button("Save Current Chat", variant="primary", id="btn-save-chat"),
                         classes="buttons"

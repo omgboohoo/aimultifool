@@ -7,6 +7,7 @@
 - **Performance Metrics**: Integrated **"Peak TPS"** tracking into the status bar, providing real-time visibility into your hardware's maximum generation speed during every interaction.
 - **Robust Clipboard**: Added a "Copy" button to the Context Window modal powered by `pyperclip`, providing reliable cross-platform clipboard sync and resolving TUI-specific copy limitations.
 - **Roleplay Immersion**: Selection of the "Default" style now intelligently suppresses the generic assistant persona when a character card is active, preventing immersion-breaking character shifts.
+- **Transparent Passphrases**: Password and passphrase fields in the "Save Chat" and "Unlock Chat" modals are now visible as you type, allowing for immediate verification and fewer entry errors.
 
 ## v0.1.8: Secure Persistence & File Management
 - **Secure Chat Management**: Introduced a new **File** menu allowing users to save and load conversation histories.
