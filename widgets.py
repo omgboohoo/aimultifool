@@ -43,11 +43,12 @@ def create_styled_text(text):
 
 class MessageWidget(Static):
     """A widget to display a single chat message."""
-    def __init__(self, role: str, content: str, user_name: str = "User", **kwargs):
+    def __init__(self, role: str, content: str, user_name: str = "User", is_info: bool = False, **kwargs):
         super().__init__(**kwargs)
         self.role = role
         self.content = content
         self.user_name = user_name
+        self.is_info = is_info
 
     def on_mount(self):
         if self.role == "user":

@@ -723,23 +723,10 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         if action == "load":
             messages = result.get("messages")
             if messages:
+                # Clear and repopulate chat scroll robustly
                 await self.action_stop_generation()
                 self.messages = messages
-                
-                # Clear and repopulate chat scroll
-                chat_scroll = self.query_one("#chat-scroll")
-                chat_scroll.remove_children()
-                
-                for msg in self.messages:
-                    role = msg.get("role")
-                    content = msg.get("content")
-                    if role == "system":
-                        # We don't usually show system prompts in the chat window, 
-                        # but if we want to follow the app's pattern:
-                        # await self.add_info_message(f"[System Prompt]\n\n{content}")
-                        pass
-                    else:
-                        await self.add_message(role, content, sync_only=True)
+                await self.full_sync_chat_ui()
                 
                 self.notify("Chat loaded successfully.")
                 self.focus_chat_input()

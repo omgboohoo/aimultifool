@@ -344,28 +344,37 @@ class ActionsMixin:
             self.notify("Nothing to rewind.", severity="warning")
             return
 
-        chat_scroll = self.query_one("#chat-scroll")
-        widgets = list(chat_scroll.children)
+        # 1. Pop the last interaction from the context window
+        last_user_content = ""
         
+        # Remove assistant message if it's the last one
         if self.messages[-1]["role"] == "assistant":
             self.messages.pop()
-            if widgets:
-                widgets.pop().remove()
         
+        # Remove user message if it's the last one
         if len(self.messages) > 1 and self.messages[-1]["role"] == "user":
             user_msg = self.messages.pop()
-            if widgets:
-                widgets.pop().remove()
-            if self.first_user_message == user_msg["content"]:
+            last_user_content = user_msg.get("content", "")
+            if self.first_user_message == last_user_content:
                 self.first_user_message = None
             
-            # Put the message back into the input box for editing
-            try:
-                content = user_msg.get("content", "")
-                if content and content != "continue":
-                    self.query_one("#chat-input").value = content
-            except Exception:
-                pass
+        # 2. Put the user's message back into the input box for editing
+        try:
+            if last_user_content and last_user_content != "continue":
+                self.query_one("#chat-input").value = last_user_content
+        except Exception:
+            pass
+
+        # 3. Synchronize the UI perfectly with the new state
+        if hasattr(self, "full_sync_chat_ui"):
+            await self.full_sync_chat_ui()
+        else:
+            # Fallback for manual removal (less robust but safe)
+            chat_scroll = self.query_one("#chat-scroll")
+            # Remove trailing info widgets and the last context widgets
+            widgets = [w for w in chat_scroll.children if isinstance(w, MessageWidget)]
+            while widgets and (widgets[-1].is_info or len(list(w for w in widgets if not w.is_info)) > len(self.messages)-1):
+                widgets.pop().remove()
 
         self.notify("Rewound last interaction.")
         self.focus_chat_input()
