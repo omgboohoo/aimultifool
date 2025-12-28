@@ -1,4 +1,4 @@
-# Product Requirements Document: aiMultiFool v0.1.8
+# Product Requirements Document: aiMultiFool v0.1.9
 
 ## 1. Executive Summary
 aiMultiFool is a premium Linux TUI sandbox for private AI roleplay. Built with **Textual** and **llama.cpp**, it provides a local, high-performance interface for interacting with GGUF models using SillyTavern character cards.

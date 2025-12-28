@@ -13,7 +13,7 @@ WHEEL_DIR="$SCRIPT_DIR/llama.cpp"
 WHEEL_PATH="$WHEEL_DIR/$WHEEL_NAME"
 
 echo "----------------------------------------------------------------"
-echo "  aiMultiFool Suite - Setup & Launch Script v0.1.8"
+echo "  aiMultiFool Suite - Setup & Launch Script v0.1.9"
 echo "----------------------------------------------------------------"
 
 # 1. Ensure the llama.cpp directory exists
@@ -57,26 +57,13 @@ WHEEL_FILE=$(ls "$WHEEL_DIR/"llama_cpp_python-*.whl 2>/dev/null | head -n 1)
 
 # Check if venv already exists
 if [ -d "$VENV_DIR" ]; then
-    echo "[STATUS] Virtual environment detected."
-    read -p "[PROMPT] Recreate environment (fix dependencies)? [y/N]: " -t 5 -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "[CLEANUP] Removing existing virtual environment..."
-        rm -rf "$VENV_DIR"
-    else
-        echo "[ACTIVATE] Entering existing environment..."
-        source "$VENV_DIR/bin/activate"
-        
-        echo "[CHECK] Verifying/Updating core requirements..."
-        if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
-            pip install -q -r "$SCRIPT_DIR/requirements.txt"
-        fi
-        
-        echo "[LAUNCH] Starting aiMultiFool TUI..."
-        echo ""
-        python "$SCRIPT_DIR/aimultifool.py"
-        exit 0
-    fi
+    echo "[STATUS] Virtual environment detected. Auto-skipping setup."
+    source "$VENV_DIR/bin/activate"
+    
+    echo "[LAUNCH] Starting aiMultiFool TUI..."
+    echo ""
+    python "$SCRIPT_DIR/aimultifool.py"
+    exit 0
 fi
 
 # Create virtual environment

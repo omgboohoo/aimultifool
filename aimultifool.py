@@ -199,7 +199,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             # We don't set the widget value here anymore as the modal handles it
             pass
 
-        self.title = f"aiMultiFool v0.1.8"
+        self.title = f"aiMultiFool v0.1.9"
         # Sidebar is gone
         self.query_one("#right-sidebar").add_class("-visible")
         self.watch_is_loading(self.is_loading)
@@ -216,7 +216,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         self.disable_character_list() # Start disabled
         self.show_footer = True
         
-        self.push_screen(ModelScreen())
+        self.push_screen(ModelScreen(), self.model_screen_callback)
 
     def watch_is_loading(self, is_loading: bool) -> None:
         """Called when is_loading (inference) changes."""
@@ -644,7 +644,6 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             gc.collect()
             llama_cpp.llama_backend_init()
             
-        self.is_model_loading = True
         self.load_model_task(model_path, ctx, gpu)
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -652,7 +651,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         elif event.button.id == "btn-continue": await self.action_continue_chat()
         # elif event.button.id == "btn-toggle-sidebar": self.action_toggle_sidebar() # Sidebar is gone
         elif event.button.id == "btn-model-settings":
-             self.push_screen(ModelScreen())
+             self.push_screen(ModelScreen(), self.model_screen_callback)
         elif event.button.id == "btn-restart": await self.action_reset_chat()
         elif event.button.id == "btn-rewind": await self.action_rewind()
         elif event.button.id == "btn-clear-chat": await self.action_wipe_all()
@@ -733,6 +732,15 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                 
                 self.notify("Chat loaded successfully.")
                 self.focus_chat_input()
+
+    async def model_screen_callback(self, result):
+        if not result:
+            return
+        
+        if result.get("action") == "load":
+            self.is_model_loading = True
+            await asyncio.sleep(0.1)
+            self.start_model_load(result["model_path"], result["ctx"], result["gpu"])
 
     async def add_message(self, role: str, content: str, sync_only: bool = False):
         """Helper to add a message to state and UI."""

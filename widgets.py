@@ -140,10 +140,12 @@ class ModelScreen(ModalScreen):
                 ctx = int(self.query_one("#select-context").value)
                 gpu = int(self.query_one("#select-gpu-layers").value)
                 
-
-                
-                self.dismiss()
-                self.app.start_model_load(model_path, ctx, gpu)
+                self.dismiss({
+                    "action": "load",
+                    "model_path": model_path,
+                    "ctx": ctx,
+                    "gpu": gpu
+                })
             except Exception as e:
                 self.app.notify(f"Error gathering settings: {e}", severity="error")
         # btn-load-model is handled by the main app via bubbling or we delegate it here?

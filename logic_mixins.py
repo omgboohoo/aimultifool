@@ -70,6 +70,7 @@ class InferenceMixin:
             
             start_time = time.time()
             token_count = 0
+            peak_tps = 0.0
             
             was_cancelled = False
             for output in stream:
@@ -101,10 +102,11 @@ class InferenceMixin:
                 token_count += len(chunk_tokens)
                 elapsed = time.time() - start_time
                 tps = token_count / elapsed if elapsed > 0 else 0
+                peak_tps = max(peak_tps, tps)
                 
                 total_tokens = prompt_tokens + token_count
                 ctx_pct = (total_tokens / self.context_size) * 100
-                self.call_from_thread(setattr, self, "status_text", f"TPS: {tps:.1f} | Context: {ctx_pct:.1f}% | Tokens: {token_count}")
+                self.call_from_thread(setattr, self, "status_text", f"TPS: {tps:.1f} | Peak: {peak_tps:.1f} | Context: {ctx_pct:.1f}% | Tokens: {token_count}")
 
             if assistant_content:
                 try:
@@ -115,7 +117,7 @@ class InferenceMixin:
                     final_tokens = count_tokens_in_messages(self.llm, messages_to_use)
                     final_pct = (final_tokens / self.context_size) * 100
                     
-                    self.call_from_thread(setattr, self, "status_text", f"{'Stopped' if was_cancelled else 'Finished'}. {token_count} tokens generated. Context: {final_pct:.1f}%")
+                    self.call_from_thread(setattr, self, "status_text", f"{'Stopped' if was_cancelled else 'Finished'}. {token_count} tokens. Peak TPS: {peak_tps:.1f} | Context: {final_pct:.1f}%")
                 except Exception:
                     pass
             
@@ -355,6 +357,14 @@ class ActionsMixin:
                 widgets.pop().remove()
             if self.first_user_message == user_msg["content"]:
                 self.first_user_message = None
+            
+            # Put the message back into the input box for editing
+            try:
+                content = user_msg.get("content", "")
+                if content and content != "continue":
+                    self.query_one("#chat-input").value = content
+            except Exception:
+                pass
 
         self.notify("Rewound last interaction.")
         self.focus_chat_input()

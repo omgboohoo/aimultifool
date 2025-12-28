@@ -1,4 +1,10 @@
 # Release Notes
+ 
+## v0.1.9: Speed, Safety & Stats
+- **Smart Rewind**: Rewinding now automatically restores the last user message to the input box for rapid correction and resending.
+- **Streamlined Launch**: `run.sh` now intelligently skips the venv setup and recreation prompts if a virtual environment is already present, ensuring the fastest possible startup.
+- **Lapse-Free Loading**: Optimized the model selection workflow—the modal now closes and locks UI controls before initializing resource-heavy model loading, eliminating visual lag.
+- **Performance Metrics**: Integrated **"Peak TPS"** tracking into the status bar, providing real-time visibility into your hardware's maximum generation speed during every interaction.
 
 ## v0.1.8: Secure Persistence & File Management
 - **Secure Chat Management**: Introduced a new **File** menu allowing users to save and load conversation histories.
