@@ -1,5 +1,13 @@
 # Release Notes
 
+## v0.1.8: Secure Persistence & File Management
+- **Secure Chat Management**: Introduced a new **File** menu allowing users to save and load conversation histories.
+- **Privacy Armor**: Optional state-of-the-art **AES-256-GCM** encryption for saved chats.
+- **Hardened Key Derivation**: Uses **Argon2id** (memory-hard KDF) for deriving encryption keys from passphrases.
+- **Model Lifecycle Fixes**: Resolved a bug where successful model downloads were incorrectly reported as failed.
+- **Dynamic Model Discovery**: The model selection list now automatically refreshes and populates as soon as a download completes, without requiring a restart.
+- **Robust UI Ghosting**: Enhanced "busy state" detection ensures that model-related controls are correctly disabled and provide visual feedback across all modal screens during background processes.
+
 ## v0.1.7: Styling & Transparency
 - **Expanded Style Library**: More than doubled the available narrative styles to 44 distinct presets, including new "Super Dark", "Degenerate", and "Roleplay" themes.
 - **Improved Default Persona**: Replaced the default system prompt with a highly optimized, friendly, and adaptive instruction set.

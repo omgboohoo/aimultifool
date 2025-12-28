@@ -27,7 +27,7 @@ from ui_mixin import UIMixin
 from utils import _get_action_menu_data, load_settings, save_settings, DOWNLOAD_AVAILABLE, get_style_prompt, save_action_menu_data
 from character_manager import extract_chara_metadata, process_character_metadata, create_initial_messages, write_chara_metadata
 from ai_engine import get_models
-from widgets import MessageWidget, AddActionScreen, EditCharacterScreen, CharactersScreen, ParametersScreen, AboutScreen, ActionsManagerScreen, ModelScreen
+from widgets import MessageWidget, AddActionScreen, EditCharacterScreen, CharactersScreen, ParametersScreen, AboutScreen, ActionsManagerScreen, ModelScreen, ChatManagerScreen
 
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     """The main aiMultiFool application."""
@@ -45,6 +45,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     ]
 
     llm = None
+    root_path = Path(__file__).parent
     action_menu_data = []
     messages = reactive([])
     user_name = reactive("User")
@@ -74,6 +75,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     def compose(self) -> ComposeResult:
         yield Header()
         yield Horizontal(
+            Button("File", id="btn-file", variant="default"),
             Button("Model", id="btn-model-settings", variant="default"),
             Button("Parameters", id="btn-parameters", variant="default"),
             Button("Cards", id="btn-cards", variant="default"),
@@ -197,7 +199,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             # We don't set the widget value here anymore as the modal handles it
             pass
 
-        self.title = f"aiMultiFool v0.1.7"
+        self.title = f"aiMultiFool v0.1.8"
         # Sidebar is gone
         self.query_one("#right-sidebar").add_class("-visible")
         self.watch_is_loading(self.is_loading)
@@ -249,41 +251,84 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     def update_ui_state(self):
         """Disable or enable UI elements based on app state."""
         is_busy = self.is_model_loading or self.is_downloading
-        
-        for btn in self.query(Button):
+        # Query both the main app and the active screen to ensure modals are covered
+        all_buttons = list(self.query(Button))
+        if self.screen:
+            all_buttons.extend(list(self.screen.query(Button)))
+
+        for btn in all_buttons:
+            if btn.id == "btn-load-model":
+                btn.disabled = is_busy
+                btn.loading = self.is_model_loading
+                continue
+
             # Always keep these top menu buttons enabled
-            if btn.id in ["btn-about", "btn-cards", "btn-parameters", "btn-model-settings", "btn-manage-actions"]:
+            if btn.id in ["btn-file", "btn-about", "btn-cards", "btn-parameters", "btn-model-settings", "btn-manage-actions"]:
                 btn.disabled = False
             elif btn.id in ["btn-continue", "btn-rewind", "btn-restart", "btn-clear-chat"]:
                 # Disable if busy OR if no model is loaded
                 btn.disabled = is_busy or not self.llm
             elif btn.id == "btn-clear-search":
                 # Only enabled if there is text in the search box
-                search_val = self.query_one("#input-action-search").value
-                btn.disabled = not bool(search_val.strip())
+                try:
+                    search_val = self.query_one("#input-action-search").value
+                    btn.disabled = not bool(search_val.strip())
+                except Exception:
+                    btn.disabled = True
             else:
                 btn.disabled = is_busy
             
-        for select in self.query(Select):
+        all_selects = list(self.query(Select))
+        if self.screen:
+            all_selects.extend(list(self.screen.query(Select)))
+        for select in all_selects:
             select.disabled = is_busy
             
-        for inp in self.query(Input):
+        all_inputs = list(self.query(Input))
+        if self.screen:
+            all_inputs.extend(list(self.screen.query(Input)))
+        for inp in all_inputs:
             if inp.id == "chat-input":
                 inp.disabled = is_busy or not self.llm
             else:
                 inp.disabled = is_busy
             
         try:
-            self.query_one("#list-characters").disabled = is_busy or (not self.llm and not self.is_char_edit_mode)
-            self.query_one("#btn-char-edit-mode").disabled = is_busy
+            # Check app and screen for these specific widgets
+            for root in [self, self.screen]:
+                chars = root.query("#list-characters")
+                if chars:
+                    chars.first().disabled = is_busy or (not self.llm and not self.is_char_edit_mode)
+                
+                edit_btn = root.query("#btn-char-edit-mode")
+                if edit_btn:
+                    edit_btn.first().disabled = is_busy
         except Exception:
             pass
-        for lv in self.query(".action-list"):
-            lv.disabled = is_busy or not self.llm
-        for collapsible in self.query(Collapsible):
-            collapsible.disabled = is_busy
 
-    # update_model_list moved to ModelScreen
+        # Action lists and collapsibles on both
+        for root in [self, self.screen]:
+            for lv in root.query(".action-list"):
+                lv.disabled = is_busy or not self.llm
+            for collapsible in root.query(Collapsible):
+                collapsible.disabled = is_busy
+
+    def update_model_list(self):
+        """Update model list on the active ModelScreen if it's open."""
+        models = get_models()
+        
+        # Check if ModelScreen is the current screen
+        if isinstance(self.screen, ModelScreen):
+            try:
+                select_model = self.screen.query_one("#select-model", Select)
+                options = [(m.name, str(m)) for m in models]
+                select_model.set_options(options)
+                
+                # If nothing is selected or current selection is invalid, select the first one
+                if options and (select_model.value == Select.BLANK or not any(opt[1] == select_model.value for opt in options)):
+                    select_model.value = options[0][1]
+            except Exception:
+                pass
 
 
     def get_card_list(self):
@@ -619,6 +664,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             self.push_screen(ParametersScreen())
         elif event.button.id == "btn-about":
             self.push_screen(AboutScreen())
+        elif event.button.id == "btn-file":
+            self.push_screen(ChatManagerScreen(), self.chat_manager_callback)
         elif event.button.id == "btn-clear-search":
             search_input = self.query_one("#input-action-search", Input)
             search_input.value = ""
@@ -657,6 +704,45 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         self.populate_right_sidebar()
         
         self.focus_chat_input()
+
+    async def chat_manager_callback(self, result):
+        if not result:
+            return
+        
+        action = result.get("action")
+        if action == "load":
+            messages = result.get("messages")
+            if messages:
+                await self.action_stop_generation()
+                self.messages = messages
+                
+                # Clear and repopulate chat scroll
+                chat_scroll = self.query_one("#chat-scroll")
+                chat_scroll.remove_children()
+                
+                for msg in self.messages:
+                    role = msg.get("role")
+                    content = msg.get("content")
+                    if role == "system":
+                        # We don't usually show system prompts in the chat window, 
+                        # but if we want to follow the app's pattern:
+                        # await self.add_info_message(f"[System Prompt]\n\n{content}")
+                        pass
+                    else:
+                        await self.add_message(role, content, sync_only=True)
+                
+                self.notify("Chat loaded successfully.")
+                self.focus_chat_input()
+
+    async def add_message(self, role: str, content: str, sync_only: bool = False):
+        """Helper to add a message to state and UI."""
+        if not sync_only:
+            self.messages.append({"role": role, "content": content})
+        
+        chat_scroll = self.query_one("#chat-scroll")
+        new_widget = MessageWidget(role, content, self.user_name)
+        await chat_scroll.mount(new_widget)
+        chat_scroll.scroll_end(animate=False)
 
     def duplicate_character_card(self, original_path):
         import shutil

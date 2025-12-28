@@ -7,7 +7,7 @@ from textual.screen import ModalScreen
 from textual.containers import Vertical, Container, Horizontal, Grid, ScrollableContainer
 from textual.widgets import Label, Input, Select, Button, ListView, ListItem, Static, TextArea
 from pathlib import Path
-from utils import save_action_menu_data
+from utils import save_action_menu_data, encrypt_data, decrypt_data
 
 def create_styled_text(text):
     """Create a rich renderable with styled quoted text"""
@@ -128,6 +128,8 @@ class ModelScreen(ModalScreen):
                 pass
         elif options:
             select_model.value = options[0][1]
+        
+        self.app.update_ui_state()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-close-model":
@@ -265,6 +267,7 @@ class CharactersScreen(ModalScreen):
 
     def on_mount(self) -> None:
         self.last_search_idx = -1
+        self.app.update_ui_state()
 
     def compose(self) -> ComposeResult:
         cards = self.app.get_card_list()
@@ -809,7 +812,8 @@ class ActionsManagerScreen(ModalScreen):
             if new_idx != -1:
                 # Use a small timer to allow the ListView to fully mount the new items
                 self.set_timer(0.1, lambda: self.select_item_by_data_index(new_idx))
-            
+
+        
         elif event.button.id == "btn-delete-action-mgmt":
             idx = self.current_data_idx
             if idx >= 0:
@@ -873,5 +877,188 @@ class ActionsManagerScreen(ModalScreen):
                         self.set_timer(0.1, lambda: self.select_item_by_data_index(new_idx))
                 except Exception as e:
                     self.app.notify(f"Duplicate error: {e}", severity="error")
+
+class PasswordPromptScreen(ModalScreen):
+    """Modal for entering a password to decrypt a chat."""
+    def __init__(self, file_path):
+        super().__init__()
+        self.file_path = file_path
+
+    def compose(self) -> ComposeResult:
+        yield Vertical(
+            Label("Encrypted Chat Detected", classes="dialog-title"),
+            Input(placeholder="Password / Passphrase", id="input-password", password=True),
+            Horizontal(
+                Button("Unlock & Load", variant="primary", id="btn-unlock"),
+                Button("Cancel", variant="default", id="btn-cancel-unlock"),
+                classes="buttons"
+            ),
+            id="password-prompt-dialog",
+            classes="modal-dialog"
+        )
+
+    def on_mount(self) -> None:
+        self.query_one("#input-password").focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "input-password":
+            self.action_unlock()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-cancel-unlock":
+            self.dismiss(None)
+        elif event.button.id == "btn-unlock":
+            self.action_unlock()
+
+    def action_unlock(self) -> None:
+        password = self.query_one("#input-password").value
+        if not password:
+            self.app.notify("Password required!", severity="warning")
+            self.query_one("#input-password").focus()
+            return
+        
+        try:
+            with open(self.file_path, "r") as f:
+                content = f.read()
+            
+            # Check if it's already JSON (not encrypted) or needs decryption
+            try:
+                # If this succeeds, it was NOT encrypted
+                messages = json.loads(content)
+                self.dismiss(messages)
+                return
+            except json.JSONDecodeError:
+                # Needs decryption
+                decrypted_json = decrypt_data(content, password)
+                messages = json.loads(decrypted_json)
+                self.dismiss(messages)
+        except Exception as e:
+            self.app.notify(str(e), severity="error")
+            self.query_one("#input-password").focus()
+
+class ChatManagerScreen(ModalScreen):
+    """Screen for managing saved chats (loading/saving)."""
+    def compose(self) -> ComposeResult:
+        yield Vertical(
+            Label("Chat Manager - AES-256-GCM + Argon2id", classes="dialog-title"),
+            Horizontal(
+                Vertical(
+                    Label("Saved Chats", classes="label"),
+                    ListView(id="list-saved-chats"),
+                    classes="pane-left"
+                ),
+                Vertical(
+                    Label("Save Current Chat", classes="label"),
+                    Input(placeholder="Filename (optional)...", id="input-save-name"),
+                    Label("Password / Passphrase", classes="label"),
+                    Input(placeholder="Password / Passphrase (optional)..", id="input-save-password", password=True),
+                    Horizontal(
+                        Button("Save Current Chat", variant="primary", id="btn-save-chat"),
+                        classes="buttons"
+                    ),
+                    classes="pane-right"
+                ),
+                id="management-split"
+            ),
+            Horizontal(
+                Button("Load Selected", variant="default", id="btn-load-chat"),
+                Button("Delete", variant="error", id="btn-delete-chat"),
+                Button("Close", variant="default", id="btn-close-chat"),
+                classes="buttons"
+            ),
+            id="chat-manager-dialog",
+            classes="modal-dialog"
+        )
+
+    def on_mount(self) -> None:
+        self.refresh_chat_list()
+
+    def refresh_chat_list(self) -> None:
+        chats_dir = Path(self.app.root_path) / "chats"
+        if not chats_dir.exists():
+            chats_dir.mkdir(parents=True, exist_ok=True)
+        
+        lv = self.query_one("#list-saved-chats", ListView)
+        lv.clear()
+        
+        chats = sorted(list(chats_dir.glob("*.json")))
+        for chat_file in chats:
+            lv.append(ListItem(Label(chat_file.name), name=str(chat_file)))
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-close-chat":
+            self.dismiss()
+        elif event.button.id == "btn-save-chat":
+            save_name = self.query_one("#input-save-name", Input).value.strip()
+            password = self.query_one("#input-save-password", Input).value
+            
+            if not save_name:
+                import datetime
+                save_name = f"chat_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            
+            if not save_name.endswith(".json"):
+                save_name += ".json"
+            
+            chats_dir = Path(self.app.root_path) / "chats"
+            file_path = chats_dir / save_name
+            
+            try:
+                chat_data = json.dumps(self.app.messages, indent=2)
+                if password:
+                    encrypted_data = encrypt_data(chat_data, password)
+                    with open(file_path, "w") as f:
+                        f.write(encrypted_data)
+                    self.app.notify(f"Encrypted chat saved to {save_name}")
+                else:
+                    with open(file_path, "w") as f:
+                        f.write(chat_data)
+                    self.app.notify(f"Chat saved to {save_name}")
+                self.refresh_chat_list()
+                self.query_one("#input-save-password", Input).value = ""
+                self.query_one("#input-save-name").focus()
+            except Exception as e:
+                self.app.notify(f"Error saving chat: {e}", severity="error")
+
+        elif event.button.id == "btn-load-chat":
+            selected = self.query_one("#list-saved-chats", ListView).highlighted_child
+            if selected:
+                file_path = getattr(selected, "name", "")
+                if file_path:
+                    try:
+                        with open(file_path, "r") as f:
+                            content = f.read()
+                        
+                        try:
+                            # Try loading as plain JSON first
+                            messages = json.loads(content)
+                            self.dismiss({"action": "load", "messages": messages})
+                        except json.JSONDecodeError:
+                            # If not JSON, it's likely encrypted. Prompt for password.
+                            self.app.push_screen(PasswordPromptScreen(file_path), self.password_prompt_callback)
+                    except Exception as e:
+                        self.app.notify(f"Error loading chat: {e}", severity="error")
+                        self.query_one("#list-saved-chats").focus()
+            else:
+                self.app.notify("Select a chat to load first!", severity="warning")
+                self.query_one("#list-saved-chats").focus()
+
+        elif event.button.id == "btn-delete-chat":
+            selected = self.query_one("#list-saved-chats", ListView).highlighted_child
+            if selected:
+                file_path = getattr(selected, "name", "")
+                if file_path:
+                    try:
+                        Path(file_path).unlink()
+                        self.app.notify("Chat deleted.")
+                        self.refresh_chat_list()
+                    except Exception as e:
+                        self.app.notify(f"Error deleting chat: {e}", severity="error")
+            else:
+                self.app.notify("Select a chat to delete first!", severity="warning")
+            self.query_one("#list-saved-chats").focus()
+
+    def password_prompt_callback(self, messages):
+        if messages:
+            self.dismiss({"action": "load", "messages": messages})
 
 

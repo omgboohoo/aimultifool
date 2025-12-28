@@ -1,4 +1,4 @@
-# aiMultiFool v0.1.7
+# aiMultiFool v0.1.8
 
 **The Premium Linux Terminal-Based Sandbox for Private AI Roleplay.** 
 Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favorite SillyTavern character cards with zero lag and full privacy.
@@ -12,12 +12,13 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
 - 🎭 **Character Card Support**: Load SillyTavern PNG cards directly from the top menu. Includes a built-in **Metadata Editor** to modify character data without leaving the app. Supports raw text metadata for maximum compatibility.
 - ⚡ **Real-time Metrics**: Live TPS, Token counts, and Context % usage.
 - 💾 **Smart Pruning**: Automatically manages context window by trimming middle-history while preserving the System Prompt and latest messages.
--  **GPU/CPU Auto-Detection**: Optimized layer loading with configuration caching for faster subsequent loads.
+- 🚀 **GPU/CPU Auto-Detection**: Optimized layer loading with configuration caching for faster subsequent loads.
 - 🎨 **Minimalist TUI**: Pure Textual interface styled via external `.tcss` for fast, clean roleplay aesthetics.
 - 🏗️ **Advanced Modular Architecture**: State-of-the-art codebase using Mixins and separate UI/Logic modules for maximum maintainability.
 - 🎭 **Narrative Styles**: Choose from 44 custom presets covering a wide range of tones including Concise, Descriptive, Dramatic, Horror, Whimsical, and more.
 - 🔧 **Advanced AI Parameters**: Precise control over Temperature, Top P, Top K, Repeat Penalty, and the modern **Min P**.
 - 💬 **Action Sidebar**: Right Sidebar containing roleplay tools and system prompts. Features a full in-app **Action Manager** with real-time search and category filtering.
+- 💾 **Secure Conversation Management**: New **File** menu to save and load chat histories. Supports high-grade **AES-256-GCM** encryption with **Argon2id** key derivation for private sessions.
 - 🪲 **Context Window Viewer**: Inspect the raw JSON context and system prompts being sent to the LLM (via the About menu).
 
 ---
@@ -45,9 +46,8 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
 
 | Shortcut | Action |
 | :--- | :--- |
-| **Ctrl+B** | Toggle Sidebars (Settings & Action Menu) |
 | **Ctrl+S** | Stop AI generation |
-| **Ctrl+Enter** | Send prompt or trigger AI "Continue" |
+| **Ctrl+Enter** | Trigger AI "Continue" |
 | **Ctrl+Z** | Rewind (Undo last user/assistant interaction) |
 | **Ctrl+R** | Restart conversation from the beginning |
 | **Ctrl+Shift+W** | Clear chat history completely |

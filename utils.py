@@ -1,9 +1,53 @@
 import json
 import re
+import os
+import base64
 from pathlib import Path
+from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 SETTINGS_FILE = Path(__file__).parent / "settings.json"
 ACTION_MENU_FILE = Path(__file__).parent / "action_menu.json"
+
+def encrypt_data(data: str, password: str) -> str:
+    """Encrypts string data using AES-256-GCM with Argon2id key derivation."""
+    salt = os.urandom(16)
+    kdf = Argon2id(
+        salt=salt,
+        length=32,
+        iterations=3,
+        memory_cost=65536,
+        lanes=4,
+    )
+    key = kdf.derive(password.encode())
+    aesgcm = AESGCM(key)
+    nonce = os.urandom(12)
+    ciphertext = aesgcm.encrypt(nonce, data.encode(), None)
+    # Combine salt + nonce + ciphertext and base64 encode
+    combined = salt + nonce + ciphertext
+    return base64.b64encode(combined).decode('utf-8')
+
+def decrypt_data(encrypted_data: str, password: str) -> str:
+    """Decrypts AES-256-GCM encrypted string data."""
+    try:
+        combined = base64.b64decode(encrypted_data)
+        salt = combined[:16]
+        nonce = combined[16:28]
+        ciphertext = combined[28:]
+        
+        kdf = Argon2id(
+            salt=salt,
+            length=32,
+            iterations=3,
+            memory_cost=65536,
+            lanes=4,
+        )
+        key = kdf.derive(password.encode())
+        aesgcm = AESGCM(key)
+        decrypted = aesgcm.decrypt(nonce, ciphertext, None)
+        return decrypted.decode('utf-8')
+    except Exception as e:
+        raise ValueError("Decryption failed. Incorrect password?") from e
 
 def _get_action_menu_data():
     """Retrieves action menu data from the JSON file or creates it from defaults."""

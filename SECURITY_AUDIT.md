@@ -1,5 +1,5 @@
 # Security & Privacy Audit
-**Application**: aiMultiFool v0.1.5  
+**Application**: aiMultiFool v0.1.8  
 **Status**: ✅ Fully Private / Offline-Ready
 
 ## 1. Executive Summary
@@ -42,9 +42,11 @@ aiMultiFool is designed with a "Privacy First" architecture. All Large Language 
 - **Metadata Editing**: The built-in character editor operates strictly on local PNG files.
 - **In-App Processing**: Metadata extraction and injection handle binary `zTXt/tEXt` chunks locally using standard Python libraries.
 
-### 🧠 In-Memory Conversation
-- **Chat History**: Held strictly in system RAM during the session.
-- **Persistence**: **Zero**. Chat history is not saved to disk. Closing the application permanently wipes the current session.
+### 📁 Conversation Persistence (Encrypted)
+- Chats can be optionally saved to the `chats/` directory.
+- **Encryption**: Optional high-grade **AES-256-GCM** authenticated encryption.
+- **KDF**: Uses **Argon2id** (64MB memory cost, 3 iterations) to derive keys from user passphrases.
+- **Privacy**: Without the passphrase, sessions are cryptographically inaccessible. Decryption occurs strictly in system RAM.
 
 ---
 

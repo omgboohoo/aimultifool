@@ -61,12 +61,4 @@ class UIMixin:
 
     def watch_user_name(self, name):
         if hasattr(self, "title"):
-            self.title = f"aiMultiFool v0.1.7 - {name}"
-
-    def watch_is_model_loading(self, loading: bool) -> None:
-        try:
-            btn = self.query_one("#btn-load-model", Button)
-            btn.loading = loading
-            btn.disabled = loading
-        except Exception:
-            pass
+            self.title = f"aiMultiFool v0.1.8 - {name}"

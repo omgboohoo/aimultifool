@@ -289,8 +289,22 @@ AboutScreen {
     align: center middle;
 }
 
+ChatManagerScreen {
+    align: center middle;
+}
+
+PasswordPromptScreen {
+    align: center middle;
+}
+
 ActionsManagerScreen {
     align: center middle;
+}
+
+#password-prompt-dialog {
+    width: 50;
+    height: auto;
+    padding: 1;
 }
 
 #actions-dialog {
@@ -414,6 +428,17 @@ ActionsManagerScreen {
     border: solid $primary;
 }
 
+#chat-manager-dialog {
+    width: 85;
+    height: 60%;
+    max-height: 90%;
+}
+
+#list-saved-chats {
+    height: 1fr;
+    background: transparent;
+}
+
 .dialog-title {
     width: 100%;
     content-align: center middle;
@@ -455,7 +480,7 @@ ActionsManagerScreen {
     width: 100%;
     height: auto;
     align: center middle;
-    margin-top: 1;
+    margin-top: 2;
     margin-bottom: 1;
 }
 

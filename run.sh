@@ -13,7 +13,7 @@ WHEEL_DIR="$SCRIPT_DIR/llama.cpp"
 WHEEL_PATH="$WHEEL_DIR/$WHEEL_NAME"
 
 echo "----------------------------------------------------------------"
-echo "  aiMultiFool Suite - Setup & Launch Script v0.1.6"
+echo "  aiMultiFool Suite - Setup & Launch Script v0.1.8"
 echo "----------------------------------------------------------------"
 
 # 1. Ensure the llama.cpp directory exists
