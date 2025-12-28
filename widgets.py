@@ -7,7 +7,7 @@ from textual.screen import ModalScreen
 from textual.containers import Vertical, Container, Horizontal, Grid, ScrollableContainer
 from textual.widgets import Label, Input, Select, Button, ListView, ListItem, Static, TextArea
 from pathlib import Path
-from utils import save_action_menu_data, encrypt_data, decrypt_data
+from utils import save_action_menu_data, encrypt_data, decrypt_data, copy_to_clipboard
 
 def create_styled_text(text):
     """Create a rich renderable with styled quoted text"""
@@ -252,6 +252,7 @@ class ContextWindowScreen(ModalScreen):
             Label("Context Window", classes="dialog-title"),
             TextArea(context_text, id="context-text", read_only=True),
             Horizontal(
+                Button("Copy", variant="default", id="copy"),
                 Button("Close", variant="default", id="close"),
                 classes="buttons"
             ),
@@ -262,6 +263,13 @@ class ContextWindowScreen(ModalScreen):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "close":
             self.dismiss()
+        elif event.button.id == "copy":
+            context_text = self.query_one("#context-text", TextArea).text
+            # Try our robust Linux copy first (uses xclip/xsel)
+            if not copy_to_clipboard(context_text):
+                # Fallback to Textual's OSC 52 method
+                self.app.copy_to_clipboard(context_text)
+            self.app.notify("Context copied to clipboard!")
 
 class CharactersScreen(ModalScreen):
     """Integrated character list and metadata editor."""

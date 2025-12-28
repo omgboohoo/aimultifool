@@ -2,9 +2,11 @@
  
 ## v0.1.9: Speed, Safety & Stats
 - **Smart Rewind**: Rewinding now automatically restores the last user message to the input box for rapid correction and resending.
-- **Streamlined Launch**: `run.sh` now intelligently skips the venv setup and recreation prompts if a virtual environment is already present, ensuring the fastest possible startup.
+- **Interactive Setup**: `run.sh` now prompts for environment reinstallation on launch with a recommendation to do so after updates, ensuring dependency alignment while maintaining fast startup by default.
 - **Lapse-Free Loading**: Optimized the model selection workflow—the modal now closes and locks UI controls before initializing resource-heavy model loading, eliminating visual lag.
 - **Performance Metrics**: Integrated **"Peak TPS"** tracking into the status bar, providing real-time visibility into your hardware's maximum generation speed during every interaction.
+- **Robust Clipboard**: Added a "Copy" button to the Context Window modal powered by `pyperclip`, providing reliable cross-platform clipboard sync and resolving TUI-specific copy limitations.
+- **Roleplay Immersion**: Selection of the "Default" style now intelligently suppresses the generic assistant persona when a character card is active, preventing immersion-breaking character shifts.
 
 ## v0.1.8: Secure Persistence & File Management
 - **Secure Chat Management**: Introduced a new **File** menu allowing users to save and load conversation histories.

@@ -315,7 +315,8 @@ class ActionsMixin:
         
         # 6. Apply style and print instructions
         if hasattr(self, "update_system_prompt_style"):
-            await self.update_system_prompt_style(self.style)
+            # Suppress info message if restarting with a character card to keep it clean
+            await self.update_system_prompt_style(self.style, suppress_info=bool(self.current_character))
         # 6. Restart the inference
         if self.current_character:
             # For character cards, we send 'continue' to trigger the character's first response

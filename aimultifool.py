@@ -590,11 +590,16 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             self.populate_right_sidebar(event.value)
             self.query_one("#btn-clear-search").disabled = not bool(event.value.strip())
 
-    async def update_system_prompt_style(self, style: str) -> None:
+    async def update_system_prompt_style(self, style: str, suppress_info: bool = False) -> None:
         if not self.messages: return
         has_started = len(self.messages) > 1
         
-        style_instruction = get_style_prompt(style)
+        # If a character is active and style is Default, we don't want the "Helpful Assistant" persona.
+        # We only want the basic procedural constraints.
+        if self.current_character and style.lower() == "default":
+            style_instruction = "Do not reply on behalf of user."
+        else:
+            style_instruction = get_style_prompt(style)
         
         if self.current_character:
             # We must re-import here to avoid circular imports if any, 
@@ -608,9 +613,15 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
 
         if self.messages and self.messages[0]["role"] == "system":
             self.messages[0]["content"] = new_content
-            if has_started: self.notify(f"Style updated: {style.capitalize()}")
+            if has_started and not suppress_info: 
+                self.notify(f"Style updated: {style.capitalize()}")
+            elif not has_started and not suppress_info:
+                # If chat hasn't started, clear previous style info messages 
+                # to prevent multiple instruction blocks in an empty chat.
+                self.query_one("#chat-scroll").remove_children()
 
-        await self.add_info_message(f"[Style: {style.capitalize()}]\n\n{new_content}")
+        if not suppress_info:
+            await self.add_info_message(f"[Style: {style.capitalize()}]\n\n{new_content}")
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "chat-input":

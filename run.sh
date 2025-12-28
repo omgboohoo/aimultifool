@@ -57,13 +57,20 @@ WHEEL_FILE=$(ls "$WHEEL_DIR/"llama_cpp_python-*.whl 2>/dev/null | head -n 1)
 
 # Check if venv already exists
 if [ -d "$VENV_DIR" ]; then
-    echo "[STATUS] Virtual environment detected. Auto-skipping setup."
-    source "$VENV_DIR/bin/activate"
-    
-    echo "[LAUNCH] Starting aiMultiFool TUI..."
-    echo ""
-    python "$SCRIPT_DIR/aimultifool.py"
-    exit 0
+    echo "[STATUS] Virtual environment detected."
+    echo "[INFO]   It is recommended to reinstall (y) if you just updated to a new version."
+    read -p "Do you want to reinstall the environment? [y/N] (Default: n): " choice
+    if [[ "$choice" =~ ^[yY]$ ]]; then
+        echo "[ACTION] Reinstalling environment..."
+        rm -rf "$VENV_DIR"
+    else
+        echo "[SKIP] Skipping environment setup."
+        source "$VENV_DIR/bin/activate"
+        echo "[LAUNCH] Starting aiMultiFool TUI..."
+        echo ""
+        python "$SCRIPT_DIR/aimultifool.py"
+        exit 0
+    fi
 fi
 
 # Create virtual environment

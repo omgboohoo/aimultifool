@@ -9,6 +9,15 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 SETTINGS_FILE = Path(__file__).parent / "settings.json"
 ACTION_MENU_FILE = Path(__file__).parent / "action_menu.json"
 
+def copy_to_clipboard(text: str) -> bool:
+    """Robust copy to clipboard using the pyperclip library."""
+    try:
+        import pyperclip
+        pyperclip.copy(text)
+        return True
+    except Exception:
+        return False
+
 def encrypt_data(data: str, password: str) -> str:
     """Encrypts string data using AES-256-GCM with Argon2id key derivation."""
     salt = os.urandom(16)
