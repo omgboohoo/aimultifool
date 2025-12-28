@@ -96,6 +96,9 @@ class ModelScreen(ModalScreen):
         )
 
     def on_mount(self) -> None:
+        title = self.query_one(".dialog-title")
+        title.can_focus = True
+        title.focus()
         # Populate fields from app state
         app = self.app
 
@@ -247,6 +250,11 @@ class ContextWindowScreen(ModalScreen):
         super().__init__()
         self.messages = messages
 
+    def on_mount(self) -> None:
+        title = self.query_one(".dialog-title")
+        title.can_focus = True
+        title.focus()
+
     def compose(self) -> ComposeResult:
         context_text = json.dumps(self.messages, indent=2)
         yield Vertical(
@@ -277,6 +285,9 @@ class CharactersScreen(ModalScreen):
     last_search_idx = -1
 
     def on_mount(self) -> None:
+        title = self.query_one(".dialog-title")
+        title.can_focus = True
+        title.focus()
         self.last_search_idx = -1
         self.app.update_ui_state()
 
@@ -422,10 +433,12 @@ class CharactersScreen(ModalScreen):
                 if old_content != new_content:
                     text_area.text = new_content
                     self.app.notify(f"Replaced occurrences of '{search_text}' (case-insensitive)")
+                    self.query_one(".dialog-title").focus()
                 else:
                     self.app.notify(f"'{search_text}' not found.", severity="warning")
             else:
                 self.app.notify("Enter search text!", severity="warning")
+            self.query_one(".dialog-title").focus()
         elif event.button.id == "btn-save-metadata":
             if card_path:
                 metadata_str = self.query_one("#metadata-text", TextArea).text.strip()
@@ -433,15 +446,21 @@ class CharactersScreen(ModalScreen):
                 success = write_chara_metadata(card_path, metadata_str)
                 if success:
                     self.app.notify(f"Successfully updated {Path(card_path).name}")
+                    self.query_one(".dialog-title").focus()
                 else:
                     self.app.notify("Failed to write metadata!", severity="error")
             else:
                 self.app.notify("Select a card first!", severity="warning")
+            self.query_one(".dialog-title").focus()
         elif event.button.id == "btn-cancel-mgmt":
             self.dismiss(None)
 
 class ParametersScreen(ModalScreen):
     """Modal for adjusting AI generation parameters."""
+    def on_mount(self) -> None:
+        title = self.query_one(".dialog-title")
+        title.can_focus = True
+        title.focus()
     def compose(self) -> ComposeResult:
         # Fetch current values from the app
         app = self.app
@@ -496,6 +515,7 @@ class ParametersScreen(ModalScreen):
                 try: self.query_one(f"#input-{attr}", Input).value = str(val)
                 except Exception: pass
             self.app.notify("UI values reset. Click Apply to save.")
+            self.query_one(".dialog-title").focus()
             
         elif event.button.id == "btn-apply-params":
             # Read from UI and apply to app
@@ -836,6 +856,7 @@ class ActionsManagerScreen(ModalScreen):
                     self.refresh_action_list()
                     self.app.notify("Action deleted.")
                     self.current_data_idx = -1
+                    self.query_one(".dialog-title").focus()
                 except Exception as e:
                     self.app.notify(f"Delete error: {e}", severity="error")
                 # Reset inputs if list empty
@@ -982,6 +1003,9 @@ class ChatManagerScreen(ModalScreen):
         )
 
     def on_mount(self) -> None:
+        title = self.query_one(".dialog-title")
+        title.can_focus = True
+        title.focus()
         self.refresh_chat_list()
 
     def refresh_chat_list(self) -> None:

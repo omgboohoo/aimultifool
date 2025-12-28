@@ -174,7 +174,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         settings = load_settings()
         self.user_name = settings.get("user_name", "User")
         self.context_size = settings.get("context_size", 4096)
-        self.gpu_layers = -1
+        self.gpu_layers = settings.get("gpu_layers", -1)
         self.style = "Default"
         self.temp = settings.get("temp", 0.8)
         self.topp = settings.get("topp", 0.9)

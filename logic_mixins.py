@@ -404,6 +404,7 @@ class ActionsMixin:
         settings = {
             "user_name": self.user_name,
             "context_size": self.context_size,
+            "gpu_layers": self.gpu_layers,
             "selected_model": self.selected_model,
             "temp": self.temp,
             "topp": self.topp,
