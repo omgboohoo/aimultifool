@@ -198,7 +198,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             # We don't set the widget value here anymore as the modal handles it
             pass
 
-        self.title = f"aiMultiFool v0.1.11"
+        self.title = f"aiMultiFool v0.1.10"
         # Sidebar is gone
         self.query_one("#right-sidebar").add_class("-visible")
         self.watch_is_loading(self.is_loading)
