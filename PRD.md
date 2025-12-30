@@ -1,4 +1,4 @@
-# Product Requirements Document: aiMultiFool v0.1.9
+# Product Requirements Document: aiMultiFool v0.1.10
 
 ## 1. Executive Summary
 aiMultiFool is a premium Linux TUI sandbox for private AI roleplay. Built with **Textual** and **llama.cpp**, it provides a local, high-performance interface for interacting with GGUF models using SillyTavern character cards.
@@ -17,7 +17,7 @@ aiMultiFool is a premium Linux TUI sandbox for private AI roleplay. Built with *
 
 ### 3.1 Interface & Layout
 - **Two-Column Layout**: Central Area (Chat) and a Right Sidebar (Settings & Actions). Accessible via a minimalist TUI design.
-- **Global Modals**: Dedicated screens for **Character Cards**, **AI Parameters**, and **Action Management**.
+- **Global Modals**: Dedicated screens for **Character Cards**, **AI Parameters**, and **Action Management**. All major interactions, including password prompts and file naming, are handled via focused, centered modals.
 - **Real-time Status Bar**: Displays current state (Ready, Thinking, Recording) and live TPS/Context metrics.
 
 ### 3.2 AI & Inference
@@ -26,8 +26,9 @@ aiMultiFool is a premium Linux TUI sandbox for private AI roleplay. Built with *
 - **Smart Pruning**: Automatically trims middle-history if context exceeds 80%, strictly preserving the System Prompt and latest turns.
 
 ### 3.3 Character & Content
-- **SillyTavern Integration**: Manual binary chunk handling for PNG metadata extraction and in-app metadata injection.
-- **Style Blending**: Users select from 20 narrative styles that are dynamically blended into the character's system instructions.
+- **SillyTavern Integration**: Manual binary chunk handling for PNG metadata extraction and in-app metadata injection. Includes **real-time AI-powered generation** and **on-demand AES-256-GCM encryption** for limiting access to sensitive character data.
+- **Smart Templates**: New character cards are automatically instantiated from a consistent base template (`aimultifool.png`), ensuring immediate compatibility and visual consistency.
+- **Style Blending**: Users select from 44 narrative styles that are dynamically blended into the character's system instructions.
 - **Action Manager**: Searchable sidebar for tools; changes are saved instantly as the user types.
 - **Secure File Persistence**: High-grade **AES-256-GCM** encryption with **Argon2id** key derivation for chat history.
 

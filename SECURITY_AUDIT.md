@@ -1,5 +1,5 @@
 # Security & Privacy Audit
-**Application**: aiMultiFool v0.1.9  
+**Application**: aiMultiFool v0.1.10  
 **Status**: ✅ Fully Private / Offline-Ready
 
 ## 1. Executive Summary
@@ -41,12 +41,14 @@ aiMultiFool is designed with a "Privacy First" architecture. All Large Language 
 ### 🎭 Character Metadata (Local Only)
 - **Metadata Editing**: The built-in character editor operates strictly on local PNG files.
 - **In-App Processing**: Metadata extraction and injection handle binary `zTXt/tEXt` chunks locally using standard Python libraries.
+- **Smart Templates**: Locally cloned from `aimultifool.png` root asset; no external assets are fetched.
 
-### 📁 Conversation Persistence (Encrypted)
-- Chats can be optionally saved to the `chats/` directory.
-- **Encryption**: Optional high-grade **AES-256-GCM** authenticated encryption.
-- **KDF**: Uses **Argon2id** (64MB memory cost, 3 iterations) to derive keys from user passphrases.
-- **Privacy**: Without the passphrase, sessions are cryptographically inaccessible. Decryption occurs strictly in system RAM.
+### 🔒 Encryption Features (AES-256-GCM)
+- **Conversation Persistence**: High-grade authenticated encryption for saved chats in the `chats/` directory.
+- **Character Card Encryption (New)**: Metadata within individual character cards can now be optionally encrypted.
+- **Encryption Algorithm**: **AES-256-GCM** (Galois/Counter Mode) via the `cryptography` library.
+- **KDF (Key Derivation Function)**: Uses **Argon2id** (64MB memory cost, 3 iterations) to derive keys from user passphrases. This is a memory-hard function resistant to GPU-based brute-force attacks.
+- **Privacy**: Without the correct passphrase, both chat histories and character metadata are cryptographically inaccessible. Decryption occurs purely in system RAM.
 
 ---
 
@@ -54,10 +56,12 @@ aiMultiFool is designed with a "Privacy First" architecture. All Large Language 
 - **`llama-cpp-python`**: Local C++ bindings for inference.
 - **`textual` / `rich`**: TUI framework (Terminal-only).
 - **`requests`**: Only used for initiated model downloads.
-- **`advanced modular architecture`**: Logic is isolated into Mixins, allowing for transparent auditing of how data flows between the UI and the AI engine.
+- **`cryptography`**: Standard library for industry-vetted encryption (AES-GCM, Argon2id).
+- **`pyperclip`**: Local clipboard interaction; does not store or transmit data.
 
 ---
 
 ## 5. Privacy Guarantee
 aiMultiFool **cannot** see, read, or store your conversations. Your roleplay sessions are entirely your own and exist only as long as the application window is open.
+
 

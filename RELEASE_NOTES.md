@@ -1,6 +1,15 @@
 # Release Notes
  
+## v0.1.10: Real-Time AI & Enhanced Management
+### 🪄 Intelligent Creation
+- **AI Assisted Character Card Editing**: The Character Card AI Editor now **streams its thoughts in real-time**, providing instant feedback as it crafts your character's personality and metadata on the fly.
+- **Smart Card Templates**: Creating a "New Card" now automatically clones the `aimultifool.png` base and injects a complete V2 template, allowing for immediate AI-assisted editing without starting from scratch.
+
+### 🔒 Security & Management
+- **On-Demand Card Encryption**: Secure your character cards with AES-256-GCM encryption via a new "Save as Encrypted" modal prompt. Encrypted cards are locked by default and must be explicitly unlocked to view or play.
+
 ## v0.1.9: Speed, Safety & Stats
+
 - **Smart Rewind**: Rewinding now automatically restores the last user message to the input box for rapid correction and resending.
 - **Interactive Setup**: `run.sh` now prompts for environment reinstallation on launch with a recommendation to do so after updates, ensuring dependency alignment while maintaining fast startup by default.
 - **Lapse-Free Loading**: Optimized the model selection workflow—the modal now closes and locks UI controls before initializing resource-heavy model loading, eliminating visual lag.

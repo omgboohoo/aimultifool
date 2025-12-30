@@ -1,13 +1,85 @@
+import os
 import re
 import json
+import asyncio
 import webbrowser
+from pathlib import Path
 from rich.text import Text
+from textual import work
 from textual.app import ComposeResult
 from textual.screen import ModalScreen
 from textual.containers import Vertical, Container, Horizontal, Grid, ScrollableContainer
 from textual.widgets import Label, Input, Select, Button, ListView, ListItem, Static, TextArea
-from pathlib import Path
 from utils import save_action_menu_data, encrypt_data, decrypt_data, copy_to_clipboard
+from character_manager import extract_chara_metadata, write_chara_metadata
+
+class GenericPasswordModal(ModalScreen):
+    """Generic modal for entering a password."""
+    def __init__(self, title="Enter Password", allow_blank=False, **kwargs):
+        super().__init__(**kwargs)
+        self.dialog_title = title
+        self.allow_blank = allow_blank
+
+    def compose(self) -> ComposeResult:
+        yield Vertical(
+            Label(self.dialog_title, classes="dialog-title"),
+            Input(placeholder="Password / Passphrase", id="input-generic-password"),
+            Horizontal(
+                Button("Confirm", variant="primary", id="btn-confirm-pass"),
+                Button("Cancel", variant="default", id="btn-cancel-pass"),
+                classes="buttons"
+            ),
+            id="password-prompt-dialog",
+            classes="modal-dialog"
+        )
+
+    def on_mount(self) -> None:
+        self.query_one("#input-generic-password").focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self.action_confirm()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-cancel-pass":
+            self.dismiss(None)
+        elif event.button.id == "btn-confirm-pass":
+            self.action_confirm()
+
+    def action_confirm(self) -> None:
+        password = self.query_one("#input-generic-password").value
+        if not password and not self.allow_blank:
+            self.app.notify("Password required!", severity="warning")
+            self.query_one("#input-generic-password").focus()
+            return
+        self.dismiss(password)
+
+class FileNamePrompt(ModalScreen):
+    """Modal to ask for a new file name."""
+    def __init__(self, initial_value: str = "", prompt_text: str = "Enter filename:"):
+        super().__init__()
+        self.initial_value = initial_value
+        self.prompt_text = prompt_text
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="name-prompt-dialog", classes="modal-dialog"):
+            yield Label(self.prompt_text, classes="dialog-title")
+            yield Input(value=self.initial_value, id="filename-input")
+            with Horizontal(classes="buttons"):
+                yield Button("Cancel", id="btn-cancel", variant="default")
+                yield Button("Confirm", id="btn-confirm", variant="success")
+
+    def on_mount(self) -> None:
+        self.query_one("#filename-input").focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self.dismiss(event.value)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-confirm":
+            val = self.query_one("#filename-input", Input).value
+            self.dismiss(val)
+        else:
+            self.dismiss(None)
 
 def create_styled_text(text):
     """Create a rich renderable with styled quoted text"""
@@ -290,13 +362,17 @@ class CharactersScreen(ModalScreen):
         title.focus()
         self.last_search_idx = -1
         self.app.update_ui_state()
+        
+        # Welcome message
+        history = self.query_one("#ai-meta-history", ScrollableContainer)
+        history.mount(Static("Assistant: Hello! I can help you edit character metadata. Ask me to change names, descriptions, or traits.", classes="ai-message"))
 
     def compose(self) -> ComposeResult:
         cards = self.app.get_card_list()
         items = [ListItem(Label(card.name), name=str(card)) for card in cards]
         
         yield Vertical(
-            Label("Character Management", classes="dialog-title"),
+            Label("Character Management - Stheno 8b Model Recommended", classes="dialog-title"),
             Horizontal(
                 Vertical(
                     Label("Cards", classes="label"),
@@ -314,34 +390,107 @@ class CharactersScreen(ModalScreen):
                     TextArea(id="metadata-text"),
                     classes="pane-right"
                 ),
+                Vertical(
+                    Label("AI Card Editor", classes="label"),
+                    ScrollableContainer(id="ai-meta-history"),
+                    Input(placeholder="Ask AI to edit... (e.g. 'change name to Bob')", id="ai-meta-input"),
+                    classes="pane-ai"
+                ),
                 id="management-split"
             ),
             Horizontal(
                 Button("Play", variant="default", id="btn-play-card", disabled=not self.app.llm),
+                Button("New", variant="default", id="btn-new-card"),
                 Button("Duplicate", variant="default", id="btn-duplicate-card"),
+                Button("Rename", variant="default", id="btn-rename-card"),
+                Button("Delete", variant="error", id="btn-delete-card"),
                 Button("Save Changes", variant="default", id="btn-save-metadata"),
-                Button("Cancel", variant="default", id="btn-cancel-mgmt"),
+                Button("Close", variant="default", id="btn-cancel-mgmt"),
                 classes="buttons"
             ),
             id="characters-dialog",
             classes="modal-dialog"
         )
 
+    def refresh_list(self, select_path: str = None) -> None:
+        """Explicitly refresh the character list widget."""
+        cards = self.app.get_card_list()
+        lv = self.query_one("#list-characters", ListView)
+        lv.clear()
+        
+        target_idx = -1
+        for i, card in enumerate(cards):
+            card_str = str(card)
+            lv.append(ListItem(Label(card.name), name=card_str))
+            if select_path and card_str == select_path:
+                target_idx = i
+        
+        if target_idx != -1:
+            self.force_select_index(target_idx, select_path)
+            
+        self.app.update_ui_state()
+
+    @work
+    async def force_select_index(self, idx: int, path: str) -> None:
+        # Brutal wait to ensure UI is ready
+        await asyncio.sleep(0.5)
+        lv = self.query_one("#list-characters", ListView)
+        lv.index = idx
+        lv.focus()
+        self.load_metadata(path)
+
+    def load_metadata(self, card_path: str, password_attempt: str = None) -> None:
+        """Load character metadata into the editor."""
+        if not card_path:
+            return
+        from character_manager import extract_chara_metadata
+        chara_json = extract_chara_metadata(card_path)
+        
+        if chara_json:
+            try:
+                # Check for standard JSON first
+                parsed = json.loads(chara_json)
+                pretty_json = json.dumps(parsed, indent=4)
+                self.query_one("#metadata-text", TextArea).text = pretty_json
+            except Exception:
+                # Might be encrypted
+                if password_attempt:
+                     try:
+                        decrypted = decrypt_data(chara_json, password_attempt)
+                        if decrypted:
+                            try:
+                                parsed = json.loads(decrypted)
+                                pretty_json = json.dumps(parsed, indent=4)
+                                self.query_one("#metadata-text", TextArea).text = pretty_json
+                            except:
+                                self.query_one("#metadata-text", TextArea).text = decrypted
+                        else:
+                             self.app.notify("Incorrect Password!", severity="error")
+                             # Don't clear text to avoid flickers, just maybe show error toast
+                     except Exception:
+                        self.app.notify("Decryption Failed!", severity="error")
+                else:
+                    self.query_one("#metadata-text", TextArea).text = "Encrypted Data (Click card in list to Unlock)"
+        else:
+            self.query_one("#metadata-text", TextArea).text = "No metadata found."
+
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         if event.list_view.id == "list-characters" and event.item:
-            card_path = getattr(event.item, "name", "")
-            if card_path:
-                from character_manager import extract_chara_metadata
-                chara_json = extract_chara_metadata(card_path)
-                if chara_json:
-                    try:
-                        parsed = json.loads(chara_json)
-                        pretty_json = json.dumps(parsed, indent=4)
-                    except Exception:
-                        pretty_json = chara_json
-                    self.query_one("#metadata-text", TextArea).text = pretty_json
-                else:
-                    self.query_one("#metadata-text", TextArea).text = "No metadata found."
+            self.load_metadata(getattr(event.item, "name", ""))
+            
+    async def on_list_view_selected(self, event: ListView.Selected) -> None:
+        if event.list_view.id == "list-characters" and event.item:
+            # Check if encrypted
+            tas = self.query("#metadata-text")
+            if not tas: return
+            text_area = tas.first()
+            if text_area.text.startswith("Encrypted Data"):
+                 card_path = getattr(event.item, "name", "")
+                 def on_pass(password):
+                     if password:
+                         self.load_metadata(card_path, password_attempt=password)
+                 
+                 self.app.push_screen(GenericPasswordModal(title="Enter Password to Unlock"), on_pass)
 
     def perform_search(self, search_text, start_from=0):
         if not search_text:
@@ -400,6 +549,165 @@ class CharactersScreen(ModalScreen):
         if event.input.id == "input-search-meta":
             # Search from the next character to find the NEXT occurrence
             self.perform_search(event.value, start_from=self.last_search_idx + 1)
+        elif event.input.id == "ai-meta-input":
+            user_text = event.input.value.strip()
+            if user_text:
+                current_meta = self.query_one("#metadata-text", TextArea).text
+                self.ask_ai_to_edit(user_text, current_meta)
+                event.input.value = ""
+
+    @work(exclusive=True)
+    async def ask_ai_to_edit(self, user_request: str, current_metadata: str) -> None:
+        if not self.app.llm:
+            self.app.notify("Model not loaded! Load a model first.", severity="error")
+            return
+
+        history = self.query_one("#ai-meta-history", ScrollableContainer)
+        history.mount(Static(f"User: {user_request}", classes="ai-message user"))
+        history.scroll_end()
+        
+        status_msg = Static("AI is thinking...", classes="ai-message system")
+        history.mount(status_msg)
+        history.scroll_end()
+
+        try:
+            # Check if this looks like a new/template card to refine the prompt
+            is_template = "New Character" in current_metadata and len(current_metadata) < 1000
+            
+            system_prompt = (
+                "You are an expert character card creator for SillyTavern V2 format. "
+                "Your goal is to transform the user's request into high-quality character data. "
+                "\n\nINSTRUCTIONS:\n"
+                "1. Provide a SINGLE flat JSON block with these keys: name, description, personality, scenario, first_mes, mes_example, tags (array).\n"
+                "2. Be creative and detailed. Expand on the user's idea to make a rich, playable character.\n"
+                "3. Ensure the character's voice in the 'first_mes' and 'mes_example' is distinct and consistent with their personality.\n"
+                "\n\nJSON RULES:\n"
+                "- ALWAYS provide the JSON in a ```json block.\n"
+                "- Do NOT nest a 'data' block; provide a flat dictionary of the core fields.\n"
+            )
+            
+            full_prompt = f"Current SillyTavern V2 JSON:\n{current_metadata}\n\nUser Message: {user_request}\n\nComplete the card based on this request (include full updated JSON in ```json block):"
+            
+            import threading
+            import queue as thread_queue
+            
+            token_queue = thread_queue.Queue()
+            
+            llm = self.app.llm
+            params = {
+                "temperature": self.app.temp,
+                "top_p": self.app.topp,
+                "top_k": self.app.topk,
+                "repeat_penalty": self.app.repeat,
+                "min_p": self.app.minp,
+                "max_tokens": 4096,
+                "stream": True,
+                "stop": ["```\n", "}\n\n"] # Stop sequences to prevent trailing loop/gibberish
+            }
+            
+            def stream_generation():
+                try:
+                    stream = llm.create_chat_completion(
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": full_prompt}
+                        ],
+                        **params
+                    )
+                    for chunk in stream:
+                        delta = chunk["choices"][0]["delta"].get("content", "")
+                        if delta:
+                            token_queue.put(delta)
+                    token_queue.put(None)
+                except Exception as e:
+                    token_queue.put(e)
+
+            t = threading.Thread(target=stream_generation)
+            t.start()
+            
+            answer = ""
+            finished = False
+            
+            while not finished:
+                try:
+                    while True:
+                        item = token_queue.get_nowait()
+                        if item is None:
+                            finished = True
+                            break
+                        if isinstance(item, Exception):
+                            raise item
+                        answer += item
+                except thread_queue.Empty:
+                    pass
+                
+                if answer:
+                    status_msg.update(f"AI: {answer}")
+                
+                if finished:
+                    break
+                    
+                history.scroll_end()
+                await asyncio.sleep(0.05)
+            
+            # Post-processing
+            json_match = re.search(r"```json\s*(.*?)\s*```", answer, re.DOTALL)
+            if not json_match:
+                json_match = re.search(r"({.*})", answer, re.DOTALL)
+                
+            clean_json = None
+            if json_match:
+                try:
+                    raw_json = json_match.group(1).strip()
+                    parsed_ai = json.loads(raw_json)
+                    
+                    # Merge logic: Take the simplified AI output and apply it to the full V2 structure
+                    try:
+                        base_v2 = json.loads(current_metadata)
+                        
+                        # Primary fields to clone
+                        core_fields = ["name", "description", "personality", "scenario", "first_mes", "mes_example"]
+                        
+                        for key in core_fields:
+                            if key in parsed_ai:
+                                val = parsed_ai[key]
+                                base_v2[key] = val
+                                if "data" in base_v2:
+                                    base_v2["data"][key] = val
+                        
+                        if "tags" in parsed_ai:
+                            tags = parsed_ai["tags"]
+                            if "data" in base_v2:
+                                base_v2["data"]["tags"] = tags
+                        
+                        clean_json = json.dumps(base_v2, indent=4)
+                    except Exception:
+                        # Fallback if current metadata is not valid JSON
+                        clean_json = json.dumps(parsed_ai, indent=4)
+                except json.JSONDecodeError:
+                    pass
+            
+            conv_text = answer
+            if json_match:
+                if "```json" in answer:
+                    conv_text = re.sub(r"```json.*?```", "", answer, flags=re.DOTALL).strip()
+                else:
+                    conv_text = answer.replace(json_match.group(1), "").strip()
+
+            if clean_json:
+                self.query_one("#metadata-text", TextArea).text = clean_json
+                status_msg.update("AI: JSON Updated.")
+            else:
+                status_msg.update("AI: (No structural changes)")
+            
+            if conv_text:
+                conv_text += "\n\n(Don't forget to click 'Save Changes' if you like the results!)"
+                history.mount(Static(f"Assistant: {conv_text}", classes="ai-message"))
+                
+        except Exception as e:
+            status_msg.update(f"AI error: {str(e)}")
+        
+        history.scroll_end()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         selected_item = self.query_one("#list-characters", ListView).highlighted_child
@@ -411,15 +719,104 @@ class CharactersScreen(ModalScreen):
                 return
             if card_path:
                 metadata_str = self.query_one("#metadata-text", TextArea).text.strip()
+                
+                # Check if card is still encrypted
+                if metadata_str.startswith("Encrypted Data"):
+                    self.app.notify("Card is encrypted! Enter password to unlock.", severity="error")
+                    self.query_one("#input-card-password").focus()
+                    return
+                
                 # We don't care if it's JSON or not, the engine now handles both
                 self.dismiss({"action": "play", "path": card_path, "meta": metadata_str})
             else:
                 self.app.notify("Select a card first!", severity="warning")
+        elif event.button.id == "btn-new-card":
+            def on_filename(filename):
+                if not filename:
+                    return
+                # Ensure .png extension
+                if not filename.lower().endswith(".png"):
+                    filename += ".png"
+                
+                new_path = self.app.create_new_character_card(filename=filename)
+                if new_path:
+                    self.app.notify(f"Created new card: {os.path.basename(new_path)}")
+                    self.refresh_list(select_path=str(new_path))
+                    
+                    # Initiate AI Guidance
+                    history = self.query_one("#ai-meta-history", ScrollableContainer)
+                    history.remove_children()
+                    history.mount(Static("Assistant: I've created a new card template! Tell me about the character you want to create (e.g., 'a 1920s detective who is obsessed with coffee'), and I'll fill out the whole card for you.", classes="ai-message"))
+                    
+                    # Focus the AI input
+                    self.query_one("#ai-meta-input", Input).focus()
+                else:
+                    self.app.notify("Failed to create card (file name might exist)", severity="error")
+                    self.query_one(".dialog-title").focus()
+
+            self.app.push_screen(FileNamePrompt(initial_value="New_Character_Card", prompt_text="Name your new character file:"), on_filename)
         elif event.button.id == "btn-duplicate-card":
             if card_path:
-                self.dismiss({"action": "duplicate", "path": card_path})
+                new_path = self.app.duplicate_character_card(card_path)
+                if new_path:
+                    self.app.notify(f"Duplicated: {os.path.basename(new_path)}")
+                    self.refresh_list(select_path=str(new_path))
             else:
                 self.app.notify("Select a card first!", severity="warning")
+            self.query_one(".dialog-title").focus()
+        elif event.button.id == "btn-rename-card":
+            if card_path:
+                current_name = Path(card_path).stem
+                
+                def on_rename(new_name):
+                    if not new_name:
+                        return
+                    if not new_name.lower().endswith(".png"):
+                        new_name += ".png"
+                    
+                    old_p = Path(card_path)
+                    new_p = old_p.parent / new_name
+                    
+                    if new_p.exists() and new_p != old_p:
+                        self.app.notify("File already exists!", severity="error")
+                        return
+                    
+                    try:
+                        old_p.rename(new_p)
+                        self.app.notify(f"Renamed to: {new_name}")
+                        self.refresh_list(select_path=str(new_p))
+                    except Exception as e:
+                        self.app.notify(f"Rename failed: {e}", severity="error")
+                    self.query_one(".dialog-title").focus()
+
+                self.app.push_screen(FileNamePrompt(initial_value=current_name, prompt_text="Rename character file:"), on_rename)
+            else:
+                self.app.notify("Select a card first!", severity="warning")
+                self.query_one(".dialog-title").focus()
+        elif event.button.id == "btn-delete-card":
+            if card_path:
+                try:
+                    p = Path(card_path)
+                    if p.exists():
+                        p.unlink()
+                        self.app.notify(f"Deleted: {p.name}")
+                        # Clear metadata preview
+                        self.query_one("#metadata-text", TextArea).text = ""
+                        # Force refresh
+                        self.refresh_list()
+                        self.last_search_idx = -1
+                    else:
+                        self.app.notify("File not found.", severity="error")
+                except Exception as e:
+                    self.app.notify(f"Delete failed: {str(e)}", severity="error")
+            else:
+                self.app.notify("Select a card first!", severity="warning")
+            
+            # Focus handling
+            try:
+                self.query_one("#list-characters").focus()
+            except Exception:
+                self.query_one(".dialog-title").focus()
         elif event.button.id == "btn-replace-all":
             search_text = self.query_one("#input-search-meta", Input).value
             replace_text = self.query_one("#input-replace-meta", Input).value
@@ -439,19 +836,37 @@ class CharactersScreen(ModalScreen):
             else:
                 self.app.notify("Enter search text!", severity="warning")
             self.query_one(".dialog-title").focus()
+
         elif event.button.id == "btn-save-metadata":
             if card_path:
-                metadata_str = self.query_one("#metadata-text", TextArea).text.strip()
-                from character_manager import write_chara_metadata
-                success = write_chara_metadata(card_path, metadata_str)
-                if success:
-                    self.app.notify(f"Successfully updated {Path(card_path).name}")
-                    self.query_one(".dialog-title").focus()
-                else:
-                    self.app.notify("Failed to write metadata!", severity="error")
+                def do_save(password=None):
+                     try:
+                        metadata_str = self.query_one("#metadata-text", TextArea).text.strip()
+                        if password:
+                            final_data = encrypt_data(metadata_str, password)
+                            self.app.notify("Saving encrypted metadata...")
+                        else:
+                            final_data = metadata_str
+                            
+                        success = write_chara_metadata(card_path, final_data)
+                        if success:
+                            filename = Path(card_path).name
+                            self.app.notify(f"Successfully updated {filename}")
+                            # Reload to refresh view state (e.g. show encrypted/decrypted)
+                            # If we just encrypted it, we should probably show it in decrypted state or reload?
+                            # Actually if we just saved it and we have the PW, we can reload with it?
+                            # For simplicity, just reload regular. If encrypted, it will lock.
+                            self.load_metadata(card_path, password_attempt=password)
+                        else:
+                            self.app.notify("Failed to write metadata PNG! (File might be locked or invalid)", severity="error")
+                     except Exception as e:
+                        self.app.notify(f"Save crash: {str(e)}", severity="error")
+                     self.query_one(".dialog-title").focus()
+
+                self.app.push_screen(GenericPasswordModal(title="Encrypt Card? (Leave blank for no)", allow_blank=True), do_save)
             else:
                 self.app.notify("Select a card first!", severity="warning")
-            self.query_one(".dialog-title").focus()
+                self.query_one(".dialog-title").focus()
         elif event.button.id == "btn-cancel-mgmt":
             self.dismiss(None)
 

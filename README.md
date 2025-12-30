@@ -1,4 +1,4 @@
-# aiMultiFool v0.1.9
+# aiMultiFool v0.1.10
 
 **The Premium Linux Terminal-Based Sandbox for Private AI Roleplay.** 
 Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favorite SillyTavern character cards with zero lag and full privacy.
@@ -9,17 +9,29 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
 
 ## ✨ Features
 
-- 🎭 **Character Card Support**: Load SillyTavern PNG cards directly from the top menu. Includes a built-in **Metadata Editor** to modify character data without leaving the app. Supports raw text metadata for maximum compatibility.
-- ⚡ **Real-time Metrics**: Live TPS, Token counts, and Context % usage.
-- 💾 **Smart Pruning**: Automatically manages context window by trimming middle-history while preserving the System Prompt and latest messages.
-- 🚀 **GPU/CPU Auto-Detection**: Optimized layer loading with configuration caching for faster subsequent loads.
-- 🎨 **Minimalist TUI**: Pure Textual interface styled via external `.tcss` for fast, clean roleplay aesthetics.
-- 🏗️ **Advanced Modular Architecture**: State-of-the-art codebase using Mixins and separate UI/Logic modules for maximum maintainability.
-- 🎭 **Narrative Styles**: Choose from 44 custom presets covering a wide range of tones including Concise, Descriptive, Dramatic, Horror, Whimsical, and more.
-- 🔧 **Advanced AI Parameters**: Precise control over Temperature, Top P, Top K, Repeat Penalty, and the modern **Min P**.
-- 💬 **Action Sidebar**: Right Sidebar containing roleplay tools and system prompts. Features a full in-app **Action Manager** with real-time search and category filtering.
-- 💾 **Secure Conversation Management**: New **File** menu to save and load chat histories. Supports high-grade **AES-256-GCM** encryption with **Argon2id** key derivation for private sessions.
-- 🪲 **Context Window Viewer**: Inspect the raw JSON context and system prompts being sent to the LLM (via the About menu).
+### 🎭 Character & Content
+- **Character Card Support**: Load SillyTavern PNG cards directly from the top menu.
+- **AI-Assisted Editing**: Built-in **Metadata Editor** with **real-time streaming AI assistance** for generating and modifying character data without leaving the app.
+    > *Tip: Use a small 8B parameter model for responsive AI editing. Larger models may loop with JSON data.*
+- **Narrative Styles**: Choose from **44 custom presets** covering a wide range of tones including Concise, Descriptive, Dramatic, Horror, Whimsical, and more.
+- **On-Demand Encryption**: Secure individual character cards with **AES-256-GCM** encryption. Encrypted cards are locked by default and require a password to view or play.
+
+### ⚡ AI & Performance
+- **Real-time Metrics**: Live TPS, Token counts, and Context % usage.
+- **Smart Pruning**: Automatically manages context window by trimming middle-history while preserving the System Prompt and latest messages.
+- **GPU/CPU Auto-Detection**: Optimized layer loading with configuration caching for faster subsequent loads.
+- **Advanced Parameters**: Precise control over Temperature, Top P, Top K, Repeat Penalty, and **Min P**.
+
+### 🔒 Privacy & Security
+- **Secure Chats**: **File** menu to save and load conversation histories with optional **AES-256-GCM** encryption and **Argon2id** key derivation.
+- **Transparent Passphrases**: Password fields are visible by default to prevent entry errors.
+- **Private Roleplay**: 100% local inference with zero data leakage.
+
+### 🛠️ Interface & Tools
+- **Minimalist TUI**: Pure Textual interface styled via external `.tcss` for fast, clean roleplay aesthetics.
+- **Action Sidebar**: Right Sidebar containing roleplay tools and system prompts.
+- **Action Manager**: Full in-app manager with real-time search and category filtering.
+- **Context Window Viewer**: Inspect the raw JSON context and system prompts being sent to the LLM.
 
 ---
 

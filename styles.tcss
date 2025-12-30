@@ -258,6 +258,10 @@ AddActionScreen {
     align: center middle;
 }
 
+FileNamePrompt {
+    align: center middle;
+}
+
 .modal-dialog {
     layout: vertical;
     width: 60;
@@ -294,6 +298,10 @@ ChatManagerScreen {
 }
 
 PasswordPromptScreen {
+    align: center middle;
+}
+
+GenericPasswordModal {
     align: center middle;
 }
 
@@ -367,9 +375,45 @@ ActionsManagerScreen {
 }
 
 .pane-right {
-    width: 1fr;
+    width: 2fr;
     background: $boost;
     padding: 1;
+}
+
+.pane-ai {
+    width: 35;
+    background: $boost;
+    padding: 1;
+    border-left: solid $primary;
+}
+
+#ai-meta-history {
+    height: 1fr;
+    background: $surface;
+    border: solid $primary;
+    margin-bottom: 1;
+    padding: 1;
+}
+
+#ai-meta-input {
+    height: 3;
+}
+
+.ai-message {
+    margin-bottom: 1;
+    padding: 0 1;
+    border-left: solid $accent;
+}
+
+.ai-message.user {
+    color: green;
+    border-left: solid green;
+}
+
+.ai-message.system {
+    color: #888888;
+    text-style: italic;
+    border-left: solid #888888;
 }
 
 #characters-dialog ListView {

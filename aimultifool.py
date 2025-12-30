@@ -199,7 +199,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             # We don't set the widget value here anymore as the modal handles it
             pass
 
-        self.title = f"aiMultiFool v0.1.9"
+        self.title = f"aiMultiFool v0.1.10"
         # Sidebar is gone
         self.query_one("#right-sidebar").add_class("-visible")
         self.watch_is_loading(self.is_loading)
@@ -704,10 +704,6 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         if action == "play":
             meta = result.get("meta")
             await self.load_character_from_path(path, chara_json_obj=meta)
-        elif action == "duplicate":
-            new_path = self.duplicate_character_card(path)
-            if new_path:
-                self.notify(f"Duplicated: {os.path.basename(new_path)}")
         
     async def actions_mgmt_callback(self, result):
         # Always refresh sidebar after mgmt modal
@@ -768,6 +764,90 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             return new_path
         except Exception as e:
             self.notify(f"Duplication failed: {e}", severity="error")
+            return None
+
+    def create_new_character_card(self, filename: str = None):
+        """Create a new placeholder character card by copying aimultifool.png and injecting template metadata."""
+        cards_dir = self.root_path / "cards"
+        cards_dir.mkdir(exist_ok=True)
+        
+        # Determine filename
+        if not filename:
+            filename = "New_Character.png"
+            counter = 2
+            while (cards_dir / filename).exists():
+                filename = f"New_Character_{counter}.png"
+                counter += 1
+        
+        new_path = cards_dir / filename
+        
+        # Check explicit collision
+        if new_path.exists():
+            return None
+            
+        source_image = self.root_path / "aimultifool.png"
+        if not source_image.exists():
+            self.notify("Error: aimultifool.png not found in root directory!", severity="error")
+            return None
+
+        import shutil
+        try:
+            # Copy the source image
+            shutil.copy2(source_image, new_path)
+            
+            # Prepare template metadata
+            template = {
+                "name": "New Character",
+                "description": "",
+                "personality": "",
+                "scenario": "",
+                "first_mes": "",
+                "mes_example": "",
+                "creatorcomment": "Created with aiMultiFool.",
+                "avatar": "none",
+                "chat": "",
+                "talkativeness": "0.5",
+                "fav": False,
+                "tags": [],
+                "spec": "chara_card_v2",
+                "spec_version": "2.0",
+                "data": {
+                    "name": "New Character",
+                    "description": "",
+                    "personality": "",
+                    "scenario": "",
+                    "first_mes": "",
+                    "mes_example": "",
+                    "creator_notes": "",
+                    "system_prompt": "",
+                    "post_history_instructions": "",
+                    "tags": [],
+                    "creator": "aiMultiFool",
+                    "character_version": "1.0",
+                    "alternate_greetings": [],
+                    "extensions": {
+                        "talkativeness": "0.5",
+                        "fav": False,
+                        "world": "",
+                        "depth_prompt": {
+                            "prompt": "",
+                            "depth": 4
+                        }
+                    }
+                },
+                "create_date": "2024-01-01"
+            }
+            
+            # Write metadata to the PNG using character_manager
+            from character_manager import write_chara_metadata
+            if write_chara_metadata(str(new_path), template):
+                return new_path
+            else:
+                if new_path.exists(): new_path.unlink()
+                return None
+        except Exception as e:
+            self.notify(f"Failed to create new card: {e}", severity="error")
+            if new_path.exists(): new_path.unlink()
             return None
 
     def edit_character_callback(self, result):

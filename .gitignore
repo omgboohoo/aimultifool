@@ -109,3 +109,19 @@ build/
 backup.sh
 backups/
 chats/
+
+# Cards - Ignore all except specific base set
+cards/*
+!cards/Akane Hoshino.png
+!cards/Alien Invasion.png
+!cards/Aria and the End of the World.png
+!cards/Island Encounter.png
+!cards/Lilith the Witch.png
+!cards/Roxy the Cultist Advocate.png
+!cards/Scarlett the Goth.png
+!cards/The Conscript.png
+!cards/The Construct.png
+!cards/The Frozen World.png
+!cards/The Night Club.png
+!cards/The Ruined Church Ritual.png
+!cards/Zombie Outbreak.png
