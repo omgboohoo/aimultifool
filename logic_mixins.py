@@ -410,6 +410,7 @@ class ActionsMixin:
             "topp": self.topp,
             "topk": self.topk,
             "repeat": self.repeat,
-            "minp": self.minp
+            "minp": self.minp,
+            "style": self.style
         }
         save_settings(settings)

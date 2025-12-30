@@ -372,7 +372,7 @@ class CharactersScreen(ModalScreen):
         items = [ListItem(Label(card.name), name=str(card)) for card in cards]
         
         yield Vertical(
-            Label("Character Management - Stheno 8b Model Recommended", classes="dialog-title"),
+            Label("Character Management)", classes="dialog-title"),
             Horizontal(
                 Vertical(
                     Label("Cards", classes="label"),
@@ -391,9 +391,9 @@ class CharactersScreen(ModalScreen):
                     classes="pane-right"
                 ),
                 Vertical(
-                    Label("AI Card Editor", classes="label"),
+                    Label("AI Card Editor (use Stheno 8b)", classes="label"),
                     ScrollableContainer(id="ai-meta-history"),
-                    Input(placeholder="Ask AI to edit... (e.g. 'change name to Bob')", id="ai-meta-input"),
+                    Input(placeholder="Ask AI to edit...", id="ai-meta-input"),
                     classes="pane-ai"
                 ),
                 id="management-split"
