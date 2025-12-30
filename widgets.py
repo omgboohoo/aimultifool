@@ -372,7 +372,7 @@ class CharactersScreen(ModalScreen):
         items = [ListItem(Label(card.name), name=str(card)) for card in cards]
         
         yield Vertical(
-            Label("Character Management)", classes="dialog-title"),
+            Label("Character Management", classes="dialog-title"),
             Horizontal(
                 Vertical(
                     Label("Cards", classes="label"),
@@ -950,8 +950,9 @@ class ParametersScreen(ModalScreen):
         elif event.button.id == "btn-cancel-params":
             self.dismiss()
 
-class AboutScreen(ModalScreen):
-    """About / Utility modal screen."""
+
+class MiscScreen(ModalScreen):
+    """Misc / Utility modal screen (formerly About)."""
     def on_mount(self) -> None:
         # Focus the title so no buttons are highlighted by default
         title = self.query_one(".dialog-title")
@@ -960,7 +961,7 @@ class AboutScreen(ModalScreen):
 
     def compose(self) -> ComposeResult:
         yield Vertical(
-            Label("About aiMultiFool", classes="dialog-title"),
+            Label("Misc & Settings", classes="dialog-title"),
             Vertical(
                 Button("Context Window", id="btn-about-context", variant="default", classes="about-btn"),
                 Button("aiMultiFool Website", id="btn-about-website", variant="default", classes="about-btn"),
@@ -989,6 +990,7 @@ class AboutScreen(ModalScreen):
             webbrowser.open("https://aimultifool.com/")
         elif event.button.id == "btn-about-coffee":
             webbrowser.open("https://ko-fi.com/aimultifool")
+
 
 class ActionsManagerScreen(ModalScreen):
     """Integrated Action Management Screen."""

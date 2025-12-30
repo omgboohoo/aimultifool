@@ -1,67 +1,125 @@
-# Product Requirements Document: aiMultiFool v0.1.10
+# System Reference Document: aiMultiFool v0.1.10
 
 ## 1. Executive Summary
-aiMultiFool is a premium Linux TUI sandbox for private AI roleplay. Built with **Textual** and **llama.cpp**, it provides a local, high-performance interface for interacting with GGUF models using SillyTavern character cards.
+aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox. It leverages **Textual** for a responsive, desktop-class TUI and **llama-cpp-python** for high-performance local inference. The architecture prioritizes separation of concerns via a Mixin pattern, enabling clean extensibility for theming, encryption, and complex character logic.
 
 ---
 
-## 2. Core Vision
-- **Privacy First**: 100% local inference with zero data leakage.
-- **Roleplay Optimized**: Deep integration with character cards and sampling presets.
-- **Desktop-Class TUI**: A responsive interface with a centralized Chat and a Right Sidebar for Settings and Actions.
-- **Technical Transparency**: Real-time metrics and raw context inspection.
+## 2. Technical Stack
+| Component | Technology | Purpose |
+| :--- | :--- | :--- |
+| **Language** | Python 3.12+ | Core logic and type safety |
+| **GUI Framework** | Textual | Reactive TUI with CSS styling |
+| **Inference Engine** | llama-cpp-python | Python bindings for GGUF model execution |
+| **Cryptography** | cryptography (Hazmat) | AES-256-GCM + Argon2id for file security |
+| **Concurrency** | asyncio + Threads | Non-blocking UI input during blocking inference |
+| **Data Format** | JSON / PNG (Chunked) | Metadata storage for Settings and Character Cards |
 
 ---
 
-## 3. Functional Requirements
+## 3. System Architecture
+The application uses a **Mixin-based monolithic architecture** orchestrated by the main `App` class.
 
-### 3.1 Interface & Layout
-- **Two-Column Layout**: Central Area (Chat) and a Right Sidebar (Settings & Actions). Accessible via a minimalist TUI design.
-- **Global Modals**: Dedicated screens for **Character Cards**, **AI Parameters**, and **Action Management**. All major interactions, including password prompts and file naming, are handled via focused, centered modals.
-- **Real-time Status Bar**: Displays current state (Ready, Thinking, Recording) and live TPS/Context metrics.
+### 3.1 Class Hierarchy
+```mermaid
+classDiagram
+    App <|-- AiMultiFoolApp
+    InferenceMixin <|-- AiMultiFoolApp
+    ActionsMixin <|-- AiMultiFoolApp
+    UIMixin <|-- AiMultiFoolApp
+    
+    class AiMultiFoolApp {
+        +run()
+        +compose()
+    }
+    class InferenceMixin {
+        +run_inference()
+        +load_model_task()
+    }
+    class ActionsMixin {
+        +action_stop_generation()
+        +action_rewind()
+    }
+    class UIMixin {
+        +sync_chat_ui()
+        +update_status()
+    }
+```
 
-### 3.2 AI & Inference
-- **GGUF Support**: Native support for GGUF models via `llama.cpp`.
-- **GPU Optimization**: Automatic detection of optimal GPU layers with fallback to CPU. Caches successful layer counts for faster loading.
-- **Smart Pruning**: Automatically trims middle-history if context exceeds 80%, strictly preserving the System Prompt and latest turns.
+### 3.2 Core Modules
+- **`aimultifool.py`**: The entry point. Initializes the `App`, loads settings, and composes the primary layout.
+- **`logic_mixins.py` (`InferenceMixin`, `ActionsMixin`)**:
+    - **Inference**: usage of `@work(thread=True)` to offload blocking Llama.cpp calls to a background thread, preventing UI freeze. Uses `call_from_thread` to push updates back to the main event loop.
+    - **State**: Manages the message history list, pruning logic, and token counting.
+- **`ui_mixin.py` (`UIMixin`)**: Centralizes DOM manipulation. Handles the mounting of `MessageWidget`s and synchronizing the specific visual state with the backend `messages` list.
+- **`styles.tcss`**: The primary stylesheet. Supports dynamic runtime modification (see **3.3 Theming**) via generic CSS variable overrides or string replacement.
 
-### 3.3 Character & Content
-- **SillyTavern Integration**: Manual binary chunk handling for PNG metadata extraction and in-app metadata injection. Includes **real-time AI-powered generation** and **on-demand AES-256-GCM encryption** for limiting access to sensitive character data.
-- **Smart Templates**: New character cards are automatically instantiated from a consistent base template (`aimultifool.png`), ensuring immediate compatibility and visual consistency.
-- **Style Blending**: Users select from 44 narrative styles that are dynamically blended into the character's system instructions.
-- **Action Manager**: Searchable sidebar for tools; changes are saved instantly as the user types.
-- **Secure File Persistence**: High-grade **AES-256-GCM** encryption with **Argon2id** key derivation for chat history.
+### 3.3 Styling
+The application uses Textual's CSS system with theme variables (`$primary`, `$accent`) for consistent styling across the interface.
 
 ---
 
-## 4. Technical Architecture
+## 4. AI & Inference Pipeline
 
-- **Language**: Python 3.12+
-- **Frameworks**: Textual (TUI), llama-cpp-python (Inference).
-- **Architecture**: Modular Mixin pattern for logic separation:
-    - `InferenceMixin`: Handles background threads for tokenization and generation.
-    - `ActionsMixin`: Manages conversation state (Rewind, Reset, Stop).
-    - `UIMixin`: Dedicated to widget mounting and reactive UI synchronization.
-- **Core Modules**:
-    - `aimultifool.py`: Entry point and UI composition.
-    - `ai_engine.py`: Core logic for model loading and token streaming.
-    - `character_manager.py`: PNG card parser and metadata editor.
-    - `widgets.py`: Custom TUI widgets and modal screens.
-- **Data Persistence**:
-    - `settings.json`: sampling parameters and app preferences.
-    - `action_menu.json`: array of categorized roleplay prompts.
-    - `model_cache.json`: map of models to validated GPU layer counts.
+### 4.1 Token Streaming
+- **Iterative Decoding**: The `Llama.create_chat_completion` method is called with `stream=True`.
+- **Text Assembly**: Chunks are yielded back to the main thread in real-time.
+- **Visual Updates**: The `UIMixin` appends text to the active `MessageWidget` on every token, calculating TPS (Tokens Per Second) on the fly.
+
+### 4.2 Context Management
+- **Smart Pruning**: Before generation, the prompt is evaluated. If `total_tokens > context_size`, the system prunes the **middle** of the conversation history, preserving:
+    1. The System Prompt (Index 0)
+    2. The most recent `N` turns (User/Assistant pairs)
+- **Caching**: The system caches successful GPU layer configurations in `model_cache.json` to speed up subsequent loads of the same model.
+
+### 4.3 Character Cards (V2 Spec)
+- **Format**: SillyTavern-compatible PNGs.
+- **Metadata**: Embedded in standard `tEXt` chunks or base64-encoded `zTXt` chunks.
+- **AI Editor**: The app can pipe extracted metadata back into a small LLM to "rewrite" or "enhance" the character description, streaming the result into the metadata editor fields.
 
 ---
 
-## 5. Keyboard Navigation
-| Command | Result |
-| :--- | :--- |
-| **Ctrl+S** | Stop Generation |
-| **Ctrl+R** | Restart Conversation from first message |
-| **Ctrl+Z** | Rewind Last Turn |
-| **Ctrl+Enter** | Continue AI response |
-| **Ctrl+Shift+W** | Wipe Chat History |
-| **Ctrl+Q** | Quit Application |
+## 5. Security & Cryptography
+
+### 5.1 Encryption Standards
+- **Algorithm**: AES-256-GCM (Galois/Counter Mode). Authenticated encryption ensures data integrity.
+- **Key Derivation**: Argon2id.
+    - *Memory Cost*: 64MB
+    - *Iterations*: 3
+    - *Salt*: Random 16 bytes per file
+    - *Nonce*: Random 12 bytes per encryption
+- **Scope**: Applied to Saved Chat files (`.json`) and Character Card metadata.
+
+### 5.2 Local Persistence
+- **No Cloud Sync**: All data is strictly local.
+- **Passphrase Handling**: Passphrases are never stored; they are used strictly for transient key derivation and then discarded from memory.
+
+---
+
+## 6. Functional Data Models
+
+### 6.1 `settings.json`
+```json
+{
+    "user_name": "User",
+    "context_size": 8196,
+    "gpu_layers": 33,
+    "selected_model": "/path/to/model.gguf",
+    "style": "descriptive",
+    "temp": 0.8,
+    "topp": 0.9,
+    "topk": 40,
+    "minp": 0.05
+}
+```
+
+### 6.2 Application State
+- **Reactive Properties**: Textual's `reactive` logic creates a unidirectional data flow. Changing `self.is_loading` automatically toggles button states (Stop/Continue) across the entire UI tree without manual DOM queries.
+
+---
+
+
+
+
 
 
