@@ -1,5 +1,17 @@
 # Release Notes
  
+## v0.1.11: Theme Support & UI Polish
+### 🎨 Visual Customization
+- **Built-in Theme System**: Added comprehensive theme support with 11 built-in themes including Textual Dark/Light, Catppuccin Latte/Mocha, Dracula, Gruvbox, Monokai, Nord, Solarized Light, Tokyo Night, and Flexoki.
+- **Theme Persistence**: Selected theme is saved to settings and persists across app restarts.
+- **Consistent Theming**: All UI elements now respect theme colors, including buttons, inputs, modals, and message styling.
+- **Enhanced Message Styling**: User messages are now bold, and quoted text in AI responses uses terminal selection highlighting for better readability.
+
+### 🎯 UI Improvements
+- **Unified Button Styling**: All buttons now use consistent default styling, matching the selected theme.
+- **Status Bar Enhancement**: App name and version now displayed in the status bar for better visibility.
+- **Theme-Aware Components**: Removed hardcoded colors throughout the interface to ensure full theme compatibility.
+
 ## v0.1.10: Real-Time AI & Enhanced Management
 ### 🪄 Intelligent Creation
 - **AI Assisted Character Card Editing**: The Character Card AI Editor now **streams its thoughts in real-time**, providing instant feedback as it crafts your character's personality and metadata on the fly.

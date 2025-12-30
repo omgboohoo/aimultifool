@@ -82,7 +82,7 @@ class UIMixin:
         self.messages = list(new_messages)
 
     def watch_status_text(self, new_status):
-        self.query_one("#status-bar").update(new_status)
+        self.query_one("#status-text").update(new_status)
 
     def watch_is_loading(self, is_loading: bool) -> None:
         try:
@@ -93,4 +93,4 @@ class UIMixin:
 
     def watch_user_name(self, name):
         if hasattr(self, "title"):
-            self.title = f"aiMultiFool v0.1.9 - {name}"
+            self.title = f"aiMultiFool - {name}"

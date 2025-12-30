@@ -32,6 +32,8 @@ from widgets import MessageWidget, AddActionScreen, EditCharacterScreen, Charact
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     """The main aiMultiFool application."""
     
+    TITLE = "aiMultiFool v0.1.11"
+    
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
 
@@ -73,7 +75,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         super().notify(message, title=title, severity=severity, timeout=timeout)
 
     def compose(self) -> ComposeResult:
-        yield Header()
+        # yield Header()  # Disabled default Textual header
         yield Horizontal(
             Button("File", id="btn-file", variant="default"),
             Button("Model", id="btn-model-settings", variant="default"),
@@ -167,7 +169,9 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             ),
             id="main-layout"
         )
-        yield Static("Ready", id="status-bar")
+        with Horizontal(id="status-bar"):
+            yield Static("Ready", id="status-text")
+            yield Static("aiMultiFool v0.1.11", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -182,6 +186,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         self.repeat = settings.get("repeat", 1.0)
         self.minp = settings.get("minp", 0.0)
         self.selected_model = settings.get("selected_model", "")
+        self.theme = settings.get("theme", "textual-dark")
         
         # Defer character list update until Cards screen is opened
         
@@ -198,7 +203,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             # We don't set the widget value here anymore as the modal handles it
             pass
 
-        self.title = f"aiMultiFool v0.1.10"
+        self.title = "aiMultiFool"
         # Sidebar is gone
         self.query_one("#right-sidebar").add_class("-visible")
         self.watch_is_loading(self.is_loading)
@@ -382,7 +387,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             "topk": self.topk,
             "repeat": self.repeat,
             "minp": self.minp,
-            "selected_model": self.selected_model
+            "selected_model": self.selected_model,
+            "theme": self.theme
         }
         save_settings(settings)
 

@@ -1,4 +1,4 @@
-# aiMultiFool v0.1.10
+# aiMultiFool v0.1.11
 
 **The Premium Linux Terminal-Based Sandbox for Private AI Roleplay.** 
 Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favorite SillyTavern character cards with zero lag and full privacy.
@@ -29,6 +29,7 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
 
 ### 🛠️ Interface & Tools
 - **Minimalist TUI**: Pure Textual interface styled via external `.tcss` for fast, clean roleplay aesthetics.
+- **Theme Support**: Choose from 11 built-in themes including Textual Dark/Light, Catppuccin, Dracula, Gruvbox, Monokai, Nord, Solarized, Tokyo Night, and Flexoki. Themes apply consistently across the entire interface.
 - **Action Sidebar**: Right Sidebar containing roleplay tools and system prompts.
 - **Action Manager**: Full in-app manager with real-time search and category filtering.
 - **Context Window Viewer**: Inspect the raw JSON context and system prompts being sent to the LLM.

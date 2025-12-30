@@ -93,7 +93,7 @@ def save_action_menu_data(data):
 def load_settings():
     if SETTINGS_FILE.exists():
         try:
-            with open(SETTINGS_FILE, "r") as f:
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
             return {}
@@ -101,8 +101,8 @@ def load_settings():
 
 def save_settings(settings):
     try:
-        with open(SETTINGS_FILE, "w") as f:
-            json.dump(settings, f, indent=4)
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(settings, f, indent=4, ensure_ascii=False)
     except Exception:
         pass
 

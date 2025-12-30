@@ -81,7 +81,7 @@ class FileNamePrompt(ModalScreen):
         else:
             self.dismiss(None)
 
-def create_styled_text(text):
+def create_styled_text(text, use_highlight=False, highlight_color=None):
     """Create a rich renderable with styled quoted text"""
     pattern = r'"([^"\\]*(\\.[^"\\]*)*)"'
     parts = []
@@ -103,10 +103,16 @@ def create_styled_text(text):
     renderables = []
     for i, (part_type, part_text) in enumerate(parts):
         if part_type == 'styled':
-            styled_text = Text(part_text, style="italic #FFDB58")
+            # Quoted text: bold italic with highlight background (terminal selection color)
+            if use_highlight:
+                # Use Rich's "reverse" style which swaps fg/bg to match terminal selection
+                styled_text = Text(part_text, style="bold italic reverse")
+            else:
+                styled_text = Text(part_text, style="bold italic")
             renderables.append(styled_text)
         else:
             if part_text:
+                # Regular text: no background, just normal
                 renderables.append(Text(part_text))
     
     if len(renderables) == 1:
@@ -132,11 +138,27 @@ class MessageWidget(Static):
 
     def render(self):
         if self.role == "user":
-            return Text(self.content, style="green")
+            return Text(self.content, style="bold")
         elif self.role == "system":
-            return Text(self.content, style="italic #888888")
+            return Text(self.content, style="italic")
         else:
-            return create_styled_text(self.content)
+            # Try to get selection/highlight color from Rich console
+            highlight_color = None
+            try:
+                if hasattr(self.app, 'console'):
+                    console = self.app.console
+                    # Try different ways to get the selection color
+                    if hasattr(console, '_highlight_background_color'):
+                        highlight_color = console._highlight_background_color
+                    elif hasattr(console, 'get_style'):
+                        # Try to get from Rich's style system
+                        from rich.style import Style
+                        sel_style = Style.parse("reverse")
+                        if hasattr(sel_style, 'bgcolor') and sel_style.bgcolor:
+                            highlight_color = str(sel_style.bgcolor)
+            except Exception:
+                pass
+            return create_styled_text(self.content, use_highlight=True, highlight_color=highlight_color)
 
 class ModelScreen(ModalScreen):
     """The modal for model selection and settings."""
@@ -403,7 +425,7 @@ class CharactersScreen(ModalScreen):
                 Button("New", variant="default", id="btn-new-card"),
                 Button("Duplicate", variant="default", id="btn-duplicate-card"),
                 Button("Rename", variant="default", id="btn-rename-card"),
-                Button("Delete", variant="error", id="btn-delete-card"),
+                Button("Delete", variant="default", id="btn-delete-card"),
                 Button("Save Changes", variant="default", id="btn-save-metadata"),
                 Button("Close", variant="default", id="btn-cancel-mgmt"),
                 classes="buttons"
@@ -958,10 +980,41 @@ class MiscScreen(ModalScreen):
         title = self.query_one(".dialog-title")
         title.can_focus = True
         title.focus()
+        
+        # Set current theme in the selector
+        current_theme = getattr(self.app, "theme", "textual-dark")
+        try:
+            self.query_one("#select-theme").value = current_theme
+        except Exception:
+            pass
 
     def compose(self) -> ComposeResult:
+        # All built-in Textual themes
+        # Store as instance variable so we can access it in on_select_changed
+        self.available_themes = [
+            ("Textual Dark", "textual-dark"),
+            ("Textual Light", "textual-light"),
+            ("Catppuccin Latte", "catppuccin-latte"),
+            ("Catppuccin Mocha", "catppuccin-mocha"),
+            ("Dracula", "dracula"),
+            ("Flexoki", "flexoki"),
+            ("Gruvbox", "gruvbox"),
+            ("Monokai", "monokai"),
+            ("Nord", "nord"),
+            ("Solarized Light", "solarized-light"),
+            ("Tokyo Night", "tokyo-night"),
+        ]
+        
+        # Get current theme from app
+        current_theme = getattr(self.app, "theme", "textual-dark")
+        
         yield Vertical(
             Label("Misc & Settings", classes="dialog-title"),
+            Container(
+                Label("Theme", classes="sidebar-label"),
+                Select(self.available_themes, id="select-theme", value=current_theme, allow_blank=False),
+                classes="sidebar-setting-group"
+            ),
             Vertical(
                 Button("Context Window", id="btn-about-context", variant="default", classes="about-btn"),
                 Button("aiMultiFool Website", id="btn-about-website", variant="default", classes="about-btn"),
@@ -976,6 +1029,23 @@ class MiscScreen(ModalScreen):
             id="about-dialog",
             classes="modal-dialog"
         )
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == "select-theme":
+            try:
+                # event.value returns the identifier (second value in tuple), not display name
+                theme_identifier = event.value
+                # Ensure we're using the identifier, not display name
+                if hasattr(self.app, 'theme'):
+                    self.app.theme = theme_identifier
+                # Save to settings
+                if hasattr(self.app, 'save_user_settings'):
+                    self.app.save_user_settings()
+                # Find display name for notification
+                display_name = next((name for name, ident in self.available_themes if ident == theme_identifier), theme_identifier)
+                self.app.notify(f"Theme changed to: {display_name}. Restart app to apply.")
+            except Exception as e:
+                self.app.notify(f"Error saving theme: {e}", severity="error")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-close-about":
@@ -1057,7 +1127,7 @@ class ActionsManagerScreen(ModalScreen):
             Horizontal(
                 Button("Add New", variant="default", id="btn-add-action-mgmt"),
                 Button("Duplicate", variant="default", id="btn-duplicate-action-mgmt"),
-                Button("Delete", variant="error", id="btn-delete-action-mgmt"),
+                Button("Delete", variant="default", id="btn-delete-action-mgmt"),
                 Button("Close", variant="default", id="btn-close-action-mgmt"),
                 classes="buttons"
             ),
@@ -1402,7 +1472,7 @@ class ChatManagerScreen(ModalScreen):
                     Label("Password / Passphrase", classes="label"),
                     Input(placeholder="Password / Passphrase (optional)..", id="input-save-password", password=False),
                     Horizontal(
-                        Button("Save Current Chat", variant="primary", id="btn-save-chat"),
+                        Button("Save Current Chat", variant="default", id="btn-save-chat"),
                         classes="buttons"
                     ),
                     classes="pane-right"
@@ -1411,7 +1481,7 @@ class ChatManagerScreen(ModalScreen):
             ),
             Horizontal(
                 Button("Load Selected", variant="default", id="btn-load-chat"),
-                Button("Delete", variant="error", id="btn-delete-chat"),
+                Button("Delete", variant="default", id="btn-delete-chat"),
                 Button("Close", variant="default", id="btn-close-chat"),
                 classes="buttons"
             ),

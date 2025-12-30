@@ -1,4 +1,4 @@
-# System Reference Document: aiMultiFool v0.1.10
+# System Reference Document: aiMultiFool v0.1.11
 
 ## 1. Executive Summary
 aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox. It leverages **Textual** for a responsive, desktop-class TUI and **llama-cpp-python** for high-performance local inference. The architecture prioritizes separation of concerns via a Mixin pattern, enabling clean extensibility for theming, encryption, and complex character logic.
@@ -54,8 +54,15 @@ classDiagram
 - **`ui_mixin.py` (`UIMixin`)**: Centralizes DOM manipulation. Handles the mounting of `MessageWidget`s and synchronizing the specific visual state with the backend `messages` list.
 - **`styles.tcss`**: The primary stylesheet. Supports dynamic runtime modification (see **3.3 Theming**) via generic CSS variable overrides or string replacement.
 
-### 3.3 Styling
-The application uses Textual's CSS system with theme variables (`$primary`, `$accent`) for consistent styling across the interface.
+### 3.3 Styling & Theming
+The application uses Textual's CSS system with theme variables (`$primary`, `$accent`, `$background`, `$surface`, `$text`, `$text-muted`, `$boost`) for consistent styling across the interface.
+
+**Theme System**:
+- **Built-in Themes**: The application supports 11 built-in Textual themes accessible via the Misc/About screen.
+- **Theme Selection**: Users can select a theme from the dropdown menu, which is saved to `settings.json` and persists across restarts.
+- **Default Theme**: If no theme is specified in settings, the app defaults to "textual-dark".
+- **Theme Application**: Themes are applied at app startup and affect all UI components including buttons, inputs, modals, and message widgets.
+- **Theme Variables**: All CSS styling uses theme variables rather than hardcoded colors, ensuring full theme compatibility.
 
 ---
 
