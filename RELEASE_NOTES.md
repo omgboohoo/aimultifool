@@ -1,5 +1,17 @@
 # Release Notes
- 
+
+## v0.1.12: Enhanced AI Card Editing & JSON Parsing
+### 🔧 Character Card Editing Improvements
+- **Programmatic Data Section Normalization**: When editing character cards with AI assistance, the metadata structure is now automatically normalized to ensure both top-level fields and a `data` section exist, matching the behavior when creating new cards.
+- **Smart Data Section Detection**: If a card only contains a `data` section (no top-level character fields), the AI now acts directly on that section, reducing unnecessary work.
+- **Robust JSON Parsing**: Enhanced JSON parsing with automatic cleanup of common formatting issues (trailing commas, etc.) and intelligent fallback extraction of fields even from malformed JSON responses.
+- **Better Error Reporting**: When JSON parsing fails, users now see detailed error messages explaining what went wrong and what was attempted, making debugging easier.
+
+### 🐛 Bug Fixes
+- Fixed issue where larger AI models would appear to make changes but fail to apply them due to JSON parsing errors.
+- Improved handling of multi-line strings and escaped characters in AI-generated JSON responses.
+- Added fallback mechanisms to extract character data even when AI returns invalid JSON format.
+
 ## v0.1.11: Theme Support & UI Polish
 ### 🎨 Visual Customization
 - **Built-in Theme System**: Added comprehensive theme support with 11 built-in themes including Textual Dark/Light, Catppuccin Latte/Mocha, Dracula, Gruvbox, Monokai, Nord, Solarized Light, Tokyo Night, and Flexoki.

@@ -171,7 +171,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.1.11", id="status-version")
+            yield Static("aiMultiFool v0.1.12", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings

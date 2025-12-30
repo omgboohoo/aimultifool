@@ -413,7 +413,7 @@ class CharactersScreen(ModalScreen):
                     classes="pane-right"
                 ),
                 Vertical(
-                    Label("AI Card Editor (use Stheno 8b)", classes="label"),
+                    Label("AI Card Editor", classes="label"),
                     ScrollableContainer(id="ai-meta-history"),
                     Input(placeholder="Ask AI to edit...", id="ai-meta-input"),
                     classes="pane-ai"
@@ -578,6 +578,82 @@ class CharactersScreen(ModalScreen):
                 self.ask_ai_to_edit(user_text, current_meta)
                 event.input.value = ""
 
+    def normalize_metadata_structure(self, metadata_str: str) -> tuple[dict, str]:
+        """
+        Normalize metadata to ensure it has both top-level fields and a data section.
+        Returns (normalized_dict, metadata_for_ai) where metadata_for_ai is the 
+        section to send to AI (data section if it exists alone, otherwise full structure).
+        """
+        try:
+            parsed = json.loads(metadata_str)
+        except json.JSONDecodeError:
+            # If not valid JSON, return as-is wrapped in a dict
+            return {"data": {"description": metadata_str}}, metadata_str
+        
+        # Check if only a data section exists (no top-level character fields)
+        has_top_level_fields = any(key in parsed for key in ["name", "description", "personality", "scenario", "first_mes", "mes_example"])
+        has_data_section = "data" in parsed and isinstance(parsed["data"], dict)
+        
+        if has_data_section and not has_top_level_fields:
+            # Only data section exists - use it directly for AI
+            data_section = parsed["data"]
+            # Copy only core character fields to top level (not extensions, etc.)
+            core_fields = ["name", "description", "personality", "scenario", "first_mes", "mes_example", "tags"]
+            normalized = {
+                **{k: v for k, v in data_section.items() if k in core_fields},  # Copy only core fields to top level
+                "data": data_section,  # Keep full data section
+                "spec": parsed.get("spec", "chara_card_v2"),
+                "spec_version": parsed.get("spec_version", "2.0"),
+            }
+            # Preserve any other top-level fields that might exist
+            for key, value in parsed.items():
+                if key != "data" and key not in core_fields:
+                    normalized[key] = value
+            # Use data section directly for AI
+            return normalized, json.dumps(data_section, indent=4)
+        
+        # Ensure data section exists
+        if not has_data_section:
+            # Create data section from top-level fields
+            core_fields = ["name", "description", "personality", "scenario", "first_mes", "mes_example", "tags"]
+            data_section = {}
+            for field in core_fields:
+                if field in parsed:
+                    data_section[field] = parsed[field]
+            
+            # Preserve or create extensions structure
+            if "extensions" in parsed and isinstance(parsed["extensions"], dict):
+                data_section["extensions"] = parsed["extensions"]
+            else:
+                data_section["extensions"] = {
+                    "talkativeness": parsed.get("talkativeness", "0.5"),
+                    "fav": parsed.get("fav", False),
+                    "world": parsed.get("world", ""),
+                    "depth_prompt": parsed.get("depth_prompt", {"prompt": "", "depth": 4})
+                }
+            
+            # Copy other fields that might be in data section (creator, character_version, etc.)
+            optional_data_fields = ["creator", "character_version", "alternate_greetings", "creator_notes", "system_prompt", "post_history_instructions"]
+            for field in optional_data_fields:
+                if field in parsed:
+                    data_section[field] = parsed[field]
+            
+            parsed["data"] = data_section
+        
+        # Ensure top-level fields exist (copy from data if missing)
+        core_fields = ["name", "description", "personality", "scenario", "first_mes", "mes_example"]
+        for field in core_fields:
+            if field not in parsed and field in parsed.get("data", {}):
+                parsed[field] = parsed["data"][field]
+        
+        # For AI, use the data section if it exists, otherwise use the full structure
+        if "data" in parsed:
+            metadata_for_ai = json.dumps(parsed["data"], indent=4)
+        else:
+            metadata_for_ai = json.dumps(parsed, indent=4)
+        
+        return parsed, metadata_for_ai
+
     @work(exclusive=True)
     async def ask_ai_to_edit(self, user_request: str, current_metadata: str) -> None:
         if not self.app.llm:
@@ -593,6 +669,9 @@ class CharactersScreen(ModalScreen):
         history.scroll_end()
 
         try:
+            # Normalize metadata structure and get the section to send to AI
+            normalized_metadata, metadata_for_ai = self.normalize_metadata_structure(current_metadata)
+            
             # Check if this looks like a new/template card to refine the prompt
             is_template = "New Character" in current_metadata and len(current_metadata) < 1000
             
@@ -608,7 +687,7 @@ class CharactersScreen(ModalScreen):
                 "- Do NOT nest a 'data' block; provide a flat dictionary of the core fields.\n"
             )
             
-            full_prompt = f"Current SillyTavern V2 JSON:\n{current_metadata}\n\nUser Message: {user_request}\n\nComplete the card based on this request (include full updated JSON in ```json block):"
+            full_prompt = f"Current SillyTavern V2 JSON:\n{metadata_for_ai}\n\nUser Message: {user_request}\n\nComplete the card based on this request (include full updated JSON in ```json block):"
             
             import threading
             import queue as thread_queue
@@ -676,38 +755,100 @@ class CharactersScreen(ModalScreen):
             json_match = re.search(r"```json\s*(.*?)\s*```", answer, re.DOTALL)
             if not json_match:
                 json_match = re.search(r"({.*})", answer, re.DOTALL)
+            
+            # If still no match, try parsing the entire answer as JSON (might be raw JSON)
+            raw_json = None
+            if json_match:
+                raw_json = json_match.group(1).strip()
+            else:
+                # Try parsing the whole answer as JSON
+                try:
+                    test_parsed = json.loads(answer.strip())
+                    if isinstance(test_parsed, dict):
+                        raw_json = answer.strip()
+                except:
+                    pass
                 
             clean_json = None
-            if json_match:
+            json_error_msg = None
+            if raw_json:
                 try:
-                    raw_json = json_match.group(1).strip()
+                    # Try to fix common JSON issues before parsing
+                    # Remove trailing commas before closing braces/brackets
+                    raw_json = re.sub(r',(\s*[}\]])', r'\1', raw_json)
+                    
                     parsed_ai = json.loads(raw_json)
                     
-                    # Merge logic: Take the simplified AI output and apply it to the full V2 structure
-                    try:
-                        base_v2 = json.loads(current_metadata)
-                        
-                        # Primary fields to clone
-                        core_fields = ["name", "description", "personality", "scenario", "first_mes", "mes_example"]
-                        
-                        for key in core_fields:
-                            if key in parsed_ai:
-                                val = parsed_ai[key]
-                                base_v2[key] = val
-                                if "data" in base_v2:
-                                    base_v2["data"][key] = val
-                        
-                        if "tags" in parsed_ai:
-                            tags = parsed_ai["tags"]
+                    # Merge logic: Take the simplified AI output and apply it to the normalized V2 structure
+                    # normalized_metadata already has both top-level fields and data section
+                    base_v2 = normalized_metadata.copy()
+                    
+                    # Primary fields to clone
+                    core_fields = ["name", "description", "personality", "scenario", "first_mes", "mes_example"]
+                    
+                    for key in core_fields:
+                        if key in parsed_ai:
+                            val = parsed_ai[key]
+                            base_v2[key] = val
                             if "data" in base_v2:
-                                base_v2["data"]["tags"] = tags
+                                base_v2["data"][key] = val
+                    
+                    if "tags" in parsed_ai:
+                        tags = parsed_ai["tags"]
+                        base_v2["tags"] = tags
+                        if "data" in base_v2:
+                            base_v2["data"]["tags"] = tags
+                    
+                    clean_json = json.dumps(base_v2, indent=4)
+                except json.JSONDecodeError as e:
+                    json_error_msg = f"JSON parse error: {str(e)}\nAttempted to parse: {raw_json[:200]}..."
+                    # Try to extract just the fields we need even if JSON is malformed
+                    try:
+                        # Look for key-value pairs even in malformed JSON
+                        parsed_ai = {}
+                        for field in ["name", "description", "personality", "scenario", "first_mes", "mes_example", "tags"]:
+                            # Try pattern that handles escaped quotes and multi-line strings
+                            # Match: "field": "value" where value can contain escaped quotes
+                            pattern = rf'"{field}"\s*:\s*"((?:[^"\\]|\\.)*)"'
+                            match = re.search(pattern, raw_json, re.DOTALL)
+                            if match:
+                                value = match.group(1)
+                                # Unescape common escape sequences
+                                value = value.replace('\\"', '"').replace('\\n', '\n').replace('\\t', '\t').replace('\\\\', '\\')
+                                parsed_ai[field] = value
                         
-                        clean_json = json.dumps(base_v2, indent=4)
+                        # Try to extract tags array (handle multi-line)
+                        tags_match = re.search(r'"tags"\s*:\s*\[(.*?)\]', raw_json, re.DOTALL)
+                        if tags_match:
+                            tags_str = tags_match.group(1)
+                            tags_list = re.findall(r'"((?:[^"\\]|\\.)*)"', tags_str)
+                            if tags_list:
+                                parsed_ai["tags"] = [tag.replace('\\"', '"').replace('\\n', '\n') for tag in tags_list]
+                        
+                        if parsed_ai:
+                            base_v2 = normalized_metadata.copy()
+                            core_fields = ["name", "description", "personality", "scenario", "first_mes", "mes_example"]
+                            for key in core_fields:
+                                if key in parsed_ai:
+                                    val = parsed_ai[key]
+                                    base_v2[key] = val
+                                    if "data" in base_v2:
+                                        base_v2["data"][key] = val
+                            if "tags" in parsed_ai:
+                                tags = parsed_ai["tags"]
+                                base_v2["tags"] = tags
+                                if "data" in base_v2:
+                                    base_v2["data"]["tags"] = tags
+                            clean_json = json.dumps(base_v2, indent=4)
                     except Exception:
-                        # Fallback if current metadata is not valid JSON
+                        pass
+                except Exception as e:
+                    json_error_msg = f"Error processing AI response: {str(e)}"
+                    # Fallback if something goes wrong
+                    try:
                         clean_json = json.dumps(parsed_ai, indent=4)
-                except json.JSONDecodeError:
-                    pass
+                    except:
+                        pass
             
             conv_text = answer
             if json_match:
@@ -715,16 +856,26 @@ class CharactersScreen(ModalScreen):
                     conv_text = re.sub(r"```json.*?```", "", answer, flags=re.DOTALL).strip()
                 else:
                     conv_text = answer.replace(json_match.group(1), "").strip()
+            elif raw_json and raw_json == answer.strip():
+                # If we parsed the whole answer as JSON, there's no conversation text
+                conv_text = ""
 
             if clean_json:
                 self.query_one("#metadata-text", TextArea).text = clean_json
                 status_msg.update("AI: JSON Updated.")
             else:
-                status_msg.update("AI: (No structural changes)")
+                if json_error_msg:
+                    status_msg.update(f"AI: Failed to parse JSON - {json_error_msg[:100]}...")
+                else:
+                    status_msg.update("AI: (No structural changes - no valid JSON found in response)")
             
             if conv_text:
                 conv_text += "\n\n(Don't forget to click 'Save Changes' if you like the results!)"
                 history.mount(Static(f"Assistant: {conv_text}", classes="ai-message"))
+            
+            # Show error details if JSON parsing failed
+            if json_error_msg and not clean_json:
+                history.mount(Static(f"Error: {json_error_msg}", classes="ai-message system"))
                 
         except Exception as e:
             status_msg.update(f"AI error: {str(e)}")
