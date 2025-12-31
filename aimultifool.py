@@ -32,7 +32,7 @@ from widgets import MessageWidget, AddActionScreen, EditCharacterScreen, Charact
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.1.13"
+    TITLE = "aiMultiFool v0.1.14"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -172,7 +172,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.1.13", id="status-version")
+            yield Static("aiMultiFool v0.1.14", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -601,6 +601,13 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         else:
             self.messages = [{"role": "system", "content": prompt}, *self.messages]
             self.notify(f"System prompt added: {name}")
+        
+        # Check if chat window is empty (only system message exists)
+        has_started = len(self.messages) > 1
+        if not has_started:
+            # If chat hasn't started, clear previous info messages 
+            # to prevent multiple instruction blocks in an empty chat.
+            self.query_one("#chat-scroll").remove_children()
         
         await self.add_info_message(f"[System Prompt: {name}]\n\n{prompt}")
 

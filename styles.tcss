@@ -64,6 +64,7 @@ Button {
 
 .setting-group {
     height: auto;
+    margin-top: 1;
     margin-bottom: 1;
 }
 
@@ -262,7 +263,7 @@ FileNamePrompt {
     max-height: 80%;
     border: thick $primary;
     background: $surface;
-    padding: 0 2;
+    padding: 1 2;
     overflow-y: auto;
 }
 
@@ -313,7 +314,6 @@ ActionsManagerScreen {
 #password-prompt-dialog {
     width: 50;
     height: auto;
-    padding: 1;
 }
 
 #actions-dialog {
@@ -325,13 +325,11 @@ ActionsManagerScreen {
 #about-dialog {
     width: 50;
     height: auto;
-    padding: 1;
 }
 
 #theme-dialog {
     width: 50;
     height: auto;
-    padding: 1;
 }
 
 .about-buttons-list {
@@ -354,11 +352,11 @@ ActionsManagerScreen {
 #parameters-dialog {
     width: 60;
     height: auto;
-    padding: 1;
 }
 
 #parameters-dialog .setting-group {
     height: auto;
+    margin-top: 1;
     margin-bottom: 0;
 }
 
@@ -488,7 +486,7 @@ ActionsManagerScreen {
     content-align: center middle;
     text-style: bold;
     color: $text;
-    margin-top: 1;
+    margin-top: 0;
     margin-bottom: 0;
 }
 
@@ -504,11 +502,13 @@ ActionsManagerScreen {
 }
 
 .modal-dialog Input {
+    margin-top: 1;
     margin-bottom: 0;
     height: 3;
 }
 
 .modal-dialog TextArea {
+    margin-top: 1;
     margin-bottom: 0;
     height: 5;
     background: $boost;
@@ -570,6 +570,7 @@ ActionsManagerScreen {
 /* Sidebar Settings */
 .sidebar-setting-group {
     height: auto;
+    margin-top: 1;
     margin-bottom: 1;
 }
 

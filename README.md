@@ -1,4 +1,4 @@
-# aiMultiFool v0.1.13
+# aiMultiFool v0.1.14
 
 **The Premium Linux Terminal-Based Sandbox for Private AI Roleplay.** 
 Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favorite SillyTavern character cards with zero lag and full privacy.
@@ -91,14 +91,15 @@ If you've ever set **Temperature** to 2.0 and noticed the AI still sounds perfec
   ```bash
   sudo apt install nvidia-cuda-toolkit-runtime
   ```
-- **Models**: GGUF format (Auto-downloads **L3-8B-Stheno-v3.2** as default)
+- **Models**: GGUF format (Auto-downloads **MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_S** as default)
 
 ---
 
 ## 📦 Recommended Models
 
-- **Default**: [L3-8B-Stheno-v3.2-Q4_K_M](https://huggingface.co/bartowski/L3-8B-Stheno-v3.2-GGUF) (~5.2 GB)
-- **High Quality**: [MN-12B-Mag-Mell-R1](https://huggingface.co/mradermacher/MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF) (i1-Q4_K_M recommended)
+- **Default**: [MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_S](https://huggingface.co/mradermacher/MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF) (Auto-downloaded)
+- **Smaller Option**: [L3-8B-Stheno-v3.2-Q4_K_M](https://huggingface.co/bartowski/L3-8B-Stheno-v3.2-GGUF) (~5.2 GB) - Faster, lower memory usage
+- **High Quality**: [MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_M](https://huggingface.co/mradermacher/MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF) (Higher quality variant)
 
 ---
 

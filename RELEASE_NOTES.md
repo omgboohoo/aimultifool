@@ -1,5 +1,10 @@
 # Release Notes
 
+## v0.1.14: Updated Default Model
+### 🤖 Model Changes
+- **New Default Model**: Changed default auto-download model from `L3-8B-Stheno-v3.2-Q4_K_M` to `MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_S` for improved quality out of the box.
+- **Model Documentation**: Updated README to reflect new default model and note that Stheno is available as a smaller, faster option for users with limited resources.
+
 ## v0.1.13: Enhanced Theming & UI Refinements
 ### 🎨 Theming Enhancements
 - **Speech Styling Options**: Added configurable speech styling in the Theme menu with three modes: None, Inversed, and Highlight. Speech styling applies to quoted text and dialogue in AI responses, allowing users to customize how character speech is visually distinguished.

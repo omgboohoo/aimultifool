@@ -1,5 +1,5 @@
 # Security & Privacy Audit
-**Application**: aiMultiFool v0.1.13  
+**Application**: aiMultiFool v0.1.14  
 **Status**: ✅ Fully Private / Offline-Ready
 
 ## 1. Executive Summary
@@ -11,7 +11,7 @@ aiMultiFool is designed with a "Privacy First" architecture. All Large Language 
 
 ### ✅ Model Download (User-Initiated)
 - **Scope**: Only triggered if the `models/` directory is empty.
-- **Action**: Downloads the default GGUF model (`L3-8B-Stheno`) from Hugging Face via HTTPS.
+- **Action**: Downloads the default GGUF model (`MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_S`) from Hugging Face via HTTPS.
 - **Privacy**: No user-specific data, chat history, or identifiers are transmitted.
 
 ### ✅ Binary Delivery (First Launch)

@@ -216,8 +216,8 @@ class InferenceMixin:
 
         self.call_from_thread(setattr, self, "is_downloading", True)
         models_dir = Path(__file__).parent / "models"
-        url = "https://huggingface.co/bartowski/L3-8B-Stheno-v3.2-GGUF/resolve/main/L3-8B-Stheno-v3.2-Q4_K_M.gguf"
-        file_path = models_dir / "L3-8B-Stheno-v3.2-Q4_K_M.gguf"
+        url = "https://huggingface.co/mradermacher/MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF/resolve/main/MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_S.gguf?download=true"
+        file_path = models_dir / "MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_S.gguf"
         
         try:
             self.status_text = "Downloading default model..."
