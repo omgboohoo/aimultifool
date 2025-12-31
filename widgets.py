@@ -66,7 +66,7 @@ class FileNamePrompt(ModalScreen):
             yield Input(value=self.initial_value, id="filename-input")
             with Horizontal(classes="buttons"):
                 yield Button("Cancel", id="btn-cancel", variant="default")
-                yield Button("Confirm", id="btn-confirm", variant="success")
+                yield Button("Confirm", id="btn-confirm", variant="default")
 
     def on_mount(self) -> None:
         self.query_one("#filename-input").focus()
