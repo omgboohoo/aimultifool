@@ -42,7 +42,7 @@ Button {
 #top-menu-bar Button {
     height: 3;
     min-width: 12;
-    margin: 0 1;
+    margin: 0;
     text-style: bold;
 }
 
@@ -290,6 +290,10 @@ MiscScreen {
     align: center middle;
 }
 
+ThemeScreen {
+    align: center middle;
+}
+
 ChatManagerScreen {
     align: center middle;
 }
@@ -319,6 +323,12 @@ ActionsManagerScreen {
 }
 
 #about-dialog {
+    width: 50;
+    height: auto;
+    padding: 1;
+}
+
+#theme-dialog {
     width: 50;
     height: auto;
     padding: 1;

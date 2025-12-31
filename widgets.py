@@ -81,8 +81,14 @@ class FileNamePrompt(ModalScreen):
         else:
             self.dismiss(None)
 
-def create_styled_text(text, use_highlight=False, highlight_color=None):
-    """Create a rich renderable with styled quoted text"""
+def create_styled_text(text, speech_styling="highlight", highlight_color=None):
+    """Create a rich renderable with styled quoted text
+    
+    Args:
+        text: The text to style
+        speech_styling: One of "none", "inversed", or "highlight"
+        highlight_color: The highlight color to use (for "highlight" mode)
+    """
     pattern = r'"([^"\\]*(\\.[^"\\]*)*)"'
     parts = []
     last_end = 0
@@ -103,12 +109,19 @@ def create_styled_text(text, use_highlight=False, highlight_color=None):
     renderables = []
     for i, (part_type, part_text) in enumerate(parts):
         if part_type == 'styled':
-            # Quoted text: bold italic with highlight background (terminal selection color)
-            if use_highlight:
-                # Use Rich's "reverse" style which swaps fg/bg to match terminal selection
-                styled_text = Text(part_text, style="bold italic reverse")
-            else:
+            # Apply styling based on speech_styling mode
+            if speech_styling == "none":
+                # No special styling, just bold italic
                 styled_text = Text(part_text, style="bold italic")
+            elif speech_styling == "inversed":
+                # Use Rich's "reverse" style (swaps fg/bg)
+                styled_text = Text(part_text, style="bold italic reverse")
+            elif speech_styling == "highlight" and highlight_color:
+                # Use the actual selection/highlight color from the theme
+                styled_text = Text(part_text, style=f"bold italic on {highlight_color}")
+            else:
+                # Fallback: use reverse if highlight color not available
+                styled_text = Text(part_text, style="bold italic reverse")
             renderables.append(styled_text)
         else:
             if part_text:
@@ -142,23 +155,46 @@ class MessageWidget(Static):
         elif self.role == "system":
             return Text(self.content, style="italic")
         else:
-            # Try to get selection/highlight color from Rich console
+            # Get speech styling setting from app
+            speech_styling = getattr(self.app, "speech_styling", "highlight")
+            
+            # Get selection/highlight color from Textual (matches text selection color)
+            # Only needed if using "highlight" mode
             highlight_color = None
-            try:
-                if hasattr(self.app, 'console'):
-                    console = self.app.console
-                    # Try different ways to get the selection color
-                    if hasattr(console, '_highlight_background_color'):
-                        highlight_color = console._highlight_background_color
-                    elif hasattr(console, 'get_style'):
-                        # Try to get from Rich's style system
-                        from rich.style import Style
-                        sel_style = Style.parse("reverse")
-                        if hasattr(sel_style, 'bgcolor') and sel_style.bgcolor:
-                            highlight_color = str(sel_style.bgcolor)
-            except Exception:
-                pass
-            return create_styled_text(self.content, use_highlight=True, highlight_color=highlight_color)
+            if speech_styling == "highlight":
+                try:
+                    # Get the selection style from the screen - this is what TextArea uses for selections
+                    # Try multiple ways to access the screen
+                    screen = None
+                    if hasattr(self, 'screen') and self.screen:
+                        screen = self.screen
+                    elif hasattr(self, 'app') and self.app and hasattr(self.app, 'screen'):
+                        screen = self.app.screen
+                    
+                    if screen and hasattr(screen, 'get_component_rich_style'):
+                        selection_style = screen.get_component_rich_style("screen--selection")
+                        if selection_style and hasattr(selection_style, 'bgcolor') and selection_style.bgcolor:
+                            # Convert Rich Color to string format for use in style
+                            color_obj = selection_style.bgcolor
+                            try:
+                                from rich.color import Color
+                                if isinstance(color_obj, Color):
+                                    # Try to get standard color name first
+                                    if hasattr(color_obj, 'name') and color_obj.name:
+                                        highlight_color = color_obj.name
+                                    # Fallback: use color number for 256-color terminals
+                                    elif hasattr(color_obj, 'number') and color_obj.number is not None:
+                                        highlight_color = f"color({color_obj.number})"
+                                    else:
+                                        highlight_color = str(color_obj)
+                                else:
+                                    highlight_color = str(color_obj)
+                            except Exception:
+                                highlight_color = str(color_obj)
+                except Exception:
+                    pass
+            
+            return create_styled_text(self.content, speech_styling=speech_styling, highlight_color=highlight_color)
 
 class ModelScreen(ModalScreen):
     """The modal for model selection and settings."""
@@ -1124,8 +1160,8 @@ class ParametersScreen(ModalScreen):
             self.dismiss()
 
 
-class MiscScreen(ModalScreen):
-    """Misc / Utility modal screen (formerly About)."""
+class ThemeScreen(ModalScreen):
+    """Theme selection modal screen."""
     def on_mount(self) -> None:
         # Focus the title so no buttons are highlighted by default
         title = self.query_one(".dialog-title")
@@ -1136,6 +1172,13 @@ class MiscScreen(ModalScreen):
         current_theme = getattr(self.app, "theme", "textual-dark")
         try:
             self.query_one("#select-theme").value = current_theme
+        except Exception:
+            pass
+        
+        # Set current speech styling in the selector
+        speech_styling = getattr(self.app, "speech_styling", "highlight")
+        try:
+            self.query_one("#select-speech-styling").value = speech_styling
         except Exception:
             pass
 
@@ -1160,12 +1203,78 @@ class MiscScreen(ModalScreen):
         current_theme = getattr(self.app, "theme", "textual-dark")
         
         yield Vertical(
-            Label("Misc & Settings", classes="dialog-title"),
+            Label("Theme Settings", classes="dialog-title"),
             Container(
                 Label("Theme", classes="sidebar-label"),
                 Select(self.available_themes, id="select-theme", value=current_theme, allow_blank=False),
                 classes="sidebar-setting-group"
             ),
+            Container(
+                Label("Speech Styling", classes="sidebar-label"),
+                Select(
+                    [("None", "none"), ("Inversed", "inversed"), ("Highlight", "highlight")],
+                    id="select-speech-styling",
+                    value=getattr(self.app, "speech_styling", "highlight"),
+                    allow_blank=False
+                ),
+                classes="sidebar-setting-group"
+            ),
+            Horizontal(
+                Button("Close", variant="default", id="btn-close-theme"),
+                classes="buttons"
+            ),
+            id="theme-dialog",
+            classes="modal-dialog"
+        )
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == "select-theme":
+            try:
+                # event.value returns the identifier (second value in tuple), not display name
+                theme_identifier = event.value
+                # Ensure we're using the identifier, not display name
+                if hasattr(self.app, 'theme'):
+                    self.app.theme = theme_identifier
+                # Save to settings
+                if hasattr(self.app, 'save_user_settings'):
+                    self.app.save_user_settings()
+            except Exception as e:
+                self.app.notify(f"Error saving theme: {e}", severity="error")
+        elif event.select.id == "select-speech-styling":
+            try:
+                speech_styling = event.value
+                if hasattr(self.app, 'speech_styling'):
+                    self.app.speech_styling = speech_styling
+                # Save to settings
+                if hasattr(self.app, 'save_user_settings'):
+                    self.app.save_user_settings()
+                # Refresh message widgets to apply new styling
+                try:
+                    chat_scroll = self.app.query_one("#chat-scroll")
+                    for widget in chat_scroll.query(MessageWidget):
+                        if widget.role == "assistant":
+                            widget.refresh()
+                except Exception:
+                    pass
+            except Exception as e:
+                self.app.notify(f"Error saving speech styling: {e}", severity="error")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-close-theme":
+            self.dismiss()
+
+
+class MiscScreen(ModalScreen):
+    """About / Utility modal screen."""
+    def on_mount(self) -> None:
+        # Focus the title so no buttons are highlighted by default
+        title = self.query_one(".dialog-title")
+        title.can_focus = True
+        title.focus()
+
+    def compose(self) -> ComposeResult:
+        yield Vertical(
+            Label("About", classes="dialog-title"),
             Vertical(
                 Button("Context Window", id="btn-about-context", variant="default", classes="about-btn"),
                 Button("aiMultiFool Website", id="btn-about-website", variant="default", classes="about-btn"),
@@ -1181,22 +1290,6 @@ class MiscScreen(ModalScreen):
             classes="modal-dialog"
         )
 
-    def on_select_changed(self, event: Select.Changed) -> None:
-        if event.select.id == "select-theme":
-            try:
-                # event.value returns the identifier (second value in tuple), not display name
-                theme_identifier = event.value
-                # Ensure we're using the identifier, not display name
-                if hasattr(self.app, 'theme'):
-                    self.app.theme = theme_identifier
-                # Save to settings
-                if hasattr(self.app, 'save_user_settings'):
-                    self.app.save_user_settings()
-                # Find display name for notification
-                display_name = next((name for name, ident in self.available_themes if ident == theme_identifier), theme_identifier)
-                self.app.notify(f"Theme changed to: {display_name}. Restart app to apply.")
-            except Exception as e:
-                self.app.notify(f"Error saving theme: {e}", severity="error")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-close-about":

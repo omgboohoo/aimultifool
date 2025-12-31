@@ -1,5 +1,13 @@
 # Release Notes
 
+## v0.1.13: Enhanced Theming & UI Refinements
+### 🎨 Theming Enhancements
+- **Speech Styling Options**: Added configurable speech styling in the Theme menu with three modes: None, Inversed, and Highlight. Speech styling applies to quoted text and dialogue in AI responses, allowing users to customize how character speech is visually distinguished.
+- **Real-time Speech Styling**: Speech styling changes apply immediately to existing messages without requiring a restart, providing instant visual feedback.
+
+### 🎯 UI Improvements
+- **Model Name in Status Bar**: Status bar now displays the loaded model name (e.g., "L3-8B-Stheno-v3.2-Q4_K_M Ready") instead of generic "Model Ready", making it easier to identify which model is currently active.
+
 ## v0.1.12: Enhanced AI Card Editing & JSON Parsing
 ### 🔧 Character Card Editing Improvements
 - **Programmatic Data Section Normalization**: When editing character cards with AI assistance, the metadata structure is now automatically normalized to ensure both top-level fields and a `data` section exist, matching the behavior when creating new cards.

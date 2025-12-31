@@ -27,12 +27,12 @@ from ui_mixin import UIMixin
 from utils import _get_action_menu_data, load_settings, save_settings, DOWNLOAD_AVAILABLE, get_style_prompt, save_action_menu_data
 from character_manager import extract_chara_metadata, process_character_metadata, create_initial_messages, write_chara_metadata
 from ai_engine import get_models
-from widgets import MessageWidget, AddActionScreen, EditCharacterScreen, CharactersScreen, ParametersScreen, MiscScreen, ActionsManagerScreen, ModelScreen, ChatManagerScreen
+from widgets import MessageWidget, AddActionScreen, EditCharacterScreen, CharactersScreen, ParametersScreen, MiscScreen, ThemeScreen, ActionsManagerScreen, ModelScreen, ChatManagerScreen
 
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.1.11"
+    TITLE = "aiMultiFool v0.1.13"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -82,7 +82,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             Button("Parameters", id="btn-parameters", variant="default"),
             Button("Cards", id="btn-cards", variant="default"),
             Button("Actions", id="btn-manage-actions", variant="default"),
-            Button("Misc", id="btn-misc", variant="default"),
+            Button("Theme", id="btn-theme", variant="default"),
+            Button("About", id="btn-misc", variant="default"),
             id="top-menu-bar"
         )
         yield Horizontal(
@@ -171,7 +172,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.1.12", id="status-version")
+            yield Static("aiMultiFool v0.1.13", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -187,6 +188,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         self.minp = settings.get("minp", 0.0)
         self.selected_model = settings.get("selected_model", "")
         self.theme = settings.get("theme", "textual-dark")
+        self.speech_styling = settings.get("speech_styling", "highlight")
         
         # Defer character list update until Cards screen is opened
         
@@ -270,7 +272,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                 continue
 
             # Always keep these top menu buttons enabled
-            if btn.id in ["btn-file", "btn-misc", "btn-cards", "btn-parameters", "btn-model-settings", "btn-manage-actions"]:
+            if btn.id in ["btn-file", "btn-misc", "btn-theme", "btn-cards", "btn-parameters", "btn-model-settings", "btn-manage-actions"]:
                 btn.disabled = False
             elif btn.id in ["btn-continue", "btn-rewind", "btn-restart", "btn-clear-chat"]:
                 # Disable if busy OR if no model is loaded
@@ -388,7 +390,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             "repeat": self.repeat,
             "minp": self.minp,
             "selected_model": self.selected_model,
-            "theme": self.theme
+            "theme": self.theme,
+            "speech_styling": self.speech_styling
         }
         save_settings(settings)
 
@@ -703,6 +706,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             self.push_screen(CharactersScreen(), self.cards_screen_callback)
         elif event.button.id == "btn-parameters":
             self.push_screen(ParametersScreen())
+        elif event.button.id == "btn-theme":
+            self.push_screen(ThemeScreen())
         elif event.button.id == "btn-misc":
             self.push_screen(MiscScreen())
         elif event.button.id == "btn-file":

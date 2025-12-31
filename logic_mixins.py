@@ -195,7 +195,8 @@ class InferenceMixin:
             self.gpu_layers = actual_layers
             self.call_from_thread(self.notify, f"Model loaded successfully with {actual_layers} layers!")
             self.call_from_thread(self.enable_character_list)
-            self.status_text = "Model Ready"
+            model_name = Path(model_path).stem
+            self.status_text = f"{model_name} Ready"
         else:
             self.call_from_thread(self.notify, "Failed to load model!", severity="error")
             self.status_text = "Load Failed"
