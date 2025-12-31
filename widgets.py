@@ -25,7 +25,7 @@ class GenericPasswordModal(ModalScreen):
             Label(self.dialog_title, classes="dialog-title"),
             Input(placeholder="Password / Passphrase", id="input-generic-password"),
             Horizontal(
-                Button("Confirm", variant="primary", id="btn-confirm-pass"),
+                Button("Confirm", variant="default", id="btn-confirm-pass"),
                 Button("Cancel", variant="default", id="btn-cancel-pass"),
                 classes="buttons"
             ),
@@ -1652,7 +1652,7 @@ class PasswordPromptScreen(ModalScreen):
             Label("Encrypted Chat Detected", classes="dialog-title"),
             Input(placeholder="Password / Passphrase", id="input-password", password=False),
             Horizontal(
-                Button("Unlock & Load", variant="primary", id="btn-unlock"),
+                Button("Unlock & Load", variant="default", id="btn-unlock"),
                 Button("Cancel", variant="default", id="btn-cancel-unlock"),
                 classes="buttons"
             ),
