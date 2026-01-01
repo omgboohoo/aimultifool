@@ -94,6 +94,8 @@ class UIMixin:
         try:
             self.query_one("#btn-stop").display = is_loading
             self.query_one("#btn-continue").display = not is_loading
+            # Regenerate button stays visible during generation so user can stop and regen
+            self.query_one("#btn-regenerate").display = True
         except Exception:
             pass
 

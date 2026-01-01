@@ -1,5 +1,14 @@
 # Release Notes
 
+## v0.1.17: Regenerate Button & Enhanced AI Control
+### 🎮 User Experience
+- **Regenerate Button**: Added a new "Regenerate" button next to the "Continue" button that allows users to have the AI try the last reply again. The button remains visible even during AI generation, allowing users to stop and regenerate mid-generation.
+- **Smart Regeneration**: The regenerate button intelligently handles both completed and in-progress generations, removing partial or complete assistant messages and re-running inference with the same user prompt.
+
+### 🔧 Technical
+- Enhanced `action_regenerate` method in `ActionsMixin` to support stopping ongoing generation and cleaning up partial assistant messages from the UI.
+- Improved button state management to keep regenerate button visible during generation for better user control.
+
 ## v0.1.16: Improved Context Window Pruning & Default Settings
 ### 🧠 Context Management
 - **Smart Pruning Strategy**: Completely redesigned pruning algorithm for better roleplay context preservation. Now preserves system prompt, first 3 exchanges (for early scene setup), and the last message, then deletes messages one by one from the middle until reaching 60% context usage.

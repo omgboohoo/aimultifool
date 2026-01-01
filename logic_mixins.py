@@ -401,6 +401,77 @@ class ActionsMixin:
             self.is_loading = True
             self._inference_worker = self.run_inference(user_text)
 
+    async def action_regenerate(self) -> None:
+        """Regenerate the last AI reply by removing it and re-running inference."""
+        was_loading = self.is_loading
+        
+        # Stop generation if currently generating
+        if self.is_loading:
+            await self.action_stop_generation()
+            # Wait a bit for the stop to complete
+            await asyncio.sleep(0.1)
+        
+        if not self.llm:
+            self.notify("No model loaded!", severity="warning")
+            return
+        
+        if len(self.messages) <= 1:
+            self.notify("Nothing to regenerate.", severity="warning")
+            return
+        
+        # Find the user message that prompted the last assistant reply
+        user_text = None
+        
+        # If we were loading, the assistant message might not be in messages yet (only in UI)
+        # So we need to check the UI for the last assistant widget
+        if was_loading:
+            # Find the last user message in messages
+            for i in range(len(self.messages) - 1, -1, -1):
+                if self.messages[i]["role"] == "user":
+                    user_text = self.messages[i]["content"]
+                    break
+            
+            # Remove any partial assistant widget from UI
+            try:
+                chat_scroll = self.query_one("#chat-scroll")
+                widgets = [w for w in chat_scroll.children if isinstance(w, MessageWidget) and not w.is_info]
+                if widgets and widgets[-1].role == "assistant":
+                    widgets[-1].remove()
+            except Exception:
+                pass
+        else:
+            # Not loading - check if last message is assistant
+            if self.messages[-1]["role"] != "assistant":
+                self.notify("Last message is not from AI. Nothing to regenerate.", severity="warning")
+                return
+            
+            # Find the user message that prompted this assistant reply
+            for i in range(len(self.messages) - 1, -1, -1):
+                if self.messages[i]["role"] == "user":
+                    user_text = self.messages[i]["content"]
+                    break
+            
+            # Remove the last assistant message from messages
+            self.messages.pop()
+            
+            # Remove the last assistant message widget from UI
+            try:
+                chat_scroll = self.query_one("#chat-scroll")
+                widgets = [w for w in chat_scroll.children if isinstance(w, MessageWidget) and not w.is_info]
+                if widgets and widgets[-1].role == "assistant":
+                    widgets[-1].remove()
+            except Exception:
+                pass
+        
+        if not user_text:
+            self.notify("Could not find user message to regenerate from.", severity="warning")
+            return
+        
+        # Re-run inference with the same user message
+        self.is_loading = True
+        self._inference_worker = self.run_inference(user_text)
+        self.notify("Regenerating last reply...")
+
     def save_user_settings(self):
         settings = {
             "user_name": self.user_name,

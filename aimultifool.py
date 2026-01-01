@@ -32,7 +32,7 @@ from widgets import MessageWidget, AddActionScreen, EditCharacterScreen, Charact
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.1.16"
+    TITLE = "aiMultiFool v0.1.17"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -94,6 +94,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                     Horizontal(
                         Button("Stop", id="btn-stop", variant="default"),
                         Button("Continue", id="btn-continue", variant="default"),
+                        Button("Regenerate", id="btn-regenerate", variant="default"),
                         Button("Rewind", id="btn-rewind", variant="default"),
                         Button("Restart", id="btn-restart", variant="default"),
                         Button("Clear", id="btn-clear-chat", variant="default"),
@@ -172,7 +173,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.1.16", id="status-version")
+            yield Static("aiMultiFool v0.1.17", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -237,6 +238,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         try:
             self.query_one("#btn-stop").display = is_loading
             self.query_one("#btn-continue").display = not is_loading
+            # Regenerate button stays visible during generation so user can stop and regen
+            self.query_one("#btn-regenerate").display = True
         except Exception:
             pass
 
@@ -274,7 +277,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             # Always keep these top menu buttons enabled
             if btn.id in ["btn-file", "btn-misc", "btn-theme", "btn-cards", "btn-parameters", "btn-model-settings", "btn-manage-actions"]:
                 btn.disabled = False
-            elif btn.id in ["btn-continue", "btn-rewind", "btn-restart", "btn-clear-chat"]:
+            elif btn.id in ["btn-continue", "btn-regenerate", "btn-rewind", "btn-restart", "btn-clear-chat"]:
                 # Disable if busy OR if no model is loaded
                 btn.disabled = is_busy or not self.llm
             elif btn.id == "btn-clear-search":
@@ -701,6 +704,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-stop": await self.action_stop_generation()
         elif event.button.id == "btn-continue": await self.action_continue_chat()
+        elif event.button.id == "btn-regenerate": await self.action_regenerate()
         # elif event.button.id == "btn-toggle-sidebar": self.action_toggle_sidebar() # Sidebar is gone
         elif event.button.id == "btn-model-settings":
              self.push_screen(ModelScreen(), self.model_screen_callback)
