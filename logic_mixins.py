@@ -422,9 +422,13 @@ class ActionsMixin:
         # Find the user message that prompted the last assistant reply
         user_text = None
         
-        # If we were loading, the assistant message might not be in messages yet (only in UI)
-        # So we need to check the UI for the last assistant widget
+        # If we were loading, stop generation may have added a partial assistant message
+        # to self.messages, so we need to remove it from both messages and UI
         if was_loading:
+            # Remove any partial assistant message from messages if present
+            if self.messages and self.messages[-1]["role"] == "assistant":
+                self.messages.pop()
+            
             # Find the last user message in messages
             for i in range(len(self.messages) - 1, -1, -1):
                 if self.messages[i]["role"] == "user":
