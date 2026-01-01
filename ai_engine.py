@@ -59,17 +59,46 @@ def count_tokens_in_messages(llm, messages):
 
 def prune_messages_if_needed(llm, messages, context_size):
     """
-    Prune messages when context exceeds 80%.
+    Prune messages when context exceeds 85%.
+    Preserves system prompt and first 3 exchanges (3 user prompts + 3 AI replies),
+    then removes from the middle one by one until we're at or below 60% target.
     """
     if not llm or len(messages) <= 2:
         return messages
     
     current_tokens = count_tokens_in_messages(llm, messages)
-    threshold = int(context_size * 0.8)
+    threshold = int(context_size * 0.85)
     
     if current_tokens > threshold:
         target_tokens = int(context_size * 0.6)
-        while len(messages) > 2 and count_tokens_in_messages(llm, messages) > target_tokens:
-            messages.pop(1)
+        
+        # Preserve system prompt (index 0) and first 3 exchanges (indices 1-6)
+        # First 3 exchanges = 3 user prompts + 3 AI replies = 6 messages
+        preserve_first_count = min(7, len(messages))  # System + 6 messages for 3 exchanges
+        
+        # If we have more messages than what we're preserving, we need to prune
+        if len(messages) > preserve_first_count:
+            # Start with all messages
+            pruned_messages = messages.copy()
+            
+            # Delete messages one by one from after the preserved section
+            # Keep deleting until we're at or below target token count
+            # Always keep the last message
+            while count_tokens_in_messages(llm, pruned_messages) > target_tokens and len(pruned_messages) > preserve_first_count + 1:
+                # Remove the message right after the preserved section
+                pruned_messages.pop(preserve_first_count)
+            
+            return pruned_messages
+        else:
+            # Not enough messages to prune, but still over threshold
+            # Just remove from middle if possible
+            pruned_messages = messages.copy()
+            while count_tokens_in_messages(llm, pruned_messages) > target_tokens and len(pruned_messages) > 2:
+                if len(pruned_messages) > 3:
+                    middle_idx = len(pruned_messages) // 2
+                    pruned_messages.pop(middle_idx)
+                else:
+                    break
+            return pruned_messages
     
     return messages

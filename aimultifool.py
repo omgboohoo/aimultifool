@@ -32,7 +32,7 @@ from widgets import MessageWidget, AddActionScreen, EditCharacterScreen, Charact
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.1.15"
+    TITLE = "aiMultiFool v0.1.16"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -51,7 +51,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     action_menu_data = []
     messages = reactive([])
     user_name = reactive("User")
-    context_size = reactive(4096)
+    context_size = reactive(8192)
     gpu_layers = reactive(-1)
     style = reactive("descriptive")
     temp = reactive(0.8)
@@ -172,13 +172,13 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.1.15", id="status-version")
+            yield Static("aiMultiFool v0.1.16", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
         settings = load_settings()
         self.user_name = settings.get("user_name", "User")
-        self.context_size = settings.get("context_size", 4096)
+        self.context_size = settings.get("context_size", 8192)
         self.gpu_layers = settings.get("gpu_layers", -1)
         self.style = settings.get("style", "descriptive")
         self.temp = settings.get("temp", 0.8)

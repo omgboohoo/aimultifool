@@ -1,4 +1,4 @@
-# aiMultiFool v0.1.15
+# aiMultiFool v0.1.16
 
 **The Premium Linux Terminal-Based Sandbox for Private AI Roleplay.** 
 Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favorite SillyTavern character cards with zero lag and full privacy.
@@ -18,7 +18,7 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
 
 ### ⚡ AI & Performance
 - **Real-time Metrics**: Live TPS, Token counts, and Context % usage.
-- **Smart Pruning**: Automatically manages context window by trimming middle-history while preserving the System Prompt and latest messages.
+- **Smart Pruning**: Automatically manages context window by trimming middle-history while preserving the System Prompt, first 3 exchanges (for early roleplay context), and the last message. Deletes messages one by one from the middle until reaching 60% context usage. Triggers at 85% context usage. Chat window automatically syncs to match the pruned context exactly.
 - **GPU/CPU Auto-Detection**: Optimized layer loading with configuration caching for faster subsequent loads.
 - **Advanced Parameters**: Precise control over Temperature, Top P, Top K, Repeat Penalty, and **Min P**.
 

@@ -1,5 +1,22 @@
 # Release Notes
 
+## v0.1.16: Improved Context Window Pruning & Default Settings
+### 🧠 Context Management
+- **Smart Pruning Strategy**: Completely redesigned pruning algorithm for better roleplay context preservation. Now preserves system prompt, first 3 exchanges (for early scene setup), and the last message, then deletes messages one by one from the middle until reaching 60% context usage.
+- **Pruning Trigger**: Changed from 80% to 85% context usage threshold for more efficient context management.
+- **UI Synchronization**: Chat window now automatically rebuilds to match the pruned context window exactly, ensuring perfect synchronization between displayed messages and actual AI context.
+
+### ⚙️ Default Settings
+- **Default Context Size**: Changed default context size from 4096 to 8192 tokens for better roleplay experiences.
+- **Context Size Options**: Updated model settings modal with improved context size options:
+  - Removed 2048 (too small for practical use)
+  - Added 65536 option (double 32768) for high-end systems
+  - Marked 8192 as "(recommended)" in the dropdown
+
+### 🐛 Bug Fixes
+- Fixed context window display mismatch where chat UI didn't reflect pruned messages correctly.
+- Fixed aggressive pruning that was removing too many messages (dropping to 19-31% instead of target 60%).
+
 ## v0.1.15: Enhanced Parameters UI with Sliders
 ### 🎛️ UI Improvements
 - **Slider Controls**: Replaced text input fields with interactive sliders in the Parameters modal for a more intuitive parameter adjustment experience.

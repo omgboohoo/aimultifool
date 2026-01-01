@@ -1,4 +1,4 @@
-# System Reference Document: aiMultiFool v0.1.15
+# System Reference Document: aiMultiFool v0.1.16
 
 ## 1. Executive Summary
 aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox. It leverages **Textual** for a responsive, desktop-class TUI and **llama-cpp-python** for high-performance local inference. The architecture prioritizes separation of concerns via a Mixin pattern, enabling clean extensibility for theming, encryption, and complex character logic.
@@ -74,9 +74,11 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **Visual Updates**: The `UIMixin` appends text to the active `MessageWidget` on every token, calculating TPS (Tokens Per Second) on the fly.
 
 ### 4.2 Context Management
-- **Smart Pruning**: Before generation, the prompt is evaluated. If `total_tokens > context_size`, the system prunes the **middle** of the conversation history, preserving:
-    1. The System Prompt (Index 0)
-    2. The most recent `N` turns (User/Assistant pairs)
+- **Smart Pruning**: Before generation, the prompt is evaluated. If `total_tokens > 85% of context_size`, the system prunes messages from the middle of the conversation history, preserving:
+    1. The System Prompt (Index 0) - Always preserved
+    2. The first 3 exchanges (3 user prompts + 3 AI replies, indices 1-6) - Always preserved to maintain early roleplay context
+    3. The last message - Always preserved to maintain conversation flow
+- **Pruning Strategy**: Messages are deleted one by one from index 7 (right after the preserved section) until the token count reaches 60% of context_size or below. This simple approach ensures early scene setup and character introductions remain intact while maintaining recent conversation flow. The chat window UI is automatically rebuilt to match the pruned context window exactly.
 - **Caching**: The system caches successful GPU layer configurations in `model_cache.json` to speed up subsequent loads of the same model.
 
 ### 4.3 Character Cards (V2 Spec)
@@ -109,7 +111,7 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 ```json
 {
     "user_name": "User",
-    "context_size": 8196,
+    "context_size": 8192,
     "gpu_layers": 33,
     "selected_model": "/path/to/model.gguf",
     "style": "descriptive",

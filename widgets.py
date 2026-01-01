@@ -248,7 +248,13 @@ class ModelScreen(ModalScreen):
             ),
             Container(
                 Label("Context Size"),
-                Select([(str(x), x) for x in [2048, 4096, 8192, 16384, 32768]], id="select-context", value=4096),
+                Select([
+                    ("4096", 4096),
+                    ("8192 (recommended)", 8192),
+                    ("16384", 16384),
+                    ("32768", 32768),
+                    ("65536", 65536)
+                ], id="select-context", value=8192),
                 classes="setting-group"
             ),
             Container(

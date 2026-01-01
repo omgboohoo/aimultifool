@@ -58,28 +58,34 @@ class UIMixin:
         old_len = len(self.messages)
         new_len = len(new_messages)
         
+        # Update the messages list first
+        self.messages = list(new_messages)
+        
+        # If messages were pruned, rebuild the UI to match exactly
         if old_len > 0 and new_len > 0 and new_len < old_len:
-            diff = old_len - new_len
+            # Rebuild the entire chat UI to match the pruned messages exactly
+            # This ensures the chat window matches the context window
             try:
-                scroll = self.query_one("#chat-scroll")
-                # When pruning, we remove from index 1 onwards in self.messages.
-                # So we should find the corresponding non-info widgets and remove them.
-                context_widgets = [w for w in scroll.children if isinstance(w, MessageWidget) and not w.is_info]
-                
-                # We want to keep the first one if it corresponds to messages[0]? 
-                # Actually, messages[0] isn't usually in context_widgets if it's the base system prompt.
-                # Let's count how many we need to remove.
-                to_remove = diff
-                for w in context_widgets:
-                    if to_remove <= 0: break
-                    # Skip the very first one if it's the one we always keep (system)
-                    # But wait, if context_widgets[0] is NOT in self.messages anymore...
+                chat_scroll = self.query_one("#chat-scroll")
+                # Remove all message widgets (but keep info widgets if any)
+                widgets_to_remove = [w for w in chat_scroll.children if isinstance(w, MessageWidget) and not w.is_info]
+                for w in widgets_to_remove:
                     w.remove()
-                    to_remove -= 1
+                
+                # Rebuild widgets from current messages (skip system prompt at index 0)
+                for i, msg in enumerate(self.messages):
+                    if i == 0 and msg.get("role") == "system":
+                        continue  # Skip the base system prompt
+                    
+                    role = msg.get("role")
+                    content = msg.get("content")
+                    if content:
+                        new_widget = MessageWidget(role, content, self.user_name, is_info=False)
+                        chat_scroll.mount(new_widget)
+                
+                chat_scroll.scroll_end(animate=False)
             except Exception:
                 pass
-
-        self.messages = list(new_messages)
 
     def watch_status_text(self, new_status):
         self.query_one("#status-text").update(new_status)
