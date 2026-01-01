@@ -1,9 +1,9 @@
-# aiMultiFool v0.1.17
+# aiMultiFool v0.1.18
 
 **The Premium Linux Terminal-Based Sandbox for Private AI Roleplay.** 
 Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favorite SillyTavern character cards with zero lag and full privacy.
 
-*Vibe coded in Antigravity with Gemini 3 Pro / Flash using Linux Mint*
+*Vibe coded in Antigravity and Cursor using Linux Mint*
 
 ---
 

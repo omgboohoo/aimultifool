@@ -1,5 +1,11 @@
 # Release Notes
 
+## v0.1.18: Enhanced Action Menu & Improved UX
+### 🎯 Action Menu Improvements
+- **New JSON Format**: Action menu now uses an improved JSON structure for better organization and extensibility.
+- **Hover Tooltips**: Added helpful hover tooltips throughout the action menu interface, providing context and guidance for better usability.
+- **Expanded Default Actions**: Significantly increased the number of default actions available out of the box, providing users with a richer set of roleplay tools and system prompts.
+
 ## v0.1.17: Regenerate Button & Enhanced AI Control
 ### 🎮 User Experience
 - **Regenerate Button**: Added a new "Regenerate" button next to the "Continue" button that allows users to have the AI try the last reply again. The button remains visible even during AI generation, allowing users to stop and regenerate mid-generation.

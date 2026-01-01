@@ -360,7 +360,7 @@ class AddActionScreen(ModalScreen):
 
     def on_mount(self) -> None:
         if self.edit_data:
-            self.query_one("#name").value = self.edit_data.get("itemName", "")
+            self.query_one("#name").value = self.edit_data.get("name", "")
             self.query_one("#prompt").text = self.edit_data.get("prompt", "") # TextArea uses .text
             self.query_one("#type").value = self.edit_data.get("isSystem", False)
         self.query_one("#name").focus()
@@ -371,7 +371,7 @@ class AddActionScreen(ModalScreen):
             prompt = self.query_one("#prompt").text
             is_system = self.query_one("#type").value
             if name and prompt:
-                new_data = {"itemName": name, "prompt": prompt, "isSystem": is_system}
+                new_data = {"name": name, "prompt": prompt, "isSystem": is_system}
                 self.dismiss({"original": self.edit_data, "new": new_data})
         elif event.button.id == "cancel":
             self.dismiss(None)
@@ -1406,15 +1406,12 @@ class ActionsManagerScreen(ModalScreen):
         # ensuring it is never empty to prevent EmptySelectError
         if hasattr(self.app, "action_menu_data"):
              for item in self.app.action_menu_data:
-                name = item.get("itemName", "")
-                if ":" in name:
-                    parts = name.split(":", 1)
-                    item["category"] = parts[0].strip()
-                    item["itemName"] = parts[1].strip()
-                elif "category" not in item:
+                if "category" not in item:
                     item["category"] = "Other"
+                if "isSystem" not in item:
+                    item["isSystem"] = False
              
-             self.app.action_menu_data.sort(key=lambda x: (x.get("category", "Other").lower(), x.get("itemName", "").lower()))
+             self.app.action_menu_data.sort(key=lambda x: (x.get("category", "Other").lower(), x.get("name", "").lower()))
         
         # Build options
         cats = set()
@@ -1482,10 +1479,7 @@ class ActionsManagerScreen(ModalScreen):
             if filter_cat and cat != filter_cat:
                 continue
             
-            display_name = act.get('itemName', '???')
-            if ":" in display_name:
-                display_name = display_name.split(":", 1)[1].strip()
-            
+            display_name = act.get('name', '???')
             lv.append(ListItem(Label(f"[{cat}] {display_name}"), name=str(idx)))
 
     def on_select_changed(self, event: Select.Changed) -> None:
@@ -1545,7 +1539,7 @@ class ActionsManagerScreen(ModalScreen):
             is_system = (is_system_val == "true")
             
             self.app.action_menu_data[idx]['category'] = category
-            self.app.action_menu_data[idx]['itemName'] = item_name
+            self.app.action_menu_data[idx]['name'] = item_name
             self.app.action_menu_data[idx]['prompt'] = prompt
             self.app.action_menu_data[idx]['isSystem'] = is_system
             save_action_menu_data(self.app.action_menu_data)
@@ -1568,12 +1562,8 @@ class ActionsManagerScreen(ModalScreen):
                     if self.current_data_idx >= 0 and self.current_data_idx < len(self.app.action_menu_data):
                         act = self.app.action_menu_data[self.current_data_idx]
                         
-                        act_name = act.get('itemName', '')
-                        if ":" in act_name:
-                            act_name = act_name.split(":", 1)[1].strip()
-                            
                         self.query_one("#input-action-category", Input).value = act.get('category', 'Other')
-                        self.query_one("#input-action-name", Input).value = act_name
+                        self.query_one("#input-action-name", Input).value = act.get('name', '')
                         self.query_one("#input-action-prompt", TextArea).text = act.get('prompt', '')
                         self.query_one("#select-action-type", Select).value = "true" if act.get('isSystem', False) else "false"
                     else:
@@ -1607,14 +1597,9 @@ class ActionsManagerScreen(ModalScreen):
                 self.current_data_idx = data_idx
                 # Force sync fields
                 act = self.app.action_menu_data[data_idx]
-                
-                # Strip colon for display if still present
-                act_name = act.get('itemName', '')
-                if ":" in act_name:
-                    act_name = act_name.split(":", 1)[1].strip()
-                
+                # Update edit fields
                 self.query_one("#input-action-category", Input).value = act.get('category', 'Other')
-                self.query_one("#input-action-name", Input).value = act_name
+                self.query_one("#input-action-name", Input).value = act.get('name', '')
                 self.query_one("#input-action-prompt", TextArea).text = act.get('prompt', '')
                 self.query_one("#select-action-type", Select).value = "true" if act.get('isSystem', False) else "false"
                 break
@@ -1637,11 +1622,11 @@ class ActionsManagerScreen(ModalScreen):
             if "system" in cat.lower():
                 is_system = True
                 
-            new_act = {"category": cat, "itemName": name, "prompt": "Your instruction here...", "isSystem": is_system}
+            new_act = {"category": cat, "name": name, "prompt": "Your instruction here...", "isSystem": is_system}
             self.app.action_menu_data.append(new_act)
             
             # Sort after adding: Category then Name
-            self.app.action_menu_data.sort(key=lambda x: (x.get("category", "Other").lower(), x.get("itemName", "").lower()))
+            self.app.action_menu_data.sort(key=lambda x: (x.get("category", "Other").lower(), x.get("name", "").lower()))
             
             save_action_menu_data(self.app.action_menu_data)
             self.update_filter_options()
@@ -1665,7 +1650,7 @@ class ActionsManagerScreen(ModalScreen):
             if idx >= 0:
                 try:
                     del self.app.action_menu_data[idx]
-                    self.app.action_menu_data.sort(key=lambda x: (x.get("category", "Other").lower(), x.get("itemName", "").lower()))
+                    self.app.action_menu_data.sort(key=lambda x: (x.get("category", "Other").lower(), x.get("name", "").lower()))
                     save_action_menu_data(self.app.action_menu_data)
                     self.update_filter_options()
                     self.refresh_action_list()
@@ -1687,25 +1672,25 @@ class ActionsManagerScreen(ModalScreen):
                     
                     # Create copy
                     new_act = orig_act.copy()
-                    base_name = new_act.get('itemName', 'Action')
+                    base_name = new_act.get('name', 'Action')
                     
                     # Remove existing suffix if it matches _\d+
                     import re
                     clean_name = re.sub(r'_\d+$', '', base_name)
                     
                     # Find next increment
-                    existing_names = [a.get('itemName', '') for a in self.app.action_menu_data]
+                    existing_names = [a.get('name', '') for a in self.app.action_menu_data]
                     counter = 1
                     new_name = f"{clean_name}_{counter}"
                     while new_name in existing_names:
                         counter += 1
                         new_name = f"{clean_name}_{counter}"
                     
-                    new_act['itemName'] = new_name
+                    new_act['name'] = new_name
                     self.app.action_menu_data.append(new_act)
                     
                     # Sort after duplicating: Category then Name
-                    self.app.action_menu_data.sort(key=lambda x: (x.get("category", "Other").lower(), x.get("itemName", "").lower()))
+                    self.app.action_menu_data.sort(key=lambda x: (x.get("category", "Other").lower(), x.get("name", "").lower()))
                     
                     save_action_menu_data(self.app.action_menu_data)
                     self.update_filter_options()

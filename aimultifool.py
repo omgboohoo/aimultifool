@@ -32,7 +32,7 @@ from widgets import MessageWidget, AddActionScreen, EditCharacterScreen, Charact
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.1.17"
+    TITLE = "aiMultiFool v0.1.18"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -173,7 +173,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.1.17", id="status-version")
+            yield Static("aiMultiFool v0.1.18", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -422,31 +422,29 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                     section_name = section.get("sectionName", "")
                     items = section.get("items", [])
                     for item in items:
-                        if item.get("itemName") != "-":
+                        if item.get("name") != "-":
+                            item["category"] = section_name
                             if section_name == "System Prompts":
                                 item["isSystem"] = True
-                            name = item.get("itemName", "")
-                            if ":" in name:
-                                parts = name.split(":", 1)
-                                item["category"] = parts[0].strip()
-                                item["itemName"] = parts[1].strip()
+                            else:
+                                item["isSystem"] = item.get("isSystem", False)
                             flattened.append(item)
                 self.action_menu_data = flattened
 
-        categories = set()
         for item in self.action_menu_data:
-            name = item.get("itemName", "")
-            if ":" in name:
-                parts = name.split(":", 1)
+            # Migration: if category is missing or 'Other', try to parse from name
+            if ":" in item.get("name", "") and (item.get("category", "Other") == "Other"):
+                parts = item["name"].split(":", 1)
                 item["category"] = parts[0].strip()
-                item["itemName"] = parts[1].strip()
-            elif "category" not in item:
-                item["category"] = "Other"
+                item["name"] = parts[1].strip()
             
-            categories.add(item.get("category", "Other"))
+            if "category" not in item:
+                item["category"] = "Other"
+            if "isSystem" not in item:
+                item["isSystem"] = False
 
         # Sort all data: Category (A-Z) then Item Name (A-Z)
-        self.action_menu_data.sort(key=lambda x: (x.get("category", "Other").lower(), x.get("itemName", "").lower()))
+        self.action_menu_data.sort(key=lambda x: (x.get("category", "Other").lower(), x.get("name", "").lower()))
 
         # Group by category
         from collections import defaultdict
@@ -461,11 +459,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             # Determine if this category contains any matching items
             list_items = []
             for item in items:
-                item_name = item.get("itemName", "None")
+                item_name = item.get("name", "None")
                 display_name = item_name
-                if ":" in display_name:
-                    display_name = display_name.split(":", 1)[1].strip()
-                
                 prompt = item.get("prompt", "")
                 
                 # Filter logic
@@ -474,7 +469,12 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                 
                 is_system = item.get("isSystem", False)
                 data_packed = f"{item_name}:::{prompt}:::{is_system}"
-                list_items.append(ListItem(Label(display_name), name=data_packed))
+                # Create ListItem with tooltip showing the prompt on hover
+                li = ListItem(Label(display_name), name=data_packed)
+                if prompt:
+                    max_len = 200
+                    li.tooltip = prompt[:max_len] + "..." if len(prompt) > max_len else prompt
+                list_items.append(li)
             
             if not list_items:
                 continue
@@ -927,27 +927,27 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         
         if original_data:
             # Check if name changed - if so create new, otherwise update
-            if new_data.get("itemName") != original_data.get("itemName"):
+            if new_data.get("name") != original_data.get("name"):
                 self.action_menu_data.append(new_data)
-                self.notify(f"Added new action (keeping original): {new_data['itemName']}")
+                self.notify(f"Added new action (keeping original): {new_data['name']}")
             else:
                 # Edit mode: Find and replace
                 found = False
                 for i, item in enumerate(self.action_menu_data):
-                    if item.get("itemName") == original_data["itemName"] and item.get("prompt") == original_data["prompt"]:
+                    if item.get("name") == original_data["name"] and item.get("prompt") == original_data["prompt"]:
                          self.action_menu_data[i] = new_data
                          found = True
                          break
                 if not found:
                      self.action_menu_data.append(new_data) # Fallback if not found
-                self.notify(f"Updated action: {new_data['itemName']}")
+                self.notify(f"Updated action: {new_data['name']}")
         else:
             # Add mode
             self.action_menu_data.append(new_data)
-            self.notify(f"Added action: {new_data['itemName']}")
+            self.notify(f"Added action: {new_data['name']}")
             
         save_action_menu_data(self.action_menu_data)
-        self.populate_right_sidebar(highlight_item_name=new_data.get("itemName"))
+        self.populate_right_sidebar(highlight_item_name=new_data.get("name"))
 
     def delete_selected_action(self):
         # Find which ListView has the highlighted child
@@ -972,7 +972,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             # Find and remove from data
             found = False
             for i, item in enumerate(self.action_menu_data):
-                if item.get("itemName") == item_name and item.get("prompt") == prompt:
+                if item.get("name") == item_name and item.get("prompt") == prompt:
                     del self.action_menu_data[i]
                     save_action_menu_data(self.action_menu_data)
                     found = True
