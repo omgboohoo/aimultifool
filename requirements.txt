@@ -2,5 +2,6 @@ rich>=14.2.0
 requests
 tqdm
 textual>=6.11.0
+textual-slider
 cryptography
 pyperclip

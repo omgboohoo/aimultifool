@@ -1,5 +1,20 @@
 # Release Notes
 
+## v0.1.15: Enhanced Parameters UI with Sliders
+### 🎛️ UI Improvements
+- **Slider Controls**: Replaced text input fields with interactive sliders in the Parameters modal for a more intuitive parameter adjustment experience.
+- **Real-time Value Display**: Parameter values update in real-time as sliders are moved, providing immediate visual feedback.
+- **Recommended Ranges**: Sliders are pre-configured with recommended min/max values and step increments for optimal LLM parameter tuning:
+  - Temperature: 0.0-2.5 (step 0.1)
+  - Top P: 0.1-1.0 (step 0.01)
+  - Top K: 0-100 (step 1)
+  - Repeat Penalty: 0.8-2.0 (step 0.01)
+  - Min P: 0.0-1.0 (step 0.01)
+
+### 🔧 Technical
+- Integrated `textual-slider` package for native slider widget support.
+- Created `ScaledSlider` wrapper to support float values with proper scaling for integer-based sliders.
+
 ## v0.1.14: Updated Default Model
 ### 🤖 Model Changes
 - **New Default Model**: Changed default auto-download model from `L3-8B-Stheno-v3.2-Q4_K_M` to `MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_S` for improved quality out of the box.

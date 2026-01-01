@@ -10,8 +10,48 @@ from textual.app import ComposeResult
 from textual.screen import ModalScreen
 from textual.containers import Vertical, Container, Horizontal, Grid, ScrollableContainer
 from textual.widgets import Label, Input, Select, Button, ListView, ListItem, Static, TextArea
+from textual_slider import Slider
 from utils import save_action_menu_data, encrypt_data, decrypt_data, copy_to_clipboard
 from character_manager import extract_chara_metadata, write_chara_metadata
+
+class ScaledSlider(Slider):
+    """Slider that works with float values by scaling to integers."""
+    def __init__(self, min_val: float, max_val: float, step: float, value: float, id: str = None, **kwargs):
+        # Scale to integers for the underlying slider
+        self.scale_factor = 1.0
+        if step < 1.0:
+            # Find the scale factor needed to make step an integer
+            step_str = f"{step:.10f}".rstrip('0')
+            if '.' in step_str:
+                decimals = len(step_str.split('.')[1])
+                self.scale_factor = 10 ** decimals
+            else:
+                self.scale_factor = 1.0
+        else:
+            self.scale_factor = 1.0
+        
+        self.min_val = min_val
+        self.max_val = max_val
+        self.step = step
+        
+        # Scale values for integer slider
+        scaled_min = int(min_val * self.scale_factor)
+        scaled_max = int(max_val * self.scale_factor)
+        scaled_step = int(step * self.scale_factor) if step * self.scale_factor >= 1 else 1
+        scaled_value = int(value * self.scale_factor)
+        
+        super().__init__(min=scaled_min, max=scaled_max, step=scaled_step, value=scaled_value, id=id, **kwargs)
+    
+    @property
+    def float_value(self) -> float:
+        """Get the actual float value."""
+        return self.value / self.scale_factor
+    
+    @float_value.setter
+    def float_value(self, val: float) -> None:
+        """Set the float value."""
+        scaled = int(val * self.scale_factor)
+        self.value = scaled
 
 class GenericPasswordModal(ModalScreen):
     """Generic modal for entering a password."""
@@ -1090,29 +1130,34 @@ class ParametersScreen(ModalScreen):
         app = self.app
         yield Vertical(
             Label("AI Parameters", classes="dialog-title"),
-            Container(
-                Label("Temperature (0.0-2.5)"),
-                Input(value=str(app.temp), id="input-temp"),
+            Horizontal(
+                Label("Temp", classes="param-label"),
+                ScaledSlider(min_val=0.0, max_val=2.5, step=0.1, value=app.temp, id="input-temp"),
+                Static(f"{app.temp:.2f}", id="value-temp", classes="param-value"),
                 classes="setting-group"
             ),
-            Container(
-                Label("Top P (0.1-1.0)"),
-                Input(value=str(app.topp), id="input-topp"),
+            Horizontal(
+                Label("Top P", classes="param-label"),
+                ScaledSlider(min_val=0.1, max_val=1.0, step=0.01, value=app.topp, id="input-topp"),
+                Static(f"{app.topp:.2f}", id="value-topp", classes="param-value"),
                 classes="setting-group"
             ),
-            Container(
-                Label("Top K (0-100)"),
-                Input(value=str(app.topk), id="input-topk"),
+            Horizontal(
+                Label("Top K", classes="param-label"),
+                ScaledSlider(min_val=0, max_val=100, step=1, value=app.topk, id="input-topk"),
+                Static(f"{app.topk}", id="value-topk", classes="param-value"),
                 classes="setting-group"
             ),
-            Container(
-                Label("Repeat Penalty (0.8-2.0)"),
-                Input(value=str(app.repeat), id="input-repeat"),
+            Horizontal(
+                Label("Repeat", classes="param-label"),
+                ScaledSlider(min_val=0.8, max_val=2.0, step=0.01, value=app.repeat, id="input-repeat"),
+                Static(f"{app.repeat:.2f}", id="value-repeat", classes="param-value"),
                 classes="setting-group"
             ),
-            Container(
-                Label("Min P (0.0-1.0)"),
-                Input(value=str(app.minp), id="input-minp"),
+            Horizontal(
+                Label("Min P", classes="param-label"),
+                ScaledSlider(min_val=0.0, max_val=1.0, step=0.01, value=app.minp, id="input-minp"),
+                Static(f"{app.minp:.2f}", id="value-minp", classes="param-value"),
                 classes="setting-group"
             ),
             Horizontal(
@@ -1125,19 +1170,47 @@ class ParametersScreen(ModalScreen):
             classes="modal-dialog"
         )
 
-    def on_input_changed(self, event: Input.Changed) -> None:
-        # We no longer apply changes live to support Cancel behavior
-        pass
-
+    def on_slider_changed(self, event) -> None:
+        """Handle slider value changes from textual-slider."""
+        # The event has slider and value attributes
+        slider = event.slider
+        if slider and slider.id:
+            attr = slider.id.replace("input-", "")
+            try:
+                if isinstance(slider, ScaledSlider):
+                    # Use the float_value property which converts from scaled integer
+                    value = slider.float_value
+                else:
+                    # For regular sliders, use the event value
+                    value = event.value
+                value_label = self.query_one(f"#value-{attr}", Static)
+                if attr == "topk":
+                    value_label.update(f"{int(value)}")
+                else:
+                    value_label.update(f"{value:.2f}")
+            except Exception as e:
+                # Debug: uncomment to see errors
+                # self.app.notify(f"Slider update error: {e}", severity="error")
+                pass
+    
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        # Handle parameter dialog buttons
         if event.button.id == "btn-reset-params":
             # Just reset the UI fields, don't apply to app yet
             defaults = {
                 "temp": 0.8, "topp": 0.9, "topk": 40, "repeat": 1.0, "minp": 0.0
             }
             for attr, val in defaults.items():
-                try: self.query_one(f"#input-{attr}", Input).value = str(val)
-                except Exception: pass
+                try:
+                    slider = self.query_one(f"#input-{attr}", ScaledSlider)
+                    slider.float_value = val
+                    value_label = self.query_one(f"#value-{attr}", Static)
+                    if attr == "topk":
+                        value_label.update(f"{int(val)}")
+                    else:
+                        value_label.update(f"{val:.2f}")
+                except Exception:
+                    pass
             self.app.notify("UI values reset. Click Apply to save.")
             self.query_one(".dialog-title").focus()
             
@@ -1145,11 +1218,16 @@ class ParametersScreen(ModalScreen):
             # Read from UI and apply to app
             for attr in ["temp", "topp", "topk", "repeat", "minp"]:
                 try:
-                    val_str = self.query_one(f"#input-{attr}", Input).value
-                    if attr == "topk": val = int(val_str)
-                    else: val = float(val_str)
+                    slider = self.query_one(f"#input-{attr}", ScaledSlider)
+                    if isinstance(slider, ScaledSlider):
+                        val = slider.float_value
+                    else:
+                        val = slider.value
+                    if attr == "topk":
+                        val = int(val)
                     setattr(self.app, attr, val)
-                except Exception: pass
+                except Exception:
+                    pass
             
             if hasattr(self.app, "save_user_settings"):
                 self.app.save_user_settings()

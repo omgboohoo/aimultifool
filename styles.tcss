@@ -352,19 +352,44 @@ ActionsManagerScreen {
 #parameters-dialog {
     width: 60;
     height: auto;
+    min-height: 10;
+    max-height: 95%;
+    background: $surface;
+    border: thick $primary;
+    padding: 1;
 }
 
 #parameters-dialog .setting-group {
-    height: auto;
-    margin-top: 1;
-    margin-bottom: 0;
+    height: 3;
+    margin: 0;
+    padding: 0;
+    width: 100%;
 }
 
-#parameters-dialog .setting-group Input {
-    height: 1;
-    border: none;
-    padding: 0 1;
-    margin-bottom: 1;
+#parameters-dialog .setting-group:first-of-type {
+    margin-top: 1;
+}
+
+#parameters-dialog .param-label {
+    width: 12;
+    padding: 1 0 0 1;
+    color: $text-muted;
+    text-style: bold;
+}
+
+#parameters-dialog .param-value {
+    color: $accent;
+    text-style: bold;
+    text-align: right;
+    width: 8;
+    padding: 1 1 0 0;
+}
+
+#parameters-dialog Slider {
+    width: 1fr;
+    height: 3;
+    min-height: 3;
+    margin: 0;
 }
 
 #management-split {
