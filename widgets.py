@@ -1756,14 +1756,14 @@ class PasswordPromptScreen(ModalScreen):
             # Check if it's already JSON (not encrypted) or needs decryption
             try:
                 # If this succeeds, it was NOT encrypted
-                messages = json.loads(content)
-                self.dismiss(messages)
+                data = json.loads(content)
+                self.dismiss(data)
                 return
             except json.JSONDecodeError:
                 # Needs decryption
                 decrypted_json = decrypt_data(content, password)
-                messages = json.loads(decrypted_json)
-                self.dismiss(messages)
+                data = json.loads(decrypted_json)
+                self.dismiss(data)
         except Exception as e:
             self.app.notify(str(e), severity="error")
             self.query_one("#input-password").focus()
@@ -1838,15 +1838,29 @@ class ChatManagerScreen(ModalScreen):
             file_path = chats_dir / save_name
             
             try:
-                chat_data = json.dumps(self.app.messages, indent=2)
+                # Save messages along with model settings
+                chat_data = {
+                    "messages": self.app.messages,
+                    "model_settings": {
+                        "selected_model": self.app.selected_model,
+                        "context_size": self.app.context_size,
+                        "gpu_layers": self.app.gpu_layers,
+                        "temp": self.app.temp,
+                        "topp": self.app.topp,
+                        "topk": self.app.topk,
+                        "repeat": self.app.repeat,
+                        "minp": self.app.minp
+                    }
+                }
+                chat_data_json = json.dumps(chat_data, indent=2)
                 if password:
-                    encrypted_data = encrypt_data(chat_data, password)
+                    encrypted_data = encrypt_data(chat_data_json, password)
                     with open(file_path, "w") as f:
                         f.write(encrypted_data)
                     self.app.notify(f"Encrypted chat saved to {save_name}")
                 else:
                     with open(file_path, "w") as f:
-                        f.write(chat_data)
+                        f.write(chat_data_json)
                     self.app.notify(f"Chat saved to {save_name}")
                 self.refresh_chat_list()
                 self.query_one("#input-save-password", Input).value = ""
@@ -1865,8 +1879,21 @@ class ChatManagerScreen(ModalScreen):
                         
                         try:
                             # Try loading as plain JSON first
-                            messages = json.loads(content)
-                            self.dismiss({"action": "load", "messages": messages})
+                            data = json.loads(content)
+                            # Handle both old format (just messages list) and new format (dict with messages and model_settings)
+                            if isinstance(data, list):
+                                # Old format: just messages
+                                messages = data
+                                model_settings = None
+                            elif isinstance(data, dict) and "messages" in data:
+                                # New format: dict with messages and model_settings
+                                messages = data["messages"]
+                                model_settings = data.get("model_settings")
+                            else:
+                                # Fallback: treat as messages
+                                messages = data
+                                model_settings = None
+                            self.dismiss({"action": "load", "messages": messages, "model_settings": model_settings})
                         except json.JSONDecodeError:
                             # If not JSON, it's likely encrypted. Prompt for password.
                             self.app.push_screen(PasswordPromptScreen(file_path), self.password_prompt_callback)
@@ -1892,8 +1919,21 @@ class ChatManagerScreen(ModalScreen):
                 self.app.notify("Select a chat to delete first!", severity="warning")
             self.query_one("#list-saved-chats").focus()
 
-    def password_prompt_callback(self, messages):
-        if messages:
-            self.dismiss({"action": "load", "messages": messages})
+    def password_prompt_callback(self, result):
+        if result:
+            # result can be either messages (old format) or dict with messages and model_settings (new format)
+            if isinstance(result, list):
+                # Old format: just messages
+                messages = result
+                model_settings = None
+            elif isinstance(result, dict) and "messages" in result:
+                # Already in new format
+                messages = result["messages"]
+                model_settings = result.get("model_settings")
+            else:
+                # Fallback
+                messages = result
+                model_settings = None
+            self.dismiss({"action": "load", "messages": messages, "model_settings": model_settings})
 
 

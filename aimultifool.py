@@ -32,7 +32,7 @@ from widgets import MessageWidget, AddActionScreen, EditCharacterScreen, Charact
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.1.18"
+    TITLE = "aiMultiFool v0.1.19"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -173,7 +173,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.1.18", id="status-version")
+            yield Static("aiMultiFool v0.1.19", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -765,13 +765,71 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         action = result.get("action")
         if action == "load":
             messages = result.get("messages")
+            model_settings = result.get("model_settings")
+            
             if messages:
                 # Clear and repopulate chat scroll robustly
                 await self.action_stop_generation()
+                
+                # Restore model settings if available
+                if model_settings:
+                    # Check if model or critical settings need to change
+                    saved_model = model_settings.get("selected_model", "")
+                    saved_context = model_settings.get("context_size", self.context_size)
+                    saved_gpu_layers = model_settings.get("gpu_layers", self.gpu_layers)
+                    
+                    needs_reload = False
+                    if saved_model and (
+                        not self.llm or 
+                        self.selected_model != saved_model or
+                        self.context_size != saved_context or
+                        self.gpu_layers != saved_gpu_layers
+                    ):
+                        needs_reload = True
+                    
+                    # Update all model settings
+                    self.selected_model = saved_model if saved_model else self.selected_model
+                    self.context_size = saved_context
+                    self.gpu_layers = saved_gpu_layers
+                    self.temp = model_settings.get("temp", self.temp)
+                    self.topp = model_settings.get("topp", self.topp)
+                    self.topk = model_settings.get("topk", self.topk)
+                    self.repeat = model_settings.get("repeat", self.repeat)
+                    self.minp = model_settings.get("minp", self.minp)
+                    
+                    # Save updated settings
+                    self.save_user_settings()
+                    
+                    # Reload model if needed
+                    if needs_reload and self.selected_model:
+                        self.notify("Reloading model with saved settings...", severity="information")
+                        self.is_model_loading = True
+                        await asyncio.sleep(0.1)
+                        self.start_model_load(self.selected_model, self.context_size, self.gpu_layers)
+                        
+                        # Wait for model loading to complete before allowing input
+                        max_wait = 300  # 30 seconds max wait
+                        wait_count = 0
+                        while self.is_model_loading and wait_count < max_wait:
+                            await asyncio.sleep(0.1)
+                            wait_count += 1
+                        
+                        if not self.llm:
+                            self.notify("Model failed to load. Please load a model manually.", severity="error")
+                            return
+                        
+                        # Small safety delay to ensure CUDA is fully initialized
+                        await asyncio.sleep(0.2)
+                        
+                        self.notify("Model loaded successfully. Chat restored.")
+                    else:
+                        self.notify("Chat loaded successfully. Model settings restored.")
+                else:
+                    self.notify("Chat loaded successfully. (No model settings found in saved chat)")
+                
+                # Only set messages and sync UI after model is ready
                 self.messages = messages
                 await self.full_sync_chat_ui()
-                
-                self.notify("Chat loaded successfully.")
                 self.focus_chat_input()
 
     async def model_screen_callback(self, result):

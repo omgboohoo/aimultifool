@@ -1,4 +1,4 @@
-# System Reference Document: aiMultiFool v0.1.18
+# System Reference Document: aiMultiFool v0.1.19
 
 ## 1. Executive Summary
 aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox. It leverages **Textual** for a responsive, desktop-class TUI and **llama-cpp-python** for high-performance local inference. The architecture prioritizes separation of concerns via a Mixin pattern, enabling clean extensibility for theming, encryption, and complex character logic.
@@ -84,11 +84,60 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 ### 4.3 Character Cards (V2 Spec)
 - **Format**: SillyTavern-compatible PNGs.
 - **Metadata**: Embedded in standard `tEXt` chunks or base64-encoded `zTXt` chunks.
-- **AI Editor**: The app can pipe extracted metadata back into a small LLM to "rewrite" or "enhance" the character description, streaming the result into the metadata editor fields.
+- **AI Editor**: The app can pipe extracted metadata back into a small LLM to "rewrite" or "enhance" the character description, streaming the result into the metadata editor fields in real-time.
+- **Character Management**: Full character card browser with search, edit, and encryption support.
+- **Encryption**: Character cards can be encrypted with AES-256-GCM, requiring a password to view or play.
+
+### 4.4 Chat Management
+- **Save/Load Chats**: Users can save conversation histories to JSON files with optional encryption.
+- **Model Settings Persistence**: Saved chats include complete model configuration (model path, context size, GPU layers, and all sampling parameters) alongside conversation history.
+- **Automatic Model Restoration**: When loading a saved chat, the app automatically restores the model settings used during that conversation and reloads the model if needed.
+- **Backward Compatibility**: Old chat files (messages only) continue to work seamlessly.
+
+### 4.5 User Actions & System Prompts
+- **Action Menu System**: Right sidebar containing roleplay tools and system prompts.
+- **Action Manager**: Full in-app manager with real-time search, category filtering, and CRUD operations.
+- **Default Actions**: Extensive library of default actions covering scene management, character interactions, and narrative control.
+- **System Prompts**: Actions can be marked as system prompts that modify the AI's behavior rather than user messages.
 
 ---
 
-## 5. Security & Cryptography
+## 5. User Interface & Modals
+
+### 5.1 Main Interface Components
+- **Chat Input**: Primary text input for user messages, disabled during model loading or generation.
+- **Chat Scroll Area**: Displays conversation history with role-based styling (user messages bold, assistant messages normal).
+- **Status Bar**: Shows current model name, generation status, TPS, token counts, and context usage.
+- **Top Menu Bar**: Provides access to all major features via buttons.
+
+### 5.2 Modal Screens
+- **ModelScreen**: Model selection, context size, and GPU layer configuration.
+- **ParametersScreen**: AI sampling parameter controls (Temperature, Top P, Top K, Repeat Penalty, Min P) with slider interfaces.
+- **CharactersScreen**: Character card browser with search, load, edit, and encryption capabilities.
+- **EditCharacterScreen**: Character metadata editor with AI-assisted editing and real-time streaming.
+- **ActionsManagerScreen**: Full action menu management with search, filtering, and category organization.
+- **AddActionScreen**: Create new actions or system prompts.
+- **ChatManagerScreen**: Save and load conversation histories with optional encryption.
+- **ThemeScreen**: Theme selection and speech styling options.
+- **MiscScreen**: About screen with links to website, Discord, and support.
+- **ContextWindowScreen**: Inspect the raw JSON context and system prompts being sent to the LLM.
+
+### 5.3 Keyboard Shortcuts
+- **Ctrl+S**: Stop AI generation
+- **Ctrl+Enter**: Trigger AI "Continue"
+- **Ctrl+Z**: Rewind (Undo last user/assistant interaction)
+- **Ctrl+R**: Restart conversation from the beginning
+- **Ctrl+Shift+W**: Clear chat history completely
+- **Ctrl+Q**: Quit Application
+
+### 5.4 Speech Styling
+- **Modes**: Three speech styling options (None, Inversed, Highlight) for quoted text and dialogue in AI responses.
+- **Real-time Updates**: Speech styling changes apply immediately to existing messages without requiring a restart.
+- **Persistence**: Speech styling preference is saved to `settings.json`.
+
+---
+
+## 6. Security & Cryptography
 
 ### 5.1 Encryption Standards
 - **Algorithm**: AES-256-GCM (Galois/Counter Mode). Authenticated encryption ensures data integrity.
@@ -118,12 +167,83 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
     "temp": 0.8,
     "topp": 0.9,
     "topk": 40,
-    "minp": 0.05
+    "repeat": 1.0,
+    "minp": 0.0,
+    "theme": "textual-dark",
+    "speech_styling": "highlight"
 }
 ```
 
-### 6.2 Application State
+### 6.2 Saved Chat Format
+**New Format** (v0.1.19+):
+```json
+{
+    "messages": [
+        {"role": "system", "content": "..."},
+        {"role": "user", "content": "..."},
+        {"role": "assistant", "content": "..."}
+    ],
+    "model_settings": {
+        "selected_model": "/path/to/model.gguf",
+        "context_size": 8192,
+        "gpu_layers": 33,
+        "temp": 0.8,
+        "topp": 0.9,
+        "topk": 40,
+        "repeat": 1.0,
+        "minp": 0.0
+    }
+}
+```
+
+**Legacy Format** (backward compatible):
+```json
+[
+    {"role": "system", "content": "..."},
+    {"role": "user", "content": "..."},
+    {"role": "assistant", "content": "..."}
+]
+```
+
+### 6.3 Application State
 - **Reactive Properties**: Textual's `reactive` logic creates a unidirectional data flow. Changing `self.is_loading` automatically toggles button states (Stop/Continue) across the entire UI tree without manual DOM queries.
+- **State Management**: The app tracks model loading state, generation state, and UI busy states to prevent race conditions and ensure proper cleanup.
+
+### 6.4 Data Files
+- **`settings.json`**: User preferences and model configuration.
+- **`model_cache.json`**: Cached GPU layer configurations for faster model loading.
+- **`action_menu.json`**: User-defined actions and system prompts.
+- **`chats/*.json`**: Saved conversation histories (optionally encrypted).
+- **`characters/*.png`**: Character card files (optionally encrypted).
+
+---
+
+## 7. Actions & Features
+
+### 7.1 Core Actions
+- **Stop Generation**: Gracefully stops ongoing AI generation.
+- **Continue**: Triggers AI to continue from where it left off.
+- **Regenerate**: Removes the last assistant message and re-runs inference with the same user prompt.
+- **Rewind**: Undoes the last user/assistant exchange, restoring previous state.
+- **Reset Chat**: Restarts conversation from the beginning while preserving character and style settings.
+- **Wipe All**: Clears all chat history completely.
+
+### 7.2 Model Management
+- **Model Loading**: Automatic GPU layer detection with fallback strategies.
+- **Model Caching**: Successful GPU layer configurations are cached for faster subsequent loads.
+- **Model Switching**: Proper cleanup of old models before loading new ones to prevent CUDA errors.
+- **Model Restoration**: Automatic model reloading when loading chats with different model settings.
+
+### 7.3 Character Management
+- **Character Loading**: Load SillyTavern PNG cards with automatic metadata extraction.
+- **Character Editing**: Full metadata editor with AI-assisted generation and modification.
+- **Character Encryption**: Encrypt character cards with password protection.
+- **Character Browser**: Search and filter character cards by name.
+
+### 7.4 Narrative Styles
+- **44 Presets**: Extensive library of narrative style presets covering various tones and genres.
+- **Style Application**: Styles modify the system prompt and apply immediately to active conversations.
+- **Style Persistence**: Selected style is saved to settings and persists across restarts.
 
 ---
 

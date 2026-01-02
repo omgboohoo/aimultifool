@@ -1,5 +1,18 @@
 # Release Notes
 
+## v0.1.19: Model Settings Persistence in Saved Chats
+### 💾 Chat Management Enhancements
+- **Model Settings Preservation**: Saved chats now include complete model configuration (model path, context size, GPU layers, and all sampling parameters) alongside conversation history.
+- **Automatic Model Restoration**: When loading a saved chat, the app automatically restores the model settings used during that conversation and reloads the model if needed.
+- **Backward Compatibility**: Old chat files (messages only) continue to work seamlessly, ensuring no disruption for existing saved conversations.
+- **Settings Included**: All model parameters are preserved: selected model, context size, GPU layers, temperature, top P, top K, repeat penalty, and min P.
+
+### 🔧 Technical
+- Enhanced chat save format to include `model_settings` dictionary alongside `messages`.
+- Updated load logic to handle both legacy format (messages list) and new format (dictionary with messages and settings).
+- Automatic model reloading when loaded chat settings differ from current configuration.
+- Settings are automatically saved to `settings.json` when loading a chat with different model settings.
+
 ## v0.1.18: Enhanced Action Menu & Improved UX
 ### 🎯 Action Menu Improvements
 - **New JSON Format**: Action menu now uses an improved JSON structure for better organization and extensibility.
