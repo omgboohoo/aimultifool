@@ -1,4 +1,4 @@
-# aiMultiFool v0.1.20
+# aiMultiFool v0.1.21
 
 **The Premium Linux Terminal-Based Sandbox for Private AI Roleplay.** 
 Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favorite SillyTavern character cards with zero lag and full privacy.
@@ -9,12 +9,15 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
 
 ## ✨ Features
 
+Looking for a detailed guide? Check out the **[USER_GUIDE.md](./USER_GUIDE.md)** for a comprehensive walkthrough.
+
 ### 🎭 Character & Content
 - **Character Card Support**: Load SillyTavern PNG cards directly from the top menu.
 - **AI-Assisted Editing**: Built-in **Metadata Editor** with **real-time streaming AI assistance** for generating and modifying character data without leaving the app.
     > *Tip: Use a small 8B parameter model for responsive AI editing. Larger models may loop with JSON data.*
-- **Narrative Styles**: Choose from **44 custom presets** covering a wide range of tones including Concise, Descriptive, Dramatic, Horror, Whimsical, and more.
-- **On-Demand Encryption**: Secure individual character cards with **AES-256-GCM** encryption. Encrypted cards are locked by default and require a password to view or play.
+- **Narrative Styles**: Choose from **44 custom presets** covering a wide range of tones.
+- **On-Demand Encryption**: Secure individual character cards with **AES-256-GCM** encryption.
+- **Vector Chat (RAG)**: Enhance roleplay with long-term memory via local vector databases. Supports optional **AES-256-GCM** encryption for database payloads. Duplicate, rename, and manage multiple knowledge bases with ease.
 
 ### ⚡ AI & Performance
 - **Real-time Metrics**: Live TPS, Token counts, and Context % usage.
@@ -91,13 +94,14 @@ If you've ever set **Temperature** to 2.0 and noticed the AI still sounds perfec
   ```bash
   sudo apt install nvidia-cuda-toolkit-runtime
   ```
-- **Models**: GGUF format (Auto-downloads **MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_S** as default)
+- **Models**: GGUF format (Auto-downloads **MN-12B-Mag-Mell-R1** as default LLM and **nomic-embed-text-v2-moe** for Vector Chat)
 
 ---
 
 ## 📦 Recommended Models
 
-- **Default**: [MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_S](https://huggingface.co/mradermacher/MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF) (Auto-downloaded)
+- **Default LLM**: [MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_S](https://huggingface.co/mradermacher/MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF) (Auto-downloaded)
+- **Embedding Model**: [nomic-embed-text-v2-moe.Q4_K_M](https://huggingface.co/nomic-ai/nomic-embed-text-v2-moe-GGUF) (Auto-downloaded) - Required for **Vector Chat (RAG)** long-term memory.
 - **Smaller Option**: [L3-8B-Stheno-v3.2-Q4_K_M](https://huggingface.co/bartowski/L3-8B-Stheno-v3.2-GGUF) (~5.2 GB) - Faster, lower memory usage
 - **High Quality**: [MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_M](https://huggingface.co/mradermacher/MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF) (Higher quality variant)
 

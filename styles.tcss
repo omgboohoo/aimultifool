@@ -512,8 +512,16 @@ ActionsManagerScreen {
     text-style: bold;
     color: $text;
     margin-top: 0;
-    margin-bottom: 0;
+    margin-bottom: 1;
 }
+
+.dialog-subtitle {
+    width: 100%;
+    content-align: center middle;
+    color: $text-muted;
+    margin-bottom: 1;
+}
+
 
 .dialog-title:focus {
     text-style: bold;
@@ -626,3 +634,75 @@ ActionsManagerScreen {
     border-left: solid $accent;
 }
 
+VectorChatScreen {
+    align: center middle;
+}
+
+VectorInspectScreen {
+    align: center middle;
+}
+
+#vector-chat-dialog {
+    width: 80;
+    height: auto;
+    min-height: 35;
+    max-height: 95%;
+    background: $surface;
+    border: thick $primary;
+    padding: 1 2;
+}
+
+#vector-input-container {
+    height: auto;
+    width: 100%;
+    margin-top: 1;
+    margin-bottom: 1;
+    align: left middle;
+}
+
+#vector-input-container Input {
+    width: 1fr;
+    height: 3;
+    margin: 0;
+}
+
+#vector-input-container Button {
+    width: 12;
+    height: 3;
+    margin: 0 0 0 1;
+}
+
+#list-vector-chats {
+    height: 12;
+    background: $boost;
+    border: solid $primary;
+    margin: 1 0;
+}
+
+.section-label {
+    color: $text;
+    text-style: bold;
+    margin-top: 1;
+}
+
+#vector-content {
+    height: 1fr;
+    width: 100%;
+    margin: 1 0;
+    border: solid $primary;
+    background: $surface;
+}
+
+#vector-inspect-dialog {
+    width: 90%;
+    height: 90%;
+    max-height: 95%;
+}
+
+/* Active vector chat button styling */
+Button.vector-active {
+    background: $error;
+    color: $text;
+    text-style: bold;
+    border: thick $error;
+}

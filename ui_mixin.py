@@ -35,7 +35,7 @@ class UIMixin:
     async def full_sync_chat_ui(self):
         """Robustly rebuild the entire chat UI from self.messages."""
         chat_scroll = self.query_one("#chat-scroll")
-        chat_scroll.remove_children()
+        chat_scroll.query("*").remove()
         
         # We don't usually show the first system prompt (index 0) in the UI 
         # unless it was explicitly added via set_system_prompt which calls add_info_message.

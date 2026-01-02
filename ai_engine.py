@@ -7,7 +7,7 @@ def get_models():
     if not models_dir.exists():
         models_dir.mkdir(parents=True, exist_ok=True)
     
-    model_files = list(models_dir.glob("*.gguf"))
+    model_files = [m for m in models_dir.glob("*.gguf") if "nomic" not in m.name.lower() and "embed" not in m.name.lower()]
     return sorted(model_files)
 
 def get_model_cache_path():

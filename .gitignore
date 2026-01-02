@@ -125,3 +125,7 @@ cards/*
 !cards/The Night Club.png
 !cards/The Ruined Church Ritual.png
 !cards/Zombie Outbreak.png
+
+# Debug Scripts
+debug_vectors.py
+vectors/

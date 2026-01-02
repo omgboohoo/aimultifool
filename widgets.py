@@ -1,4 +1,8 @@
 import os
+
+# Disable Qdrant usage reporting for privacy
+os.environ["QDRANT__TELEMETRY_DISABLED"] = "true"
+
 import re
 import json
 import asyncio
@@ -1000,7 +1004,7 @@ class CharactersScreen(ModalScreen):
                     
                     # Initiate AI Guidance
                     history = self.query_one("#ai-meta-history", ScrollableContainer)
-                    history.remove_children()
+                    history.query("*").remove()
                     history.mount(Static("Assistant: I've created a new card template! Tell me about the character you want to create (e.g., 'a 1920s detective who is obsessed with coffee'), and I'll fill out the whole card for you.", classes="ai-message"))
                     
                     # Focus the AI input
@@ -1935,5 +1939,307 @@ class ChatManagerScreen(ModalScreen):
                 messages = result
                 model_settings = None
             self.dismiss({"action": "load", "messages": messages, "model_settings": model_settings})
+
+class VectorChatScreen(ModalScreen):
+    """The modal for managing vector chats (RAG)."""
+    def compose(self) -> ComposeResult:
+        with Vertical(id="vector-chat-dialog", classes="modal-dialog"):
+            yield Label("Vector Chat (RAG)", classes="dialog-title")
+            
+            yield Label("Manage your vector chat databases.", classes="dialog-subtitle")
+            yield Label("Conversations are stored locally and retrieved based on similarity.", classes="dialog-subtitle")
+            
+            with Horizontal(id="vector-input-container"):
+                yield Input(placeholder="New Vector Chat Name", id="input-vector-name")
+                yield Button("Create", id="btn-vector-create")
+            
+            yield Label("Password (Optional - for encryption):", classes="label")
+            yield Input(placeholder="Password / Passphrase", id="input-vector-password", password=False)
+            
+            yield Label("Existing Vector Chats:", classes="section-label")
+            yield ListView(id="list-vector-chats")
+            
+            with Horizontal(classes="buttons"):
+                yield Button("Load", id="btn-vector-load")
+                yield Button("Inspect", id="btn-vector-inspect")
+                yield Button("Duplicate", id="btn-vector-duplicate")
+                yield Button("Rename", id="btn-vector-rename")
+            
+            with Horizontal(classes="buttons"):
+                yield Button("Delete", id="btn-vector-delete")
+                yield Button("Disable Vector Chat", id="btn-vector-disable")
+                yield Button("Close", id="btn-close")
+
+    def on_mount(self) -> None:
+        title = self.query_one(".dialog-title")
+        title.can_focus = True
+        title.focus()
+        self.update_vector_list()
+        # Disable the 'Disable' button if vector chat is not currently enabled
+        self.query_one("#btn-vector-disable").disabled = not getattr(self.app, "enable_vector_chat", False)
+        self.update_button_states()
+
+    def update_button_states(self):
+        """Enable or disable management buttons based on selection."""
+        try:
+            list_view = self.query_one("#list-vector-chats", ListView)
+            has_selection = list_view.highlighted_child is not None
+            
+            for btn_id in ["btn-vector-load", "btn-vector-inspect", "btn-vector-duplicate", "btn-vector-rename", "btn-vector-delete"]:
+                self.query_one(f"#{btn_id}").disabled = not has_selection
+        except Exception:
+            pass
+
+    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
+        if event.list_view.id == "#list-vector-chats" or event.list_view.id == "list-vector-chats":
+            self.update_button_states()
+
+    def update_vector_list(self):
+        vectors_dir = Path(__file__).parent / "vectors"
+        if not vectors_dir.exists():
+            vectors_dir.mkdir(parents=True, exist_ok=True)
+            
+        chats = [d.name for d in vectors_dir.iterdir() if d.is_dir()]
+        list_view = self.query_one("#list-vector-chats", ListView)
+        list_view.clear()
+        for chat in sorted(chats):
+            is_encrypted = (vectors_dir / chat / ".encrypted").exists()
+            display_name = f"🔒 {chat}" if is_encrypted else chat
+            item = ListItem(Label(display_name))
+            item.chat_name = chat  # Custom attribute for reliability
+            item.is_encrypted = is_encrypted
+            list_view.append(item)
+        self.update_button_states()
+
+    async def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-vector-create":
+            name = self.query_one("#input-vector-name", Input).value.strip()
+            password = self.query_one("#input-vector-password", Input).value
+            if name:
+                self.dismiss({"action": "create", "name": name, "password": password})
+            else:
+                self.app.notify("Please enter a name for the new vector chat.", severity="error")
+        elif event.button.id == "btn-vector-load":
+            try:
+                selected = self.query_one("#list-vector-chats", ListView).highlighted_child
+                if selected and hasattr(selected, "chat_name"):
+                    password = self.query_one("#input-vector-password", Input).value
+                    if selected.is_encrypted and not password:
+                        self.app.notify("This vector chat is encrypted! Please enter the password below.", severity="warning")
+                        self.query_one("#input-vector-password").focus()
+                        return
+                    self.dismiss({"action": "load", "name": selected.chat_name, "password": password})
+                else:
+                    self.app.notify("No vector chat selected.", severity="warning")
+            except Exception as e:
+                self.app.notify(f"Load error: {e}", severity="error")
+        elif event.button.id == "btn-vector-inspect":
+            try:
+                item = self.query_one("#list-vector-chats", ListView).highlighted_child
+                if item and hasattr(item, "chat_name"):
+                    password = self.query_one("#input-vector-password", Input).value
+                    if item.is_encrypted and not password:
+                         self.app.notify("This vector chat is encrypted. Provide a password to see plaintext.", severity="information")
+                    self.app.push_screen(VectorInspectScreen(item.chat_name, password=password), lambda _: self.query_one(".dialog-title").focus())
+                else:
+                    self.app.notify("No vector chat selected.", severity="warning")
+            except Exception as e:
+                self.app.notify(f"Inspect error: {e}", severity="error")
+        elif event.button.id == "btn-vector-duplicate":
+            item = self.query_one("#list-vector-chats", ListView).highlighted_child
+            if item and hasattr(item, "chat_name"):
+                def on_duplicate(new_name):
+                    if new_name:
+                        import shutil
+                        old_name = item.chat_name
+                        old_path = Path(__file__).parent / "vectors" / old_name
+                        new_path = Path(__file__).parent / "vectors" / new_name
+                        if new_path.exists():
+                            self.app.notify("A vector chat with that name already exists.", severity="error")
+                        else:
+                            try:
+                                # Ignore lock files which might be open and cause copy errors
+                                shutil.copytree(old_path, new_path, ignore=shutil.ignore_patterns('.lock', 'LOCK', '*.lock'))
+                                self.app.notify(f"Duplicated {old_name} to {new_name}")
+                                self.update_vector_list()
+                            except Exception as e:
+                                self.app.notify(f"Duplicate error: {e}", severity="error")
+                        self.query_one(".dialog-title").focus()
+                self.app.push_screen(FileNamePrompt(initial_value=f"{item.chat_name}_copy", prompt_text="Name for duplicate:"), on_duplicate)
+            else:
+                self.app.notify("No vector chat selected.", severity="warning")
+        elif event.button.id == "btn-vector-rename":
+            item = self.query_one("#list-vector-chats", ListView).highlighted_child
+            if item and hasattr(item, "chat_name"):
+                if getattr(self.app, "vector_chat_name", None) == item.chat_name:
+                    self.app.notify("Cannot rename the currently active vector chat.", severity="error")
+                    return
+                def on_rename(new_name):
+                    if new_name and new_name != item.chat_name:
+                        import shutil
+                        old_name = item.chat_name
+                        old_path = Path(__file__).parent / "vectors" / old_name
+                        new_path = Path(__file__).parent / "vectors" / new_name
+                        if new_path.exists():
+                            self.app.notify("A vector chat with that name already exists.", severity="error")
+                        else:
+                            try:
+                                old_path.rename(new_path)
+                                self.app.notify(f"Renamed {old_name} to {new_name}")
+                                self.update_vector_list()
+                            except Exception as e:
+                                self.app.notify(f"Rename error: {e}", severity="error")
+                        self.query_one(".dialog-title").focus()
+                self.app.push_screen(FileNamePrompt(initial_value=item.chat_name, prompt_text="New name:"), on_rename)
+            else:
+                self.app.notify("No vector chat selected.", severity="warning")
+        elif event.button.id == "btn-vector-delete":
+            try:
+                item = self.query_one("#list-vector-chats", ListView).highlighted_child
+                if item and hasattr(item, "chat_name"):
+                    chat_name = item.chat_name
+                    
+                    # If this is the active vector chat, we must stop/close it first
+                    if getattr(self.app, "vector_chat_name", None) == chat_name:
+                        if hasattr(self.app, "close_vector_db"):
+                            self.app.close_vector_db()
+                        self.app.enable_vector_chat = False
+                        self.app.vector_chat_name = None
+                        self.app.notify(f"Deactivating '{chat_name}' before deletion...")
+
+                    import shutil
+                    vectors_dir = Path(__file__).parent / "vectors" / chat_name
+                    if vectors_dir.exists():
+                        try:
+                            shutil.rmtree(vectors_dir)
+                            self.app.notify(f"Deleted vector chat: {chat_name}", severity="warning")
+                            self.update_vector_list()
+                        except Exception as e:
+                            self.app.notify(f"Delete failed: {e}. Is the database still in use?", severity="error")
+                else:
+                    self.app.notify("No vector chat selected.", severity="warning")
+            except Exception as e:
+                self.app.notify(f"Delete error: {e}", severity="error")
+        elif event.button.id == "btn-vector-disable":
+            if hasattr(self.app, "action_disable_vector_chat"):
+                await self.app.action_disable_vector_chat()
+                event.button.disabled = True
+            else:
+                self.app.notify("Disable action not found.", severity="error")
+        elif event.button.id == "btn-close":
+            self.dismiss()
+
+        # Reset focus to title for buttons that don't dismiss
+        if event.button.id not in ["btn-close", "btn-vector-create", "btn-vector-load"]:
+            try:
+                self.query_one(".dialog-title").focus()
+            except Exception:
+                pass
+
+class VectorInspectScreen(ModalScreen):
+    """Screen for inspecting vectors in a database."""
+    def __init__(self, chat_name: str, password: str = None):
+        super().__init__()
+        self.chat_name = chat_name
+        self.password = password
+
+    def compose(self) -> ComposeResult:
+        with Container(id="vector-inspect-dialog", classes="modal-dialog"):
+            yield Label(f"Inspect Vectors: {self.chat_name}", classes="dialog-title")
+            from textual.widgets import TextArea
+            yield TextArea("Loading...", id="vector-content", read_only=True)
+            with Horizontal(classes="buttons"):
+                yield Button("Close", id="btn-close", variant="default")
+
+    def on_mount(self) -> None:
+        self.load_vectors()
+
+    @work(exclusive=True, thread=True)
+    def load_vectors(self):
+        try:
+            import qdrant_client
+        except ImportError:
+            self.app.call_from_thread(self.update_content, "qdrant-client not installed!")
+            return
+            
+        vectors_dir = Path(__file__).parent / "vectors" / self.chat_name
+        
+        new_client = False
+        if getattr(self.app, "vector_chat_name", None) == self.chat_name and getattr(self.app, "qdrant_instance", None):
+            client = self.app.qdrant_instance
+        else:
+            try:
+                client = qdrant_client.QdrantClient(path=str(vectors_dir))
+                new_client = True
+            except Exception as e:
+                self.app.call_from_thread(self.update_content, f"Failed to open database: {e}\n(Is it open in another window?)")
+                return
+        
+        try:
+            scroll_result = client.scroll(
+                collection_name="chat_memory",
+                limit=100,
+                with_payload=True,
+                with_vectors=False
+            )
+            points = scroll_result[0]
+            if not points:
+                content = "No vectors found in this database."
+            else:
+                lines = []
+                lines.append(f"Total Vectors: {len(points)}")
+                lines.append("=" * 80)
+                lines.append("")
+                for i, point in enumerate(points):
+                    text = point.payload.get("text", "No text")
+                    is_encrypted = point.payload.get("encrypted", False)
+                    
+                    if is_encrypted:
+                        if self.password:
+                            try:
+                                from utils import decrypt_data
+                                text = decrypt_data(text, self.password)
+                            except Exception:
+                                text = "[FAILED TO DECRYPT - INCORRECT PASSWORD]"
+                        else:
+                            text = "[ENCRYPTED CONTENT - PROVIDE PASSWORD TO VIEW]"
+
+                    lines.append(f"[Vector #{i+1}]")
+                    lines.append(f"ID: {point.id}")
+                    lines.append("")
+                    # Format the text nicely
+                    if "\nAssistant: " in text:
+                        parts = text.split("\nAssistant: ")
+                        user_part = parts[0].replace("User: ", "")
+                        assistant_part = parts[1] if len(parts) > 1 else ""
+                        lines.append(f"👤 User: {user_part}")
+                        lines.append(f"🤖 Assistant: {assistant_part}")
+                    else:
+                        lines.append(text)
+                    lines.append("")
+                    lines.append("-" * 80)
+                    lines.append("")
+                content = "\n".join(lines)
+            self.app.call_from_thread(self.update_content, content)
+        except Exception as e:
+            self.app.call_from_thread(self.update_content, f"Error inspecting vectors: {e}")
+        finally:
+            if new_client:
+                try:
+                    client.close()
+                except Exception:
+                    pass
+
+    def update_content(self, content: str):
+        try:
+            from textual.widgets import TextArea
+            widget = self.query_one("#vector-content", TextArea)
+            widget.load_text(content)
+        except Exception:
+            pass
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-close":
+            self.dismiss()
 
 

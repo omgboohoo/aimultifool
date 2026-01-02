@@ -1,5 +1,5 @@
 # Security & Privacy Audit
-**Application**: aiMultiFool v0.1.20  
+**Application**: aiMultiFool v0.1.21  
 **Status**: ✅ Fully Private / Offline-Ready
 
 ## 1. Executive Summary
@@ -24,9 +24,10 @@ aiMultiFool is designed with a "Privacy First" architecture. All Large Language 
 - **Control**: The app itself does not possess an internal web engine and does not track click-through rates.
 
 ### ✅ Zero Telemetry/Analytics
-- No background pings, heartbeat checks, or usage tracking.
-- No crash reporting to external servers.
-- No update checks without user interaction.
+- **General**: No background pings, heartbeat checks, or usage tracking.
+- **Vector Database**: Qdrant telemetry is explicitly disabled via the `QDRANT__TELEMETRY_DISABLED` environment variable to ensure zero usage reporting.
+- **Crash Reporting**: No crash reporting to external servers.
+- **Updates**: No update checks without user interaction.
 
 ---
 
@@ -45,7 +46,8 @@ aiMultiFool is designed with a "Privacy First" architecture. All Large Language 
 
 ### 🔒 Encryption Features (AES-256-GCM)
 - **Conversation Persistence**: High-grade authenticated encryption for saved chats in the `chats/` directory.
-- **Character Card Encryption (New)**: Metadata within individual character cards can now be optionally encrypted.
+- **Character Card Encryption**: Metadata within individual character cards can now be optionally encrypted.
+- **Vector Database Encryption (New)**: Payloads within vector databases can be encrypted via **AES-256-GCM**. Similarity search remains functional while keeping the stored content cryptographically secure.
 - **Encryption Algorithm**: **AES-256-GCM** (Galois/Counter Mode) via the `cryptography` library.
 - **KDF (Key Derivation Function)**: Uses **Argon2id** (64MB memory cost, 3 iterations) to derive keys from user passphrases. This is a memory-hard function resistant to GPU-based brute-force attacks.
 - **Privacy**: Without the correct passphrase, both chat histories and character metadata are cryptographically inaccessible. Decryption occurs purely in system RAM.
@@ -63,5 +65,8 @@ aiMultiFool is designed with a "Privacy First" architecture. All Large Language 
 
 ## 5. Privacy Guarantee
 aiMultiFool **cannot** see, read, or store your conversations. Your roleplay sessions are entirely your own and exist only as long as the application window is open.
+
+---
+**Last Updated**: January 2026
 
 

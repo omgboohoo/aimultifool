@@ -1,5 +1,12 @@
 # Release Notes
 
+## v0.1.21: Vector Chat with Optional Encryption
+### 🧠 New Feature: Vector Chat (RAG)
+- **Long-Term Memory**: Seamlessly integrate local vector databases into your roleplay for persistent long-term memory and knowledge retrieval.
+- **Optional Encryption**: Secure your vector database payloads with **AES-256-GCM** encryption, keeping your private data mathematically scrambled on disk.
+- **Database Management**: Full suite of tools to create, duplicate, rename, and delete vector databases directly from the new **Vector Chat** modal.
+- **Seamless Integration**: Toggle vector chat on/off mid-conversation to enhance characters with external knowledge or historical context.
+
 ## v0.1.20: Critical Threading Crash Fix
 ### 🐛 Critical Bug Fixes
 - **Threading Race Condition Fix**: Fixed a critical crash that occurred when trying to talk with AI, manifesting as `[Errno 2] No such file or directory: '/sysdeps/unix/sysv/linux/appll_wait.c'`. This was caused by race conditions in multi-threaded inference operations.

@@ -2,6 +2,8 @@ import time
 import gc
 import asyncio
 import threading
+import uuid
+import json
 from pathlib import Path
 from textual import work
 from textual.widgets import Select
@@ -19,6 +21,12 @@ from widgets import MessageWidget
 # Optional for download
 if DOWNLOAD_AVAILABLE:
     import requests
+
+try:
+    import qdrant_client
+    from qdrant_client.models import PointStruct, VectorParams, Distance
+except ImportError:
+    qdrant_client = None
 
 # Global lock to prevent concurrent inference operations
 _inference_lock = threading.Lock()
@@ -68,6 +76,22 @@ class InferenceMixin:
                 
                 self.call_from_thread(setattr, self, "status_text", f"Thinking (T:{self.temp} P:{self.topp})...")
                 
+                # Retrieve vector context if enabled
+                if getattr(self, "enable_vector_chat", False) and user_text.lower() != "continue":
+                    self.call_from_thread(setattr, self, "status_text", "Retrieving context...")
+                    context_msgs = self.retrieve_similar_context(user_text)
+                    if context_msgs:
+                        # Prepend context messages after the system prompt (index 0)
+                        # This makes them appear as part of the conversation history
+                        insert_idx = 1 if len(messages_to_use) > 0 and messages_to_use[0]["role"] == "system" else 0
+                        for i, msg in enumerate(context_msgs):
+                            messages_to_use.insert(insert_idx + i, msg)
+                        
+                        self.call_from_thread(setattr, self, "status_text", f"Recall: {len(context_msgs)//2} memories found.")
+                        # Small delay so user can see it found something
+                        time.sleep(0.5)
+                        self.call_from_thread(setattr, self, "status_text", "Thinking with context...")
+
                 stream = self.llm.create_chat_completion(
                     messages=messages_to_use,
                     max_tokens=self.context_size - 100,
@@ -122,6 +146,11 @@ class InferenceMixin:
                 if assistant_content:
                     try:
                         messages_to_use.append({"role": "assistant", "content": assistant_content})
+                        
+                        # Save to vector DB if enabled
+                        if getattr(self, "enable_vector_chat", False) and user_text.lower() != "continue":
+                            self.save_vector_entry(user_text, assistant_content)
+
                         messages_to_use = prune_messages_if_needed(self.llm, messages_to_use, self.context_size)
                         self.call_from_thread(self._update_messages_safely, messages_to_use)
                         
@@ -229,30 +258,52 @@ class InferenceMixin:
 
         self.call_from_thread(setattr, self, "is_downloading", True)
         models_dir = Path(__file__).parent / "models"
-        url = "https://huggingface.co/mradermacher/MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF/resolve/main/MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_S.gguf?download=true"
-        file_path = models_dir / "MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_S.gguf"
+        models_dir.mkdir(parents=True, exist_ok=True)
         
+        # Default LLM
+        llm_url = "https://huggingface.co/mradermacher/MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF/resolve/main/MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_S.gguf?download=true"
+        llm_path = models_dir / "MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_S.gguf"
+        
+        # Embedding Model
+        embed_url = "https://huggingface.co/nomic-ai/nomic-embed-text-v2-moe-GGUF/resolve/main/nomic-embed-text-v2-moe.Q4_K_M.gguf?download=true"
+        embed_path = models_dir / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
+        
+        downloads = [
+            ("LLM", llm_url, llm_path),
+            ("Embedding", embed_url, embed_path)
+        ]
+        
+        import requests
         try:
-            self.status_text = "Downloading default model..."
-            import requests
-            response = requests.get(url, stream=True)
-            response.raise_for_status()
-            total_size_str = response.headers.get('content-length')
-            total_size = int(total_size_str) if total_size_str else None
+            for name, url, path in downloads:
+                if path.exists():
+                    self.call_from_thread(self.notify, f"{name} already exists, skipping.", severity="information")
+                    continue
+                    
+                self.status_text = f"Downloading {name} model..."
+                response = requests.get(url, stream=True)
+                response.raise_for_status()
+                total_size_str = response.headers.get('content-length')
+                total_size = int(total_size_str) if total_size_str else None
+                
+                downloaded = 0
+                with open(path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if not self.is_downloading: # Cancel if app closing or whatever
+                             break
+                        if chunk:
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            if total_size and total_size > 0:
+                                pct = (downloaded / total_size) * 100
+                                self.status_text = f"Downloading {name}: {pct:.1f}% ({downloaded / 1024 / 1024:.1f} MB)"
+                            else:
+                                self.status_text = f"Downloading {name}: {downloaded / 1024 / 1024:.1f} MB"
+                
+                if not self.is_downloading:
+                    break
+                self.call_from_thread(self.notify, f"{name} downloaded successfully!")
             
-            downloaded = 0
-            with open(file_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        if total_size and total_size > 0:
-                            pct = (downloaded / total_size) * 100
-                            self.status_text = f"Downloading: {pct:.1f}% ({downloaded / 1024 / 1024:.1f} MB)"
-                        else:
-                            self.status_text = f"Downloading: {downloaded / 1024 / 1024:.1f} MB"
-            
-            self.call_from_thread(self.notify, "Model downloaded successfully!")
             self.call_from_thread(self.update_model_list)
             self.status_text = "Ready"
         except Exception as e:
@@ -305,7 +356,7 @@ class ActionsMixin:
             content = get_style_prompt(style)
             self.messages = [{"role": "system", "content": content}]
         
-        self.query_one("#chat-scroll").remove_children()
+        self.query_one("#chat-scroll").query("*").remove()
         self.notify("History cleared.")
 
     async def action_reset_chat(self) -> None:
@@ -328,7 +379,7 @@ class ActionsMixin:
             self.messages = [{"role": "system", "content": ""}]
         
         # 5. Clear chat window
-        self.query_one("#chat-scroll").remove_children()
+        self.query_one("#chat-scroll").query("*").remove()
         
         # 6. Apply style and print instructions
         if hasattr(self, "update_system_prompt_style"):
@@ -403,7 +454,7 @@ class ActionsMixin:
         self.first_user_message = None
         self.messages = [{"role": "system", "content": ""}]
         
-        self.query_one("#chat-scroll").remove_children()
+        self.query_one("#chat-scroll").query("*").remove()
         
         if hasattr(self, "update_system_prompt_style"):
             await self.update_system_prompt_style(self.style)
@@ -506,3 +557,174 @@ class ActionsMixin:
             "style": self.style
         }
         save_settings(settings)
+
+class VectorMixin:
+    """Mixin for handling Vector DB (RAG) operations."""
+    qdrant_instance = None
+    embed_llm = None
+    vector_password = None
+
+    def initialize_vector_db(self, name: str):
+        try:
+            if not qdrant_client:
+                self.notify("qdrant-client not installed!", severity="error")
+                return
+            
+            # Close existing instance if any
+            self.close_vector_db()
+                
+            vectors_dir = Path(__file__).parent / "vectors" / name
+            vectors_dir.mkdir(parents=True, exist_ok=True)
+            
+            self.qdrant_instance = qdrant_client.QdrantClient(path=str(vectors_dir))
+            
+            # Try to get collection info to check if it exists and what dimension it uses
+            try:
+                collection_info = self.qdrant_instance.get_collection("chat_memory")
+                # Collection exists, we're good to go
+                return
+            except Exception:
+                # Collection doesn't exist, need to create it
+                pass
+            
+            # Default dimension for nomic models (will be verified on first embedding)
+            dim = 768
+            
+            try:
+                self.qdrant_instance.create_collection(
+                    collection_name="chat_memory",
+                    vectors_config=VectorParams(size=dim, distance=Distance.COSINE)
+                )
+            except Exception as e:
+                err_msg = str(e).lower()
+                if "already exists" not in err_msg:
+                    self.notify(f"Database initialization error: {e}", severity="error")
+        except Exception as e:
+            self.notify(f"Failed to initialize vector database: {e}", severity="error")
+            
+    def close_vector_db(self):
+        """Safely close and clear the current vector database instance."""
+        if self.qdrant_instance:
+            try:
+                # Explicitly close the client to release file locks
+                self.qdrant_instance.close()
+            except Exception:
+                pass
+            self.qdrant_instance = None
+
+    def get_embedding(self, text: str, task: str = "document"):
+        """Get embedding for text. task can be 'document' or 'query' for Nomic 1.5 prefixes."""
+        if not self.embed_llm:
+            embed_model_path = Path(__file__).parent / "models" / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
+            if not embed_model_path.exists():
+                self.notify("Embedding model not found! Download it first.", severity="error")
+                return None
+            
+            try:
+                from llama_cpp import Llama
+                self.embed_llm = Llama(
+                    model_path=str(embed_model_path),
+                    embedding=True,
+                    n_ctx=2048,
+                    verbose=False,
+                    n_gpu_layers=0 # Force CPU
+                )
+            except Exception as e:
+                self.notify(f"Failed to load embedding model: {e}", severity="error")
+                return None
+        
+        # Nomic 1.5 specific instructions
+        prefix = "search_document: " if task == "document" else "search_query: "
+        prefixed_text = prefix + text
+            
+        try:
+            emb = self.embed_llm.create_embedding(prefixed_text)
+            return emb['data'][0]['embedding']
+        except Exception as e:
+            self.notify(f"Embedding error: {e}", severity="error")
+            return None
+
+    def retrieve_similar_context(self, user_text: str, k=3):
+        if not self.qdrant_instance:
+            return []
+            
+        emb = self.get_embedding(user_text, task="query")
+        if not emb:
+            return []
+            
+        try:
+            # Use the new query() API for qdrant-client v1.16+
+            from qdrant_client.models import QueryRequest
+            
+            results = self.qdrant_instance.query_points(
+                collection_name="chat_memory",
+                query=emb,
+                limit=k
+            )
+            
+            context_messages = []
+            for point in results.points:
+                text = point.payload.get("text", "")
+                if not text:
+                    continue
+                
+                # Decrypt if needed
+                if point.payload.get("encrypted", False):
+                    if not self.vector_password:
+                        # Should have been caught earlier, but safety first
+                        continue
+                    try:
+                        from utils import decrypt_data
+                        text = decrypt_data(text, self.vector_password)
+                    except Exception:
+                        continue
+
+                # Try to split back into User/Assistant roles
+                parts = text.split("\nAssistant: ")
+                if len(parts) == 2:
+                    user_part = parts[0].replace("User: ", "").strip()
+                    assistant_part = parts[1].strip()
+                    if user_part:
+                        context_messages.append({"role": "user", "content": f"[Past Context]: {user_part}"})
+                    if assistant_part:
+                        context_messages.append({"role": "assistant", "content": assistant_part})
+                else:
+                    # Fallback for simple text entries
+                    context_messages.append({"role": "system", "content": f"Relevant past context: {text}"})
+                    
+            return context_messages
+        except Exception as e:
+            self.notify(f"Vector search error: {e}", severity="error")
+            return []
+
+    def save_vector_entry(self, user_text: str, assistant_text: str):
+        if not self.qdrant_instance or not self.enable_vector_chat:
+            return
+            
+        combined_text = f"User: {user_text}\nAssistant: {assistant_text}"
+        
+        # Encrypt if password set
+        payload_text = combined_text
+        is_encrypted = False
+        if self.vector_password:
+            try:
+                from utils import encrypt_data
+                payload_text = encrypt_data(combined_text, self.vector_password)
+                is_encrypted = True
+            except Exception as e:
+                self.notify(f"Vector encryption failed: {e}", severity="error")
+                return
+
+        emb = self.get_embedding(combined_text, task="document")
+        if not emb:
+            return
+            
+        try:
+            point = PointStruct(
+                id=str(uuid.uuid4()),
+                vector=emb,
+                payload={"text": payload_text, "encrypted": is_encrypted}
+            )
+            self.qdrant_instance.upsert(collection_name="chat_memory", points=[point])
+        except Exception as e:
+            self.notify(f"Failed to save vector entry: {e}", severity="error")

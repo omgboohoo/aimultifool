@@ -5,3 +5,4 @@ textual>=6.11.0
 textual-slider
 cryptography
 pyperclip
+qdrant-client

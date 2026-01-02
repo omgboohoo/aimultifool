@@ -5,6 +5,10 @@ aiMultiFool - Textual TUI chat app with llama-cpp-python
 
 import os
 import sys
+
+# Disable Qdrant telemetry for total session privacy
+os.environ["QDRANT__TELEMETRY_DISABLED"] = "true"
+
 import gc
 import asyncio
 import re
@@ -20,19 +24,19 @@ from textual.binding import Binding
 import llama_cpp
 
 # Modular Logic Mixins
-from logic_mixins import InferenceMixin, ActionsMixin
+from logic_mixins import InferenceMixin, ActionsMixin, VectorMixin
 from ui_mixin import UIMixin
 
 # Module Functions
 from utils import _get_action_menu_data, load_settings, save_settings, DOWNLOAD_AVAILABLE, get_style_prompt, save_action_menu_data
 from character_manager import extract_chara_metadata, process_character_metadata, create_initial_messages, write_chara_metadata
 from ai_engine import get_models
-from widgets import MessageWidget, AddActionScreen, EditCharacterScreen, CharactersScreen, ParametersScreen, MiscScreen, ThemeScreen, ActionsManagerScreen, ModelScreen, ChatManagerScreen
+from widgets import MessageWidget, AddActionScreen, EditCharacterScreen, CharactersScreen, ParametersScreen, MiscScreen, ThemeScreen, ActionsManagerScreen, ModelScreen, ChatManagerScreen, VectorChatScreen
 
-class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
+class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.1.20"
+    TITLE = "aiMultiFool v0.1.21"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -67,6 +71,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
     is_model_loading = reactive(False)
     is_downloading = reactive(False)
     is_char_edit_mode = reactive(False)
+    vector_chat_name = reactive(None)
+    enable_vector_chat = reactive(False)
     _inference_worker = None
     _last_action_list = None
 
@@ -82,6 +88,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             Button("Parameters", id="btn-parameters", variant="default"),
             Button("Cards", id="btn-cards", variant="default"),
             Button("Actions", id="btn-manage-actions", variant="default"),
+            Button("Vector Chat", id="btn-vector-chat", variant="default"),
             Button("Theme", id="btn-theme", variant="default"),
             Button("About", id="btn-misc", variant="default"),
             id="top-menu-bar"
@@ -173,7 +180,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.1.20", id="status-version")
+            yield Static("aiMultiFool v0.1.21", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -217,8 +224,9 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         # Actually it's handled by CSS, but good to ensure everything mounted.
         
         models = get_models()
-        if not models:
-            self.notify("No models found! Downloading default...", severity="information")
+        nomic_path = self.root_path / "models" / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
+        if not models or not nomic_path.exists():
+            self.notify("Setting up default models...", severity="information")
             self.download_default_model()
         
         new_content = get_style_prompt(self.style)
@@ -256,6 +264,17 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         """Called when is_char_edit_mode changes."""
         self.update_ui_state()
 
+    def watch_enable_vector_chat(self, enable_vector_chat: bool) -> None:
+        """Called when enable_vector_chat changes."""
+        try:
+            btn = self.query_one("#btn-vector-chat", Button)
+            if enable_vector_chat:
+                btn.add_class("vector-active")
+            else:
+                btn.remove_class("vector-active")
+        except Exception:
+            pass
+
     async def on_focus(self, event) -> None:
         if hasattr(self, 'show_footer'):
             self.show_footer = True
@@ -275,7 +294,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                 continue
 
             # Always keep these top menu buttons enabled
-            if btn.id in ["btn-file", "btn-misc", "btn-theme", "btn-cards", "btn-parameters", "btn-model-settings", "btn-manage-actions"]:
+            if btn.id in ["btn-file", "btn-misc", "btn-theme", "btn-cards", "btn-parameters", "btn-model-settings", "btn-manage-actions", "btn-vector-chat"]:
                 btn.disabled = False
             elif btn.id in ["btn-continue", "btn-regenerate", "btn-rewind", "btn-restart", "btn-clear-chat"]:
                 # Disable if busy OR if no model is loaded
@@ -404,7 +423,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         action_sections = self.query_one("#action-sections", Vertical)
         
         # Clear existing sections
-        action_sections.remove_children()
+        action_sections.query("*").remove()
         
         right_sidebar.add_class("-visible")
 
@@ -567,7 +586,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             self.current_character = chara_obj
             self.messages = create_initial_messages(chara_obj, self.user_name)
             await self.update_system_prompt_style(self.style)
-            self.query_one("#chat-scroll").remove_children()
+            self.query_one("#chat-scroll").query("*").remove()
             self.notify(f"Loaded character: {Path(card_path).name}")
             if self.llm:
                 if len(self.messages) > 1 and self.messages[-1]["role"] == "user":
@@ -610,7 +629,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
         if not has_started:
             # If chat hasn't started, clear previous info messages 
             # to prevent multiple instruction blocks in an empty chat.
-            self.query_one("#chat-scroll").remove_children()
+            self.query_one("#chat-scroll").query("*").remove()
         
         await self.add_info_message(f"[System Prompt: {name}]\n\n{prompt}")
 
@@ -662,7 +681,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             elif not has_started and not suppress_info:
                 # If chat hasn't started, clear previous style info messages 
                 # to prevent multiple instruction blocks in an empty chat.
-                self.query_one("#chat-scroll").remove_children()
+                self.query_one("#chat-scroll").query("*").remove()
 
         if not suppress_info:
             await self.add_info_message(f"[Style: {style.capitalize()}]\n\n{new_content}")
@@ -723,6 +742,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
             self.push_screen(MiscScreen())
         elif event.button.id == "btn-file":
             self.push_screen(ChatManagerScreen(), self.chat_manager_callback)
+        elif event.button.id == "btn-vector-chat":
+            self.push_screen(VectorChatScreen(), self.vector_chat_callback)
         elif event.button.id == "btn-clear-search":
             search_input = self.query_one("#input-action-search", Input)
             search_input.value = ""
@@ -797,7 +818,6 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                     self.repeat = model_settings.get("repeat", self.repeat)
                     self.minp = model_settings.get("minp", self.minp)
                     
-                    # Save updated settings
                     self.save_user_settings()
                     
                     # Reload model if needed
@@ -831,6 +851,67 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin):
                 self.messages = messages
                 await self.full_sync_chat_ui()
                 self.focus_chat_input()
+
+    async def vector_chat_callback(self, result):
+        if not result:
+            return
+        
+        try:
+            action = result.get("action")
+            name = result.get("name")
+            password = result.get("password")
+            
+            if action == "load" or action == "create":
+                if not name:
+                    self.notify("Error: No chat name provided.", severity="error")
+                    return
+                
+                # Normalize password: empty strings should be None
+                password = password.strip() if password else None
+                    
+                await self.action_stop_generation()
+                self.vector_chat_name = name
+                self.enable_vector_chat = True
+                self.vector_password = password
+                
+                if action == "create" and password:
+                    # Create marker file if password provided for a new chat
+                    vectors_dir = self.root_path / "vectors" / name
+                    vectors_dir.mkdir(parents=True, exist_ok=True)
+                    (vectors_dir / ".encrypted").touch()
+                
+                # Initialize DB with error handling
+                try:
+                    self.initialize_vector_db(name)
+                except Exception as e:
+                    self.notify(f"Failed to initialize vector database: {e}", severity="error")
+                    self.enable_vector_chat = False
+                    self.vector_chat_name = None
+                    self.vector_password = None
+                    return
+                
+                self.query_one("#chat-scroll").query("*").remove()
+                self.messages = [{"role": "system", "content": "Vector Chat enabled."}]
+                enc_suffix = " (Encrypted)" if password else ""
+                self.notify(f"Vector Chat '{name}'{enc_suffix} loaded.")
+            elif action == "disable":
+                await self.action_disable_vector_chat()
+            
+            self.save_user_settings()
+        except Exception as e:
+            self.notify(f"Vector chat error: {e}", severity="error")
+            import traceback
+            traceback.print_exc()
+
+    async def action_disable_vector_chat(self):
+        self.enable_vector_chat = False
+        self.vector_chat_name = None
+        self.vector_password = None
+        self.close_vector_db()
+        self.notify("Vector Chat disabled.")
+        # Normal chat reset
+        await self.action_wipe_all()
+        self.save_user_settings()
 
     async def model_screen_callback(self, result):
         if not result:

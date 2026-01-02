@@ -1,4 +1,4 @@
-# System Reference Document: aiMultiFool v0.1.20
+# System Reference Document: aiMultiFool v0.1.21
 
 ## 1. Executive Summary
 aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox. It leverages **Textual** for a responsive, desktop-class TUI and **llama-cpp-python** for high-performance local inference. The architecture prioritizes separation of concerns via a Mixin pattern, enabling clean extensibility for theming, encryption, and complex character logic.
@@ -12,6 +12,7 @@ aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox.
 | **GUI Framework** | Textual | Reactive TUI with CSS styling |
 | **Inference Engine** | llama-cpp-python | Python bindings for GGUF model execution |
 | **Cryptography** | cryptography (Hazmat) | AES-256-GCM + Argon2id for file security |
+| **Vector DB** | Qdrant (Local) | Persistent long-term memory via embeddings |
 | **Concurrency** | asyncio + Threads | Non-blocking UI input during blocking inference |
 | **Data Format** | JSON / PNG (Chunked) | Metadata storage for Settings and Character Cards |
 
@@ -99,6 +100,14 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **Action Manager**: Full in-app manager with real-time search, category filtering, and CRUD operations.
 - **Default Actions**: Extensive library of default actions covering scene management, character interactions, and narrative control.
 - **System Prompts**: Actions can be marked as system prompts that modify the AI's behavior rather than user messages.
+
+### 4.6 Vector Chat (RAG)
+- **Persistent Memory**: Local vector databases provide long-term memory for characters, allowing them to remember facts and events beyond the context window.
+- **Technology**: Uses **Qdrant** in local storage mode.
+- **Privacy & Telemetry**: Qdrant telemetry is explicitly disabled via the `QDRANT__TELEMETRY_DISABLED` environment variable to ensure zero usage reporting.
+- **Optional Encryption**: Vector databases support optional **AES-256-GCM** encryption. When enabled, embeddings and metadata are mathematically scrambled on disk and decrypted in-memory during search.
+- **Database Management**: Users can create, duplicate, rename, and delete vector databases. The system handles lifecycle management to ensure clean file handles.
+- **Similarity Search**: Performs real-time similarity searches against active databases to retrieve relevant context for the current conversation.
 
 ---
 
