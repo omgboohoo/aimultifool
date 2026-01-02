@@ -1,6 +1,7 @@
 import time
 import gc
 import asyncio
+import threading
 from pathlib import Path
 from textual import work
 from textual.widgets import Select
@@ -19,113 +20,125 @@ from widgets import MessageWidget
 if DOWNLOAD_AVAILABLE:
     import requests
 
+# Global lock to prevent concurrent inference operations
+_inference_lock = threading.Lock()
+
 class InferenceMixin:
     """Mixin for handling AI inference and model loading tasks."""
     
     @work(exclusive=True, thread=True)
     def run_inference(self, user_text: str):
-        if not self.llm:
-            self.call_from_thread(self.notify, "Model not loaded! Load a model from the sidebar first.", severity="error")
+        # Try to acquire the lock with a timeout to prevent deadlocks
+        if not _inference_lock.acquire(timeout=5.0):
+            self.call_from_thread(self.notify, "Another inference is still running. Please wait.", severity="warning")
             self.call_from_thread(setattr, self, "is_loading", False)
             return
-
-        self.call_from_thread(setattr, self, "status_text", "Thinking...")
-        
-        # Get a snapshot of current messages to avoid race conditions
-        messages_to_use = [msg.copy() for msg in self.messages]
-        
-        # Ensure the user's current message is in the list
-        if not messages_to_use or messages_to_use[-1].get("role") != "user":
-            messages_to_use.append({"role": "user", "content": user_text})
-        elif messages_to_use[-1].get("content") != user_text:
-            messages_to_use[-1]["content"] = user_text
-        
-        # Prune if needed
-        messages_to_use = prune_messages_if_needed(self.llm, messages_to_use, self.context_size)
-        
-        # Update self.messages with pruned version
-        self.call_from_thread(self._update_messages_safely, messages_to_use)
-        
-        # Calculate initial token count
-        prompt_tokens = count_tokens_in_messages(self.llm, messages_to_use)
-        
-        assistant_widget = None
-        assistant_content = ""
         
         try:
-            from llama_cpp import Llama  # Local import to avoid top-level issues if any
-            
-            self.call_from_thread(setattr, self, "status_text", f"Thinking (T:{self.temp} P:{self.topp})...")
-            
-            stream = self.llm.create_chat_completion(
-                messages=messages_to_use,
-                max_tokens=self.context_size - 100,
-                temperature=self.temp,
-                top_p=self.topp,
-                top_k=self.topk,
-                repeat_penalty=self.repeat,
-                min_p=self.minp,
-                stream=True
-            )
-            
-            start_time = time.time()
-            token_count = 0
-            peak_tps = 0.0
-            
-            was_cancelled = False
-            for output in stream:
-                if self.is_loading == False: # Cancelled
-                    was_cancelled = True
-                    break
-                    
-                text_chunk = output["choices"][0].get("delta", {}).get("content", "")
-                if not text_chunk:
-                    continue
-                
-                assistant_content += text_chunk
-                
-                if assistant_widget is None:
-                    try:
-                        assistant_widget = self.call_from_thread(self.sync_add_assistant_widget, assistant_content)
-                    except Exception:
-                        was_cancelled = True
-                        break
-                else:
-                    try:
-                        self.call_from_thread(self.sync_update_assistant_widget, assistant_widget, assistant_content)
-                    except Exception:
-                        was_cancelled = True
-                        break
-                
-                # Stats
-                chunk_tokens = self.llm.tokenize(text_chunk.encode("utf-8"), add_bos=False, special=False)
-                token_count += len(chunk_tokens)
-                elapsed = time.time() - start_time
-                tps = token_count / elapsed if elapsed > 0 else 0
-                peak_tps = max(peak_tps, tps)
-                
-                total_tokens = prompt_tokens + token_count
-                ctx_pct = (total_tokens / self.context_size) * 100
-                self.call_from_thread(setattr, self, "status_text", f"TPS: {tps:.1f} | Peak: {peak_tps:.1f} | Context: {ctx_pct:.1f}% | Tokens: {token_count}")
+            if not self.llm:
+                self.call_from_thread(self.notify, "Model not loaded! Load a model from the sidebar first.", severity="error")
+                self.call_from_thread(setattr, self, "is_loading", False)
+                return
 
-            if assistant_content:
-                try:
-                    messages_to_use.append({"role": "assistant", "content": assistant_content})
-                    messages_to_use = prune_messages_if_needed(self.llm, messages_to_use, self.context_size)
-                    self.call_from_thread(self._update_messages_safely, messages_to_use)
-                    
-                    final_tokens = count_tokens_in_messages(self.llm, messages_to_use)
-                    final_pct = (final_tokens / self.context_size) * 100
-                    
-                    self.call_from_thread(setattr, self, "status_text", f"{'Stopped' if was_cancelled else 'Finished'}. {token_count} tokens. Peak TPS: {peak_tps:.1f} | Context: {final_pct:.1f}%")
-                except Exception:
-                    pass
+            self.call_from_thread(setattr, self, "status_text", "Thinking...")
             
-        except Exception as e:
-            self.call_from_thread(self.notify, f"Error during inference: {e}", severity="error")
+            # Get a snapshot of current messages to avoid race conditions
+            messages_to_use = [msg.copy() for msg in self.messages]
+            
+            # Ensure the user's current message is in the list
+            if not messages_to_use or messages_to_use[-1].get("role") != "user":
+                messages_to_use.append({"role": "user", "content": user_text})
+            elif messages_to_use[-1].get("content") != user_text:
+                messages_to_use[-1]["content"] = user_text
+            
+            # Prune if needed
+            messages_to_use = prune_messages_if_needed(self.llm, messages_to_use, self.context_size)
+            
+            # Update self.messages with pruned version
+            self.call_from_thread(self._update_messages_safely, messages_to_use)
+            
+            # Calculate initial token count
+            prompt_tokens = count_tokens_in_messages(self.llm, messages_to_use)
+            
+            assistant_widget = None
+            assistant_content = ""
+            
+            try:
+                from llama_cpp import Llama  # Local import to avoid top-level issues if any
+                
+                self.call_from_thread(setattr, self, "status_text", f"Thinking (T:{self.temp} P:{self.topp})...")
+                
+                stream = self.llm.create_chat_completion(
+                    messages=messages_to_use,
+                    max_tokens=self.context_size - 100,
+                    temperature=self.temp,
+                    top_p=self.topp,
+                    top_k=self.topk,
+                    repeat_penalty=self.repeat,
+                    min_p=self.minp,
+                    stream=True
+                )
+                
+                start_time = time.time()
+                token_count = 0
+                peak_tps = 0.0
+                
+                was_cancelled = False
+                for output in stream:
+                    if self.is_loading == False: # Cancelled
+                        was_cancelled = True
+                        break
+                        
+                    text_chunk = output["choices"][0].get("delta", {}).get("content", "")
+                    if not text_chunk:
+                        continue
+                    
+                    assistant_content += text_chunk
+                    
+                    if assistant_widget is None:
+                        try:
+                            assistant_widget = self.call_from_thread(self.sync_add_assistant_widget, assistant_content)
+                        except Exception:
+                            was_cancelled = True
+                            break
+                    else:
+                        try:
+                            self.call_from_thread(self.sync_update_assistant_widget, assistant_widget, assistant_content)
+                        except Exception:
+                            was_cancelled = True
+                            break
+                    
+                    # Stats
+                    chunk_tokens = self.llm.tokenize(text_chunk.encode("utf-8"), add_bos=False, special=False)
+                    token_count += len(chunk_tokens)
+                    elapsed = time.time() - start_time
+                    tps = token_count / elapsed if elapsed > 0 else 0
+                    peak_tps = max(peak_tps, tps)
+                    
+                    total_tokens = prompt_tokens + token_count
+                    ctx_pct = (total_tokens / self.context_size) * 100
+                    self.call_from_thread(setattr, self, "status_text", f"TPS: {tps:.1f} | Peak: {peak_tps:.1f} | Context: {ctx_pct:.1f}% | Tokens: {token_count}")
+
+                if assistant_content:
+                    try:
+                        messages_to_use.append({"role": "assistant", "content": assistant_content})
+                        messages_to_use = prune_messages_if_needed(self.llm, messages_to_use, self.context_size)
+                        self.call_from_thread(self._update_messages_safely, messages_to_use)
+                        
+                        final_tokens = count_tokens_in_messages(self.llm, messages_to_use)
+                        final_pct = (final_tokens / self.context_size) * 100
+                        
+                        self.call_from_thread(setattr, self, "status_text", f"{'Stopped' if was_cancelled else 'Finished'}. {token_count} tokens. Peak TPS: {peak_tps:.1f} | Context: {final_pct:.1f}%")
+                    except Exception:
+                        pass
+                
+            except Exception as e:
+                self.call_from_thread(self.notify, f"Error during inference: {e}", severity="error")
         finally:
             self.call_from_thread(setattr, self, "is_loading", False)
             self._inference_worker = None
+            # Always release the lock
+            _inference_lock.release()
 
     @work(exclusive=True, thread=True)
     def load_model_task(self, model_path, context_size, requested_gpu_layers):
@@ -264,7 +277,7 @@ class ActionsMixin:
         if self.is_loading or (hasattr(self, "_inference_worker") and self._inference_worker):
             self.is_loading = False
             # Wait gracefully for the worker thread to catch the is_loading=False flag and exit its finally block
-            max_waits = 20
+            max_waits = 40  # Increased from 20 to give more time for lock release
             while (hasattr(self, "_inference_worker") and self._inference_worker) and max_waits > 0:
                 await asyncio.sleep(0.05)
                 max_waits -= 1
@@ -277,6 +290,9 @@ class ActionsMixin:
                 except Exception:
                     pass
                 self._inference_worker = None
+            
+            # Extra delay to ensure the lock is fully released
+            await asyncio.sleep(0.15)
                 
             self.status_text = "Stopped"
             self.notify("Generation stopped.")

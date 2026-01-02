@@ -1,5 +1,18 @@
 # Release Notes
 
+## v0.1.20: Critical Threading Crash Fix
+### 🐛 Critical Bug Fixes
+- **Threading Race Condition Fix**: Fixed a critical crash that occurred when trying to talk with AI, manifesting as `[Errno 2] No such file or directory: '/sysdeps/unix/sysv/linux/appll_wait.c'`. This was caused by race conditions in multi-threaded inference operations.
+- **Inference Lock Mechanism**: Added a global threading lock to ensure only one inference operation runs at a time, preventing concurrent CUDA/GPU operations that cause system-level threading errors.
+- **Improved Stop/Start Handling**: Enhanced the stop generation logic with increased wait times and extra delays to ensure proper lock release before starting new inference operations.
+- **Deadlock Prevention**: Lock acquisition now uses a 5-second timeout to prevent deadlocks, with user-friendly warnings if another inference is still running.
+
+### 🔧 Technical
+- Added `threading.Lock()` to `InferenceMixin.run_inference()` with timeout-based acquisition.
+- Lock is always released in the `finally` block, even if errors occur during inference.
+- Increased `action_stop_generation` max waits from 20 to 40 iterations.
+- Added 0.15s delay after stopping generation to ensure clean state transitions.
+
 ## v0.1.19: Model Settings Persistence in Saved Chats
 ### 💾 Chat Management Enhancements
 - **Model Settings Preservation**: Saved chats now include complete model configuration (model path, context size, GPU layers, and all sampling parameters) alongside conversation history.

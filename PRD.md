@@ -1,4 +1,4 @@
-# System Reference Document: aiMultiFool v0.1.19
+# System Reference Document: aiMultiFool v0.1.20
 
 ## 1. Executive Summary
 aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox. It leverages **Textual** for a responsive, desktop-class TUI and **llama-cpp-python** for high-performance local inference. The architecture prioritizes separation of concerns via a Mixin pattern, enabling clean extensibility for theming, encryption, and complex character logic.
@@ -175,7 +175,7 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 ```
 
 ### 6.2 Saved Chat Format
-**New Format** (v0.1.19+):
+**New Format** (v0.1.20+):
 ```json
 {
     "messages": [
