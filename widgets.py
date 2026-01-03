@@ -470,21 +470,19 @@ class CharactersScreen(ModalScreen):
         title.focus()
         self.last_search_idx = -1
         self.app.update_ui_state()
+        self.refresh_list()
         
         # Welcome message
         history = self.query_one("#ai-meta-history", ScrollableContainer)
         history.mount(Static("Assistant: Hello! I can help you edit character metadata. Ask me to change names, descriptions, or traits.", classes="ai-message"))
 
     def compose(self) -> ComposeResult:
-        cards = self.app.get_card_list()
-        items = [ListItem(Label(card.name), name=str(card)) for card in cards]
-        
         yield Vertical(
             Label("Character Management", classes="dialog-title"),
             Horizontal(
                 Vertical(
                     Label("Cards", classes="label"),
-                    ListView(*items, id="list-characters"),
+                    ListView(id="list-characters"),
                     classes="pane-left"
                 ),
                 Vertical(
@@ -507,11 +505,11 @@ class CharactersScreen(ModalScreen):
                 id="management-split"
             ),
             Horizontal(
-                Button("Play", variant="default", id="btn-play-card", disabled=not self.app.llm),
+                Button("Play", variant="default", id="btn-play-card", disabled=True),
                 Button("New", variant="default", id="btn-new-card"),
-                Button("Duplicate", variant="default", id="btn-duplicate-card"),
-                Button("Rename", variant="default", id="btn-rename-card"),
-                Button("Delete", variant="default", id="btn-delete-card"),
+                Button("Duplicate", variant="default", id="btn-duplicate-card", disabled=True),
+                Button("Rename", variant="default", id="btn-rename-card", disabled=True),
+                Button("Delete", variant="default", id="btn-delete-card", disabled=True),
                 Button("Save Changes", variant="default", id="btn-save-metadata"),
                 Button("Close", variant="default", id="btn-cancel-mgmt"),
                 classes="buttons"
@@ -529,7 +527,22 @@ class CharactersScreen(ModalScreen):
         target_idx = -1
         for i, card in enumerate(cards):
             card_str = str(card)
-            lv.append(ListItem(Label(card.name), name=card_str))
+            
+            # Check for encryption
+            is_encrypted = False
+            try:
+                chara_json = extract_chara_metadata(card_str)
+                if chara_json:
+                    try:
+                        # Attempt to parse as JSON; if it fails, it's probably encrypted base64
+                        json.loads(chara_json)
+                    except Exception:
+                        is_encrypted = True
+            except Exception:
+                pass
+                
+            display_name = f"🔒 {card.name}" if is_encrypted else card.name
+            lv.append(ListItem(Label(display_name), name=card_str))
             if select_path and card_str == select_path:
                 target_idx = i
         
@@ -537,6 +550,21 @@ class CharactersScreen(ModalScreen):
             self.force_select_index(target_idx, select_path)
             
         self.app.update_ui_state()
+        self.update_button_states()
+
+    def update_button_states(self) -> None:
+        """Update the enabled/disabled state of the buttons based on selection."""
+        try:
+            list_view = self.query_one("#list-characters", ListView)
+            has_selection = list_view.highlighted_child is not None
+            
+            # Play also requires LLM
+            self.query_one("#btn-play-card", Button).disabled = not (has_selection and self.app.llm)
+            self.query_one("#btn-duplicate-card", Button).disabled = not has_selection
+            self.query_one("#btn-rename-card", Button).disabled = not has_selection
+            self.query_one("#btn-delete-card", Button).disabled = not has_selection
+        except Exception:
+            pass
 
     @work
     async def force_select_index(self, idx: int, path: str) -> None:
@@ -583,8 +611,10 @@ class CharactersScreen(ModalScreen):
             self.query_one("#metadata-text", TextArea).text = "No metadata found."
 
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
-        if event.list_view.id == "list-characters" and event.item:
-            self.load_metadata(getattr(event.item, "name", ""))
+        if event.list_view.id == "list-characters":
+            if event.item:
+                self.load_metadata(getattr(event.item, "name", ""))
+            self.update_button_states()
             
     async def on_list_view_selected(self, event: ListView.Selected) -> None:
         if event.list_view.id == "list-characters" and event.item:
@@ -1098,14 +1128,24 @@ class CharactersScreen(ModalScreen):
 
         elif event.button.id == "btn-save-metadata":
             if card_path:
-                def do_save(password=None):
+                def do_save(password):
+                     if password is None: # User cancelled the password prompt
+                         return
+                         
                      try:
                         metadata_str = self.query_one("#metadata-text", TextArea).text.strip()
+                        
+                        # Prevent saving the placeholder text
+                        if metadata_str.startswith("Encrypted Data"):
+                            self.app.notify("Cannot save: Card is still locked. Unlock it first to save changes or remove encryption.", severity="error")
+                            return
+                            
                         if password:
                             final_data = encrypt_data(metadata_str, password)
                             self.app.notify("Saving encrypted metadata...")
                         else:
                             final_data = metadata_str
+                            self.app.notify("Saving without encryption (encryption removed).")
                             
                         success = write_chara_metadata(card_path, final_data)
                         if success:
@@ -1116,6 +1156,7 @@ class CharactersScreen(ModalScreen):
                             # Actually if we just saved it and we have the PW, we can reload with it?
                             # For simplicity, just reload regular. If encrypted, it will lock.
                             self.load_metadata(card_path, password_attempt=password)
+                            self.refresh_list(select_path=card_path)
                         else:
                             self.app.notify("Failed to write metadata PNG! (File might be locked or invalid)", severity="error")
                      except Exception as e:
@@ -1404,6 +1445,7 @@ class ActionsManagerScreen(ModalScreen):
         title.focus()
         self.current_data_idx = -1 # Reset on mount
         self.refresh_action_list()
+        self.update_button_states()
 
     def compose(self) -> ComposeResult:
         # Clean and sort data immediately so we can populate the Select
@@ -1455,8 +1497,8 @@ class ActionsManagerScreen(ModalScreen):
             ),
             Horizontal(
                 Button("Add New", variant="default", id="btn-add-action-mgmt"),
-                Button("Duplicate", variant="default", id="btn-duplicate-action-mgmt"),
-                Button("Delete", variant="default", id="btn-delete-action-mgmt"),
+                Button("Duplicate", variant="default", id="btn-duplicate-action-mgmt", disabled=True),
+                Button("Delete", variant="default", id="btn-delete-action-mgmt", disabled=True),
                 Button("Close", variant="default", id="btn-close-action-mgmt"),
                 classes="buttons"
             ),
@@ -1485,6 +1527,17 @@ class ActionsManagerScreen(ModalScreen):
             
             display_name = act.get('name', '???')
             lv.append(ListItem(Label(f"[{cat}] {display_name}"), name=str(idx)))
+        self.update_button_states()
+
+    def update_button_states(self) -> None:
+        """Update the enabled/disabled state of the buttons based on selection."""
+        try:
+            list_view = self.query_one("#list-actions-mgmt", ListView)
+            has_selection = list_view.highlighted_child is not None
+            self.query_one("#btn-duplicate-action-mgmt", Button).disabled = not has_selection
+            self.query_one("#btn-delete-action-mgmt", Button).disabled = not has_selection
+        except Exception:
+            pass
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "select-mgmt-filter":
@@ -1559,6 +1612,7 @@ class ActionsManagerScreen(ModalScreen):
 
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         if event.list_view.id == "list-actions-mgmt":
+            self.update_button_states()
             if event.item:
                 idx_str = getattr(event.item, "name", "-1")
                 try:
@@ -1797,8 +1851,8 @@ class ChatManagerScreen(ModalScreen):
                 id="management-split"
             ),
             Horizontal(
-                Button("Load Selected", variant="default", id="btn-load-chat"),
-                Button("Delete", variant="default", id="btn-delete-chat"),
+                Button("Load Selected", variant="default", id="btn-load-chat", disabled=True),
+                Button("Delete", variant="default", id="btn-delete-chat", disabled=True),
                 Button("Close", variant="default", id="btn-close-chat"),
                 classes="buttons"
             ),
@@ -1811,6 +1865,7 @@ class ChatManagerScreen(ModalScreen):
         title.can_focus = True
         title.focus()
         self.refresh_chat_list()
+        self.update_button_states()
 
     def refresh_chat_list(self) -> None:
         chats_dir = Path(self.app.root_path) / "chats"
@@ -1822,7 +1877,33 @@ class ChatManagerScreen(ModalScreen):
         
         chats = sorted(list(chats_dir.glob("*.json")))
         for chat_file in chats:
-            lv.append(ListItem(Label(chat_file.name), name=str(chat_file)))
+            is_encrypted = False
+            try:
+                with open(chat_file, "r") as f:
+                    # Check first chunk for JSON structure; if missing, it's likely encrypted base64
+                    chunk = f.read(100).strip()
+                    if chunk and not (chunk.startswith("{") or chunk.startswith("[")):
+                        is_encrypted = True
+            except Exception:
+                pass
+            
+            display_name = f"🔒 {chat_file.name}" if is_encrypted else chat_file.name
+            lv.append(ListItem(Label(display_name), name=str(chat_file)))
+        self.update_button_states()
+
+    def update_button_states(self) -> None:
+        """Update the enabled/disabled state of the buttons based on selection."""
+        try:
+            list_view = self.query_one("#list-saved-chats", ListView)
+            has_selection = list_view.highlighted_child is not None
+            self.query_one("#btn-load-chat", Button).disabled = not has_selection
+            self.query_one("#btn-delete-chat", Button).disabled = not has_selection
+        except Exception:
+            pass
+
+    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
+        if event.list_view.id == "list-saved-chats":
+            self.update_button_states()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-close-chat":
