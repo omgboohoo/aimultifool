@@ -73,6 +73,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     is_char_edit_mode = reactive(False)
     vector_chat_name = reactive(None)
     enable_vector_chat = reactive(False)
+    force_ai_speak_first = reactive(True)
     _inference_worker = None
     _last_action_list = None
 
@@ -197,6 +198,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         self.selected_model = settings.get("selected_model", "")
         self.theme = settings.get("theme", "textual-dark")
         self.speech_styling = settings.get("speech_styling", "highlight")
+        self.force_ai_speak_first = settings.get("force_ai_speak_first", True)
         
         # Defer character list update until Cards screen is opened
         
@@ -413,7 +415,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             "minp": self.minp,
             "selected_model": self.selected_model,
             "theme": self.theme,
-            "speech_styling": self.speech_styling
+            "speech_styling": self.speech_styling,
+            "force_ai_speak_first": self.force_ai_speak_first
         }
         save_settings(settings)
 
@@ -588,7 +591,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             await self.update_system_prompt_style(self.style)
             self.query_one("#chat-scroll").query("*").remove()
             self.notify(f"Loaded character: {Path(card_path).name}")
-            if self.llm:
+            if self.llm and self.force_ai_speak_first:
                 if len(self.messages) > 1 and self.messages[-1]["role"] == "user":
                     self.messages[-1]["content"] = "continue"
                 else:

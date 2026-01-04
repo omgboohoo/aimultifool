@@ -386,7 +386,7 @@ class ActionsMixin:
             # Suppress info message if restarting with a character card to keep it clean
             await self.update_system_prompt_style(self.style, suppress_info=bool(self.current_character))
         # 6. Restart the inference
-        if self.current_character:
+        if self.current_character and getattr(self, "force_ai_speak_first", True):
             # For character cards, we send 'continue' to trigger the character's first response
             if self.messages and self.messages[-1]["role"] == "user":
                 self.messages[-1]["content"] = "continue"

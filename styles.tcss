@@ -553,6 +553,18 @@ ActionsManagerScreen {
     margin-bottom: 0;
 }
 
+#characters-buttons-grid {
+    layout: grid;
+    grid-size: 4 2;
+    grid-gutter: 0 1;
+    height: 8;
+    margin-top: 0;
+}
+
+#characters-buttons-grid Button {
+    width: 100%;
+}
+
 .buttons {
     width: 100%;
     height: auto;

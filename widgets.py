@@ -13,7 +13,7 @@ from textual import work
 from textual.app import ComposeResult
 from textual.screen import ModalScreen
 from textual.containers import Vertical, Container, Horizontal, Grid, ScrollableContainer
-from textual.widgets import Label, Input, Select, Button, ListView, ListItem, Static, TextArea
+from textual.widgets import Label, Input, Select, Button, ListView, ListItem, Static, TextArea, Checkbox
 from textual_slider import Slider
 from utils import save_action_menu_data, encrypt_data, decrypt_data, copy_to_clipboard
 from character_manager import extract_chara_metadata, write_chara_metadata
@@ -504,15 +504,16 @@ class CharactersScreen(ModalScreen):
                 ),
                 id="management-split"
             ),
-            Horizontal(
-                Button("Play", variant="default", id="btn-play-card", disabled=True),
+            Grid(
+                Button("Play (User Speak First)", variant="default", id="btn-play-card-user", disabled=True),
+                Button("Play (AI Speak First)", variant="default", id="btn-play-card-ai", disabled=True),
                 Button("New", variant="default", id="btn-new-card"),
                 Button("Duplicate", variant="default", id="btn-duplicate-card", disabled=True),
                 Button("Rename", variant="default", id="btn-rename-card", disabled=True),
                 Button("Delete", variant="default", id="btn-delete-card", disabled=True),
                 Button("Save Changes", variant="default", id="btn-save-metadata"),
                 Button("Close", variant="default", id="btn-cancel-mgmt"),
-                classes="buttons"
+                id="characters-buttons-grid"
             ),
             id="characters-dialog",
             classes="modal-dialog"
@@ -559,10 +560,13 @@ class CharactersScreen(ModalScreen):
             has_selection = list_view.highlighted_child is not None
             
             # Play also requires LLM
-            self.query_one("#btn-play-card", Button).disabled = not (has_selection and self.app.llm)
+            can_play = has_selection and self.app.llm
+            self.query_one("#btn-play-card-user", Button).disabled = not can_play
+            self.query_one("#btn-play-card-ai", Button).disabled = not can_play
             self.query_one("#btn-duplicate-card", Button).disabled = not has_selection
             self.query_one("#btn-rename-card", Button).disabled = not has_selection
             self.query_one("#btn-delete-card", Button).disabled = not has_selection
+            self.query_one("#btn-save-metadata", Button).disabled = not has_selection
         except Exception:
             pass
 
@@ -682,6 +686,10 @@ class CharactersScreen(ModalScreen):
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "input-search-meta":
             self.perform_search(event.value, start_from=0)
+
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        if event.checkbox.id == "chk-force-speak":
+            self.app.force_ai_speak_first = event.value
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "input-search-meta":
@@ -1002,7 +1010,7 @@ class CharactersScreen(ModalScreen):
         selected_item = self.query_one("#list-characters", ListView).highlighted_child
         card_path = getattr(selected_item, "name", "") if selected_item else None
 
-        if event.button.id == "btn-play-card":
+        if event.button.id in ["btn-play-card-user", "btn-play-card-ai"]:
             if not self.app.llm:
                 self.app.notify("Model not loaded! Load a model from the sidebar first.", severity="warning")
                 return
@@ -1014,6 +1022,9 @@ class CharactersScreen(ModalScreen):
                     self.app.notify("Card is encrypted! Enter password to unlock.", severity="error")
                     self.query_one("#input-card-password").focus()
                     return
+                
+                force_ai = (event.button.id == "btn-play-card-ai")
+                self.app.force_ai_speak_first = force_ai
                 
                 # We don't care if it's JSON or not, the engine now handles both
                 self.dismiss({"action": "play", "path": card_path, "meta": metadata_str})
