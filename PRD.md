@@ -1,4 +1,4 @@
-# System Reference Document: aiMultiFool v0.1.21
+# System Reference Document: aiMultiFool v0.1.22
 
 ## 1. Executive Summary
 aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox. It leverages **Textual** for a responsive, desktop-class TUI and **llama-cpp-python** for high-performance local inference. The architecture prioritizes separation of concerns via a Mixin pattern, enabling clean extensibility for theming, encryption, and complex character logic.
@@ -13,7 +13,7 @@ aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox.
 | **Inference Engine** | llama-cpp-python | Python bindings for GGUF model execution |
 | **Cryptography** | cryptography (Hazmat) | AES-256-GCM + Argon2id for file security |
 | **Vector DB** | Qdrant (Local) | Persistent long-term memory via embeddings |
-| **Concurrency** | asyncio + Threads | Non-blocking UI input during blocking inference |
+| **Concurrency** | asyncio + Threads (Linux) / Subprocess (Windows) | Non-blocking UI input during blocking inference |
 | **Data Format** | JSON / PNG (Chunked) | Metadata storage for Settings and Character Cards |
 
 ---
@@ -48,12 +48,16 @@ classDiagram
 ```
 
 ### 3.2 Core Modules
-- **`aimultifool.py`**: The entry point. Initializes the `App`, loads settings, and composes the primary layout.
-- **`logic_mixins.py` (`InferenceMixin`, `ActionsMixin`)**:
-    - **Inference**: usage of `@work(thread=True)` to offload blocking Llama.cpp calls to a background thread, preventing UI freeze. Uses `call_from_thread` to push updates back to the main event loop.
+- **`aimultifool.py`**: The entry point. Initializes the `App`, loads settings, and composes the primary layout. Sets Windows event loop policy for threading compatibility.
+- **`logic_mixins.py` (`InferenceMixin`, `ActionsMixin`, `VectorMixin`)**:
+    - **Inference**: On Linux, uses `@work(thread=True)` to offload blocking Llama.cpp calls to a background thread. On Windows, uses subprocess-based architecture (`SubprocessLlama`) to prevent GIL-related UI freezes. Uses `call_from_thread` (Linux) or direct updates (Windows subprocess) to push updates back to the main event loop.
     - **State**: Manages the message history list, pruning logic, and token counting.
+    - **Vector Chat**: On Windows, embeddings run in a separate subprocess (`SubprocessEmbedder`) to maintain UI responsiveness.
 - **`ui_mixin.py` (`UIMixin`)**: Centralizes DOM manipulation. Handles the mounting of `MessageWidget`s and synchronizing the specific visual state with the backend `messages` list.
 - **`styles.tcss`**: The primary stylesheet. Supports dynamic runtime modification (see **3.3 Theming**) via generic CSS variable overrides or string replacement.
+- **`llm_subprocess_worker.py`**: Windows-only subprocess worker that loads llama-cpp-python models and handles inference/embedding requests. Communicates via JSONL protocol over stdin/stdout. Prevents GIL-related UI freezes by isolating blocking operations in a separate process.
+- **`llm_subprocess_client.py`**: Windows-only client wrapper providing a `llama_cpp.Llama`-compatible API over the subprocess protocol. Handles process lifecycle, JSONL communication, and stream management. Automatically manages subprocess startup/shutdown and protocol synchronization.
+- **`ai_engine.py`**: Model discovery, token counting utilities, and context pruning logic. Handles both native `llama_cpp.Llama` and `SubprocessLlama` instances for token counting.
 
 ### 3.3 Styling & Theming
 The application uses Textual's CSS system with theme variables (`$primary`, `$accent`, `$background`, `$surface`, `$text`, `$text-muted`, `$boost`) for consistent styling across the interface.
@@ -73,6 +77,7 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **Iterative Decoding**: The `Llama.create_chat_completion` method is called with `stream=True`.
 - **Text Assembly**: Chunks are yielded back to the main thread in real-time.
 - **Visual Updates**: The `UIMixin` appends text to the active `MessageWidget` on every token, calculating TPS (Tokens Per Second) on the fly.
+- **Windows Subprocess Streaming**: On Windows, streaming tokens are received via JSONL protocol from the subprocess worker, maintaining the same real-time update behavior as Linux.
 
 ### 4.2 Context Management
 - **Smart Pruning**: Before generation, the prompt is evaluated. If `total_tokens > 85% of context_size`, the system prunes messages from the middle of the conversation history, preserving:

@@ -1,6 +1,6 @@
-# aiMultiFool v0.1.21
+# aiMultiFool v0.1.22
 
-**The Premium Linux Terminal-Based Sandbox for Private AI Roleplay.** 
+**The Premium Cross-Platform Terminal-Based Sandbox for Private AI Roleplay.** 
 Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favorite SillyTavern character cards with zero lag and full privacy.
 
 *Vibe coded in Antigravity and Cursor using Linux Mint*
@@ -41,6 +41,11 @@ Looking for a detailed guide? Check out the **[USER_GUIDE.md](./USER_GUIDE.md)**
 
 ## 🚀 Installation & Quick Start
 
+### Linux
+
+> [!IMPORTANT]
+> **Python 3.12** is strictly required for the pre-built GPU backends to function.
+
 1. **Clone and Enter**:
    ```bash
    git clone https://github.com/omgboohoo/aimultifool.git
@@ -55,6 +60,30 @@ Looking for a detailed guide? Check out the **[USER_GUIDE.md](./USER_GUIDE.md)**
 
 > [!TIP]
 > **GPU Acceleration**: On first launch, `run.sh` will automatically download a **Universal Multi-Arch Wheel** (~339MB) to enable CUDA support across GTX 10-series through RTX 40-series GPUs.
+
+### Windows
+
+> [!IMPORTANT]
+> **Python 3.12** is strictly required for the pre-built GPU backends to function. [Download Python 3.12.x here](https://www.python.org/downloads/windows/).
+
+1. **Clone and Enter**:
+   ```powershell
+   git clone https://github.com/omgboohoo/aimultifool.git
+   cd aiMultiFool
+   ```
+
+2. **Launch**:
+   ```powershell
+   .\run.bat
+   ```
+
+> [!TIP]
+> **GPU Acceleration**: On first launch, `run.bat` will automatically download a **Windows Multi-Arch Wheel** (~235MB) to enable CUDA support across GTX 10-series through RTX 40-series GPUs.
+> 
+> **Windows-Specific Notes**:
+> - The app uses a subprocess-based architecture on Windows to prevent UI freezes during model loading.
+> - Model loading may take longer on Windows due to subprocess initialization, but the UI remains fully responsive.
+> - The Regenerate button is automatically disabled during AI generation on Windows to prevent crashes.
 
 ---
 
@@ -88,22 +117,22 @@ If you've ever set **Temperature** to 2.0 and noticed the AI still sounds perfec
 
 ## 🛠️ Requirements
 
-- **Python 3.12+**
-- **Linux** (Ubuntu/Debian/Mint recommended)
+- **Python 3.12+** (Version **3.12.x** is highly recommended for compatibility with pre-built GPU wheels)
+- **Operating System**: 
+  - **Linux** (Ubuntu/Debian/Mint recommended)
+  - **Windows 10/11** (Windows 10+ recommended)
 - **NVIDIA GPU** (Optional) - Requires Drivers and CUDA Runtime:
-  ```bash
-  sudo apt install nvidia-cuda-toolkit-runtime
-  ```
-- **Models**: GGUF format (Auto-downloads **MN-12B-Mag-Mell-R1** as default LLM and **nomic-embed-text-v2-moe** for Vector Chat)
+  - **Linux**: `sudo apt install nvidia-cuda-toolkit-runtime`
+  - **Windows**: CUDA Toolkit installed and in PATH (usually handled automatically)
+- **Models**: GGUF format (Auto-downloads **L3-8B-Stheno-v3.2** as default LLM and **nomic-embed-text-v2-moe** for Vector Chat)
 
 ---
 
 ## 📦 Recommended Models
 
-- **Default LLM**: [MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_S](https://huggingface.co/mradermacher/MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF) (Auto-downloaded)
+- **Default LLM**: [L3-8B-Stheno-v3.2-Q4_K_M](https://huggingface.co/bartowski/L3-8B-Stheno-v3.2-GGUF) (Auto-downloaded)
 - **Embedding Model**: [nomic-embed-text-v2-moe.Q4_K_M](https://huggingface.co/nomic-ai/nomic-embed-text-v2-moe-GGUF) (Auto-downloaded) - Required for **Vector Chat (RAG)** long-term memory.
-- **Smaller Option**: [L3-8B-Stheno-v3.2-Q4_K_M](https://huggingface.co/bartowski/L3-8B-Stheno-v3.2-GGUF) (~5.2 GB) - Faster, lower memory usage
-- **High Quality**: [MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_M](https://huggingface.co/mradermacher/MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF) (Higher quality variant)
+- **High Quality**: [MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_M](https://huggingface.co/mradermacher/MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF) (Larger 12B model, higher quality)
 
 ---
 

@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 from textual import work
 from textual.widgets import Select
+from queue import Queue
+import sys
 
 # Imports for functional logic
 from ai_engine import (
@@ -17,6 +19,7 @@ from ai_engine import (
 from character_manager import create_initial_messages
 from utils import DOWNLOAD_AVAILABLE, save_settings, load_settings, get_style_prompt
 from widgets import MessageWidget
+from llm_subprocess_client import SubprocessLlama, SubprocessEmbedder
 
 # Optional for download
 if DOWNLOAD_AVAILABLE:
@@ -91,6 +94,9 @@ class InferenceMixin:
                         # Small delay so user can see it found something
                         time.sleep(0.5)
                         self.call_from_thread(setattr, self, "status_text", "Thinking with context...")
+                    else:
+                        # Make it explicit when RAG found nothing (helps debugging)
+                        self.call_from_thread(setattr, self, "status_text", "Recall: 0 memories found.")
 
                 stream = self.llm.create_chat_completion(
                     messages=messages_to_use,
@@ -111,6 +117,13 @@ class InferenceMixin:
                 for output in stream:
                     if self.is_loading == False: # Cancelled
                         was_cancelled = True
+                        # IMPORTANT (subprocess LLM): close the generator so it can drain any remaining
+                        # deltas and keep the JSONL protocol aligned for the next command.
+                        try:
+                            if hasattr(stream, "close"):
+                                stream.close()
+                        except Exception:
+                            pass
                         break
                         
                     text_chunk = output["choices"][0].get("delta", {}).get("content", "")
@@ -133,8 +146,13 @@ class InferenceMixin:
                             break
                     
                     # Stats
-                    chunk_tokens = self.llm.tokenize(text_chunk.encode("utf-8"), add_bos=False, special=False)
-                    token_count += len(chunk_tokens)
+                    # NOTE: If llm is the subprocess-backed implementation, we must NOT
+                    # call tokenize_count during streaming (can't interleave commands).
+                    if isinstance(self.llm, SubprocessLlama):
+                        token_count += max(1, len(text_chunk) // 4) if text_chunk else 0
+                    else:
+                        chunk_tokens = self.llm.tokenize(text_chunk.encode("utf-8"), add_bos=False, special=False)
+                        token_count += len(chunk_tokens)
                     elapsed = time.time() - start_time
                     tps = token_count / elapsed if elapsed > 0 else 0
                     peak_tps = max(peak_tps, tps)
@@ -169,13 +187,13 @@ class InferenceMixin:
             # Always release the lock
             _inference_lock.release()
 
-    @work(exclusive=True, thread=True)
-    def load_model_task(self, model_path, context_size, requested_gpu_layers):
-        self.status_text = "Loading model..."
+    def load_model_task(self, model_path, context_size, requested_gpu_layers, needs_cleanup=False, old_llm=None):
+        # Windows fix: Manual threading completely bypassing Textual's @work decorator
+        # Use a queue to communicate back to the main thread
+        # ALL blocking operations (including backend cleanup) happen in the thread
         
         if requested_gpu_layers == 0:
             layers_to_try = [0]
-            self.call_from_thread(self.notify, "CPU Only selected, bypassing GPU cache.", severity="information")
         else:
             cache = load_model_cache()
             cache_key = get_cache_key(model_path, context_size)
@@ -183,7 +201,6 @@ class InferenceMixin:
             cached_layers = None
             if cache_key in cache:
                 cached_layers = cache[cache_key].get("gpu_layers")
-                self.call_from_thread(self.notify, f"Found cached GPU layer count: {cached_layers}", severity="information")
             
             layers_to_try = []
             if cached_layers is not None:
@@ -207,48 +224,165 @@ class InferenceMixin:
                 if 0 not in layers_to_try:
                     layers_to_try.append(0)
         
-        llm = None
-        actual_layers = 0
-        from llama_cpp import Llama
+        # Ensure model_path is a string (Windows path handling)
+        model_path_str = str(model_path) if model_path else None
+        if not model_path_str:
+            self.is_model_loading = False
+            return
 
-        for layers in layers_to_try:
+        # Create a queue for thread communication
+        result_queue = Queue()
+        
+        # Define the blocking function to run in a manual thread
+        def _load_llama_thread():
+            llm = None
+            actual_layers = 0
+            
             try:
-                layer_display = "all" if layers == -1 else str(layers)
-                self.status_text = f"Trying {layer_display} GPU layers..."
-                self.call_from_thread(self.notify, f"Trying {layer_display} GPU layers...", severity="information")
-                llm = Llama(
-                    model_path=model_path,
-                    n_ctx=context_size,
-                    n_gpu_layers=layers,
-                    verbose=False
-                )
-                actual_layers = layers
-                cache = load_model_cache()
-                cache[cache_key] = {"gpu_layers": layers, "model_path": model_path, "context_size": context_size}
-                save_model_cache(cache)
-                self.call_from_thread(self.notify, f"✓ Successfully loaded with {layer_display} GPU layers!", severity="success")
-                break
-            except Exception:
-                continue
-        
-        if llm:
-            self.llm = llm
-            self.context_size = context_size
-            self.gpu_layers = actual_layers
-            self.call_from_thread(self.notify, f"Model loaded successfully with {actual_layers} layers!")
-            self.call_from_thread(self.enable_character_list)
-            model_name = Path(model_path).stem
-            self.status_text = f"{model_name} Ready"
-        else:
-            self.call_from_thread(self.notify, "Failed to load model!", severity="error")
-            self.status_text = "Load Failed"
+                # On Windows, run llama in a subprocess to avoid UI freezes (GIL held in native load)
+                if sys.platform == "win32":
+                    # We ignore old_llm cleanup here; parent already nulled it. Subprocess owns its own state.
+                    client = SubprocessLlama(
+                        python_exe=sys.executable,
+                        worker_path=str(Path(__file__).parent / "llm_subprocess_worker.py"),
+                    )
+                    # Try requested GPU layers first (so -1 / >0 actually uses GPU), then fallback to CPU.
+                    req = int(requested_gpu_layers)
+                    try_layers = []
+                    if req != 0:
+                        try_layers.append(req)
+                    if 0 not in try_layers:
+                        try_layers.append(0)
 
-        # Setting this False triggers update_ui_state via the reactive watcher.
-        # It must happen AFTER self.llm is set.
-        self.call_from_thread(setattr, self, "is_model_loading", False)
+                    last_err = None
+                    for layers in try_layers:
+                        try:
+                            # If CUDA init hangs, timeout and restart subprocess, then try next option.
+                            client.load(
+                                model_path=model_path_str,
+                                n_ctx=int(context_size),
+                                n_gpu_layers=int(layers),
+                                verbose=False,
+                                timeout_s=120.0,
+                            )
+                            llm = client
+                            actual_layers = int(layers)
+                            break
+                        except Exception as e:
+                            last_err = e
+                            try:
+                                client.restart()
+                            except Exception:
+                                pass
+                            continue
+
+                    if llm is None and last_err is not None:
+                        raise last_err
+                else:
+                    import llama_cpp
+                    from llama_cpp import Llama
+
+                    # Clean up old model if needed (do this in thread, not main thread!)
+                    if needs_cleanup and old_llm is not None:
+                        try:
+                            llama_cpp.llama_backend_free()
+                            del old_llm
+                            gc.collect()
+                            llama_cpp.llama_backend_init()
+                        except Exception:
+                            pass  # Continue even if cleanup fails
+
+                    for layers in layers_to_try:
+                        try:
+                            llm = Llama(
+                                model_path=model_path_str,
+                                n_ctx=context_size,
+                                n_gpu_layers=layers,
+                                verbose=False
+                            )
+                            actual_layers = layers
+                            cache = load_model_cache()
+                            cache[cache_key] = {"gpu_layers": layers, "model_path": model_path, "context_size": context_size}
+                            save_model_cache(cache)
+                            break
+                        except Exception:
+                            continue
+                
+                # Put result in queue
+                result_queue.put(("success", llm, actual_layers))
+            except Exception as e:
+                result_queue.put(("error", str(e), None))
         
-        if self.llm:
-            self.call_from_thread(self.focus_chat_input)
+        # Start the thread (daemon=True so it doesn't block app shutdown)
+        # Windows: Use manual threading, NOT Textual's @work decorator
+        thread = threading.Thread(target=_load_llama_thread, daemon=True, name="ModelLoadThread")
+        thread.start()
+        
+        # Verify thread started (for debugging)
+        if not thread.is_alive():
+            self.is_model_loading = False
+            self.status_text = "Failed to start load thread"
+            return
+        
+        # Set up a periodic check for the result
+        self._model_load_thread = thread
+        self._model_load_queue = result_queue
+        # Start checking after a short delay (use set_timer for non-blocking)
+        self.set_timer(0.1, self._check_model_load_result)
+    
+    def _check_model_load_result(self):
+        """Check if model loading is complete and update UI."""
+        if not hasattr(self, '_model_load_queue') or self._model_load_queue is None:
+            return
+        
+        try:
+            # Non-blocking check
+            if not self._model_load_queue.empty():
+                result_type, llm_or_error, actual_layers = self._model_load_queue.get_nowait()
+                
+                if result_type == "success":
+                    llm = llm_or_error
+                    if llm:
+                        self.llm = llm
+                        self.context_size = self.context_size  # Keep current
+                        self.gpu_layers = actual_layers
+                        layer_display = "all" if actual_layers == -1 else str(actual_layers)
+                        self.notify(f"Model loaded successfully with {layer_display} GPU layers!")
+                        self.enable_character_list()
+                        model_name = Path(self.selected_model).stem
+                        self.status_text = f"{model_name} Ready"
+                    else:
+                        self.notify("Failed to load model!", severity="error")
+                        self.status_text = "Load Failed"
+                else:
+                    error_msg = llm_or_error
+                    self.notify(f"Model loading error: {error_msg}", severity="error")
+                    self.status_text = "Load Failed"
+                
+                # Clean up
+                self.is_model_loading = False
+                self._model_load_queue = None
+                self._model_load_thread = None
+                
+                if self.llm:
+                    self.focus_chat_input()
+            else:
+                # Still loading, check again in 0.1 seconds
+                if hasattr(self, '_model_load_thread') and self._model_load_thread and self._model_load_thread.is_alive():
+                    self.set_timer(0.1, self._check_model_load_result)
+                else:
+                    # Thread died unexpectedly
+                    self.notify("Model loading thread terminated unexpectedly", severity="error")
+                    self.status_text = "Load Failed"
+                    self.is_model_loading = False
+                    self._model_load_queue = None
+                    self._model_load_thread = None
+        except Exception as e:
+            self.notify(f"Error checking model load: {e}", severity="error")
+            self.status_text = "Load Failed"
+            self.is_model_loading = False
+            self._model_load_queue = None
+            self._model_load_thread = None
 
     @work(exclusive=True, thread=True)
     def download_default_model(self):
@@ -261,8 +395,8 @@ class InferenceMixin:
         models_dir.mkdir(parents=True, exist_ok=True)
         
         # Default LLM
-        llm_url = "https://huggingface.co/mradermacher/MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF/resolve/main/MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_S.gguf?download=true"
-        llm_path = models_dir / "MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_S.gguf"
+        llm_url = "https://huggingface.co/bartowski/L3-8B-Stheno-v3.2-GGUF/resolve/main/L3-8B-Stheno-v3.2-Q4_K_M.gguf?download=true"
+        llm_path = models_dir / "L3-8B-Stheno-v3.2-Q4_K_M.gguf"
         
         # Embedding Model
         embed_url = "https://huggingface.co/nomic-ai/nomic-embed-text-v2-moe-GGUF/resolve/main/nomic-embed-text-v2-moe.Q4_K_M.gguf?download=true"
@@ -314,6 +448,44 @@ class InferenceMixin:
 
 class ActionsMixin:
     """Mixin for handling application actions."""
+
+    def _get_actions_lock(self):
+        """Serialize stop/regenerate/reset actions to avoid race conditions (esp. on Windows)."""
+        lock = getattr(self, "_actions_lock", None)
+        if lock is None:
+            lock = asyncio.Lock()
+            setattr(self, "_actions_lock", lock)
+        return lock
+
+    async def _stop_generation_unlocked(self) -> None:
+        """Inner stop logic. Caller must hold `_actions_lock`."""
+        if self.is_loading or (hasattr(self, "_inference_worker") and self._inference_worker):
+            self.is_loading = False
+            # Immediate feedback; full stop requires worker/drain to finish (Windows subprocess streaming).
+            try:
+                self.status_text = "Stopping..."
+            except Exception:
+                pass
+            # Wait gracefully for the worker thread to catch the is_loading=False flag and exit its finally block
+            max_waits = 40  # Increased from 20 to give more time for lock release
+            while (hasattr(self, "_inference_worker") and self._inference_worker) and max_waits > 0:
+                await asyncio.sleep(0.05)
+                max_waits -= 1
+
+            # If still stuck after graceful wait, then and only then attempt a cancel
+            if hasattr(self, "_inference_worker") and self._inference_worker:
+                try:
+                    self._inference_worker.cancel()
+                    await asyncio.sleep(0.1)
+                except Exception:
+                    pass
+                self._inference_worker = None
+
+            # Extra delay to ensure the lock is fully released
+            await asyncio.sleep(0.15)
+
+            self.status_text = "Stopped"
+            self.notify("Generation stopped.")
     
     def action_toggle_sidebar(self) -> None:
         """Toggle both sidebars simultaneously."""
@@ -325,28 +497,8 @@ class ActionsMixin:
 
     async def action_stop_generation(self) -> None:
         """Gracefully stop the AI by setting the flag and waiting for the worker to exit."""
-        if self.is_loading or (hasattr(self, "_inference_worker") and self._inference_worker):
-            self.is_loading = False
-            # Wait gracefully for the worker thread to catch the is_loading=False flag and exit its finally block
-            max_waits = 40  # Increased from 20 to give more time for lock release
-            while (hasattr(self, "_inference_worker") and self._inference_worker) and max_waits > 0:
-                await asyncio.sleep(0.05)
-                max_waits -= 1
-            
-            # If still stuck after graceful wait, then and only then attempt a cancel
-            if hasattr(self, "_inference_worker") and self._inference_worker:
-                try:
-                    self._inference_worker.cancel()
-                    await asyncio.sleep(0.1)
-                except Exception:
-                    pass
-                self._inference_worker = None
-            
-            # Extra delay to ensure the lock is fully released
-            await asyncio.sleep(0.15)
-                
-            self.status_text = "Stopped"
-            self.notify("Generation stopped.")
+        async with self._get_actions_lock():
+            await self._stop_generation_unlocked()
 
     def action_clear_history(self) -> None:
         if self.current_character:
@@ -470,78 +622,62 @@ class ActionsMixin:
 
     async def action_regenerate(self) -> None:
         """Regenerate the last AI reply by removing it and re-running inference."""
-        was_loading = self.is_loading
-        
-        # Stop generation if currently generating
-        if self.is_loading:
-            await self.action_stop_generation()
-            # Wait a bit for the stop to complete
-            await asyncio.sleep(0.1)
-        
-        if not self.llm:
-            self.notify("No model loaded!", severity="warning")
+        # Windows safety: disable regenerate during streaming (UI also disables button)
+        # to avoid subprocess protocol interleaving / crashes.
+        if sys.platform == "win32" and getattr(self, "is_loading", False):
+            self.notify("Regenerate is disabled while AI is speaking on Windows. Stop first, then Regenerate.", severity="warning")
             return
-        
-        if len(self.messages) <= 1:
-            self.notify("Nothing to regenerate.", severity="warning")
-            return
-        
-        # Find the user message that prompted the last assistant reply
-        user_text = None
-        
-        # If we were loading, stop generation may have added a partial assistant message
-        # to self.messages, so we need to remove it from both messages and UI
-        if was_loading:
-            # Remove any partial assistant message from messages if present
-            if self.messages and self.messages[-1]["role"] == "assistant":
-                self.messages.pop()
-            
-            # Find the last user message in messages
-            for i in range(len(self.messages) - 1, -1, -1):
-                if self.messages[i]["role"] == "user":
-                    user_text = self.messages[i]["content"]
-                    break
-            
-            # Remove any partial assistant widget from UI
-            try:
-                chat_scroll = self.query_one("#chat-scroll")
-                widgets = [w for w in chat_scroll.children if isinstance(w, MessageWidget) and not w.is_info]
-                if widgets and widgets[-1].role == "assistant":
-                    widgets[-1].remove()
-            except Exception:
-                pass
-        else:
-            # Not loading - check if last message is assistant
-            if self.messages[-1]["role"] != "assistant":
-                self.notify("Last message is not from AI. Nothing to regenerate.", severity="warning")
+        # Serialize regenerate requests so repeated button presses can't interleave
+        # with stop / UI rebuild / worker startup.
+        async with self._get_actions_lock():
+            if getattr(self, "_regen_in_progress", False):
+                # Ignore extra clicks (prevents crashes from re-entrancy)
                 return
-            
-            # Find the user message that prompted this assistant reply
-            for i in range(len(self.messages) - 1, -1, -1):
-                if self.messages[i]["role"] == "user":
-                    user_text = self.messages[i]["content"]
-                    break
-            
-            # Remove the last assistant message from messages
-            self.messages.pop()
-            
-            # Remove the last assistant message widget from UI
+            self._regen_in_progress = True
             try:
-                chat_scroll = self.query_one("#chat-scroll")
-                widgets = [w for w in chat_scroll.children if isinstance(w, MessageWidget) and not w.is_info]
-                if widgets and widgets[-1].role == "assistant":
-                    widgets[-1].remove()
-            except Exception:
-                pass
-        
-        if not user_text:
-            self.notify("Could not find user message to regenerate from.", severity="warning")
-            return
-        
-        # Re-run inference with the same user message
-        self.is_loading = True
-        self._inference_worker = self.run_inference(user_text)
-        self.notify("Regenerating last reply...")
+                # Windows safety: don't remove/update widgets while the inference thread may still
+                # be streaming UI updates. Instead, stop generation, mutate message state, then
+                # rebuild the chat UI from state and restart inference.
+                was_loading = bool(self.is_loading)
+
+                if not self.llm:
+                    self.notify("No model loaded!", severity="warning")
+                    return
+
+                if len(self.messages) <= 1:
+                    self.notify("Nothing to regenerate.", severity="warning")
+                    return
+
+                # If currently generating, stop first and give it time to fully unwind.
+                if was_loading:
+                    await self._stop_generation_unlocked()
+                    await asyncio.sleep(0.25)
+
+                # If the last message is an assistant (possibly partial from a cancelled stream), remove it.
+                if self.messages and self.messages[-1].get("role") == "assistant":
+                    self.messages.pop()
+
+                # Find the last user message to regenerate from
+                user_text = None
+                for i in range(len(self.messages) - 1, -1, -1):
+                    if self.messages[i].get("role") == "user":
+                        user_text = self.messages[i].get("content")
+                        break
+
+                if not user_text:
+                    self.notify("Could not find user message to regenerate from.", severity="warning")
+                    return
+
+                # Rebuild UI to match message state (avoids widget races/crashes)
+                if hasattr(self, "full_sync_chat_ui"):
+                    await self.full_sync_chat_ui()
+
+                # Re-run inference with the same user message
+                self.is_loading = True
+                self._inference_worker = self.run_inference(user_text)
+                self.notify("Regenerating last reply...")
+            finally:
+                self._regen_in_progress = False
 
     def save_user_settings(self):
         settings = {
@@ -563,6 +699,34 @@ class VectorMixin:
     qdrant_instance = None
     embed_llm = None
     vector_password = None
+    vector_collection_name = "chat_memory"
+    _embedder = None
+
+    def _ensure_collection_dim(self, dim: int) -> None:
+        """Ensure the active collection exists with the right vector dimension."""
+        if not self.qdrant_instance or not dim:
+            return
+
+        # Use a dimension-specific collection name to avoid destroying older data.
+        desired = f"chat_memory_{dim}"
+        self.vector_collection_name = desired
+
+        try:
+            # If it exists, we're good
+            self.qdrant_instance.get_collection(desired)
+            return
+        except Exception:
+            pass
+
+        try:
+            self.qdrant_instance.create_collection(
+                collection_name=desired,
+                vectors_config=VectorParams(size=dim, distance=Distance.COSINE),
+            )
+        except Exception as e:
+            # If it already exists (race), ignore
+            if "already exists" not in str(e).lower():
+                raise
 
     def initialize_vector_db(self, name: str):
         try:
@@ -578,9 +742,12 @@ class VectorMixin:
             
             self.qdrant_instance = qdrant_client.QdrantClient(path=str(vectors_dir))
             
-            # Try to get collection info to check if it exists and what dimension it uses
+            # Default collection (we may switch to dimension-specific collection after first embedding)
+            self.vector_collection_name = "chat_memory"
+
+            # Try to get collection info to check if it exists
             try:
-                collection_info = self.qdrant_instance.get_collection("chat_memory")
+                self.qdrant_instance.get_collection(self.vector_collection_name)
                 # Collection exists, we're good to go
                 return
             except Exception:
@@ -592,7 +759,7 @@ class VectorMixin:
             
             try:
                 self.qdrant_instance.create_collection(
-                    collection_name="chat_memory",
+                    collection_name=self.vector_collection_name,
                     vectors_config=VectorParams(size=dim, distance=Distance.COSINE)
                 )
             except Exception as e:
@@ -614,6 +781,37 @@ class VectorMixin:
 
     def get_embedding(self, text: str, task: str = "document"):
         """Get embedding for text. task can be 'document' or 'query' for Nomic 1.5 prefixes."""
+        # Windows: use embedding subprocess to avoid in-process llama embedding load freezing / blocking inference.
+        if sys.platform == "win32":
+            try:
+                if not hasattr(self, "_embedder") or self._embedder is None:
+                    self._embedder = SubprocessEmbedder(
+                        python_exe=sys.executable,
+                        worker_path=str(Path(__file__).parent / "llm_subprocess_worker.py"),
+                    )
+                    embed_model_path = Path(__file__).parent / "models" / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
+                    if not embed_model_path.exists():
+                        self.call_from_thread(self.notify, "Embedding model not found! Download it first.", severity="error")
+                        return None
+                    self._embedder.load(model_path=str(embed_model_path), n_ctx=2048, timeout_s=120.0)
+                emb = self._embedder.embed(text, task=task, timeout_s=30.0)
+                # Ensure collection dimension matches embeddings
+                if emb:
+                    try:
+                        self._ensure_collection_dim(len(emb))
+                    except Exception as e:
+                        try:
+                            self.call_from_thread(self.notify, f"Vector DB dimension setup failed: {e}", severity="error")
+                        except Exception:
+                            pass
+                return emb
+            except Exception as e:
+                try:
+                    self.call_from_thread(self.notify, f"Embedding error: {e}", severity="error")
+                except Exception:
+                    pass
+                return None
+
         if not self.embed_llm:
             embed_model_path = Path(__file__).parent / "models" / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
             if not embed_model_path.exists():
@@ -639,7 +837,13 @@ class VectorMixin:
             
         try:
             emb = self.embed_llm.create_embedding(prefixed_text)
-            return emb['data'][0]['embedding']
+            vec = emb['data'][0]['embedding']
+            if vec:
+                try:
+                    self._ensure_collection_dim(len(vec))
+                except Exception:
+                    pass
+            return vec
         except Exception as e:
             self.notify(f"Embedding error: {e}", severity="error")
             return None
@@ -653,11 +857,8 @@ class VectorMixin:
             return []
             
         try:
-            # Use the new query() API for qdrant-client v1.16+
-            from qdrant_client.models import QueryRequest
-            
             results = self.qdrant_instance.query_points(
-                collection_name="chat_memory",
+                collection_name=getattr(self, "vector_collection_name", "chat_memory"),
                 query=emb,
                 limit=k
             )
@@ -725,6 +926,6 @@ class VectorMixin:
                 vector=emb,
                 payload={"text": payload_text, "encrypted": is_encrypted}
             )
-            self.qdrant_instance.upsert(collection_name="chat_memory", points=[point])
+            self.qdrant_instance.upsert(collection_name=getattr(self, "vector_collection_name", "chat_memory"), points=[point])
         except Exception as e:
             self.notify(f"Failed to save vector entry: {e}", severity="error")

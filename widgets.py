@@ -1819,7 +1819,7 @@ class PasswordPromptScreen(ModalScreen):
             return
         
         try:
-            with open(self.file_path, "r") as f:
+            with open(self.file_path, "r", encoding="utf-8") as f:
                 content = f.read()
             
             # Check if it's already JSON (not encrypted) or needs decryption
@@ -1890,7 +1890,7 @@ class ChatManagerScreen(ModalScreen):
         for chat_file in chats:
             is_encrypted = False
             try:
-                with open(chat_file, "r") as f:
+                with open(chat_file, "r", encoding="utf-8") as f:
                     # Check first chunk for JSON structure; if missing, it's likely encrypted base64
                     chunk = f.read(100).strip()
                     if chunk and not (chunk.startswith("{") or chunk.startswith("[")):
@@ -1951,11 +1951,11 @@ class ChatManagerScreen(ModalScreen):
                 chat_data_json = json.dumps(chat_data, indent=2)
                 if password:
                     encrypted_data = encrypt_data(chat_data_json, password)
-                    with open(file_path, "w") as f:
+                    with open(file_path, "w", encoding="utf-8") as f:
                         f.write(encrypted_data)
                     self.app.notify(f"Encrypted chat saved to {save_name}")
                 else:
-                    with open(file_path, "w") as f:
+                    with open(file_path, "w", encoding="utf-8") as f:
                         f.write(chat_data_json)
                     self.app.notify(f"Chat saved to {save_name}")
                 self.refresh_chat_list()
@@ -1970,7 +1970,7 @@ class ChatManagerScreen(ModalScreen):
                 file_path = getattr(selected, "name", "")
                 if file_path:
                     try:
-                        with open(file_path, "r") as f:
+                        with open(file_path, "r", encoding="utf-8") as f:
                             content = f.read()
                         
                         try:

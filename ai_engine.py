@@ -19,7 +19,7 @@ def load_model_cache():
     cache_path = get_model_cache_path()
     if cache_path.exists():
         try:
-            with open(cache_path, 'r') as f:
+            with open(cache_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except (json.JSONDecodeError, IOError):
             return {}
@@ -29,7 +29,7 @@ def save_model_cache(cache):
     """Save model configuration cache"""
     cache_path = get_model_cache_path()
     try:
-        with open(cache_path, 'w') as f:
+        with open(cache_path, 'w', encoding='utf-8') as f:
             json.dump(cache, f, indent=2)
     except IOError:
         pass
@@ -52,8 +52,11 @@ def count_tokens_in_messages(llm, messages):
             text = content
         else:
             text = f"Assistant: {content}"
-        tokens = llm.tokenize(text.encode("utf-8"), add_bos=False, special=False)
-        total_tokens += len(tokens)
+        if hasattr(llm, "tokenize_count"):
+            total_tokens += int(llm.tokenize_count(text, add_bos=False, special=False))
+        else:
+            tokens = llm.tokenize(text.encode("utf-8"), add_bos=False, special=False)
+            total_tokens += len(tokens)
     total_tokens += (len(messages) - 1) * 2
     return total_tokens
 

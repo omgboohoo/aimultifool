@@ -5,6 +5,17 @@ aiMultiFool - Textual TUI chat app with llama-cpp-python
 
 import os
 import sys
+import faulthandler
+
+# Windows safety: enable fault handler to debug hangs
+if sys.platform == "win32":
+    faulthandler.enable()
+    # Fix Windows event loop policy for threading compatibility
+    # Windows 10+ defaults to ProactorEventLoop which doesn't work well with Textual's threading
+    import asyncio
+    if sys.version_info >= (3, 8):
+        # Ensure we use SelectorEventLoop for better threading compatibility with Textual's @work decorator
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # Disable Qdrant telemetry for total session privacy
 os.environ["QDRANT__TELEMETRY_DISABLED"] = "true"
@@ -36,7 +47,7 @@ from widgets import MessageWidget, AddActionScreen, EditCharacterScreen, Charact
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.1.21"
+    TITLE = "aiMultiFool v0.1.22"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -181,7 +192,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.1.21", id="status-version")
+            yield Static("aiMultiFool v0.1.22", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -243,6 +254,12 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         # Allow typing while loading
         self.query_one("#chat-input").disabled = False
         self.query_one("#btn-stop").disabled = not is_loading
+        # Windows safety: disable regenerate while streaming to avoid protocol/race crashes
+        try:
+            if sys.platform == "win32":
+                self.query_one("#btn-regenerate").disabled = bool(is_loading)
+        except Exception:
+            pass
         
         # Sync visibility
         try:
@@ -301,6 +318,9 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             elif btn.id in ["btn-continue", "btn-regenerate", "btn-rewind", "btn-restart", "btn-clear-chat"]:
                 # Disable if busy OR if no model is loaded
                 btn.disabled = is_busy or not self.llm
+                # Windows safety: disable regenerate while streaming to avoid crashes
+                if sys.platform == "win32" and btn.id == "btn-regenerate":
+                    btn.disabled = btn.disabled or bool(self.is_loading)
             elif btn.id == "btn-clear-search":
                 # Only enabled if there is text in the search box
                 try:
@@ -714,14 +734,20 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         self.gpu_layers = int(gpu)
         self.save_user_settings()
 
-        if self.llm:
+        # Set loading state and status BEFORE starting worker (Windows needs reactive updates on main thread)
+        self.is_model_loading = True
+        self.status_text = "Loading model..."
+        
+        # Store if we need to clean up existing model (do this in thread, not main thread)
+        needs_cleanup = bool(self.llm)
+        if needs_cleanup:
             self.disable_character_list()
-            llama_cpp.llama_backend_free()
-            del self.llm
-            gc.collect()
-            llama_cpp.llama_backend_init()
-            
-        self.load_model_task(model_path, ctx, gpu)
+            old_llm = self.llm
+            self.llm = None  # Clear reference immediately
+        
+        # Start manual threading (completely bypasses Textual's @work decorator for Windows compatibility)
+        # Pass cleanup flag so thread can handle it
+        self.load_model_task(model_path, ctx, gpu, needs_cleanup=needs_cleanup, old_llm=old_llm if needs_cleanup else None)
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-stop": await self.action_stop_generation()
@@ -1127,5 +1153,13 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                 self.notify("Could not find action in data!", severity="error")
 
 if __name__ == "__main__":
-    app = AiMultiFoolApp()
-    app.run()
+    try:
+        app = AiMultiFoolApp()
+        app.run()
+    except Exception as e:
+        # Catch-all for Windows weirdness or silent crashes
+        print(f"FATAL ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        if sys.platform == "win32":
+            input("Press Enter to close window...")

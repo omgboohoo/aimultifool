@@ -1,5 +1,20 @@
 # Release Notes
 
+## v0.1.22: Initial Windows Release (Strictly Alpha)
+### 🪟 Windows Support
+- **Cross-Platform Compatibility**: Full Windows 10/11 support with native subprocess-based architecture to prevent UI freezes.
+- **Subprocess LLM**: Model loading and inference run in separate processes on Windows, ensuring the UI remains responsive even during heavy GPU operations.
+- **Subprocess Embeddings**: Vector Chat embeddings also run in a separate process on Windows, maintaining full RAG functionality without blocking the UI.
+- **Windows-Specific UX**: Regenerate button automatically disabled during AI generation on Windows to prevent protocol conflicts.
+- **Stream Cleanup**: Improved Stop/Continue handling with proper stream draining to prevent crashes when interrupting generation.
+
+### 🔧 Technical
+- Added `llm_subprocess_worker.py`: Separate process worker for model loading and inference on Windows.
+- Added `llm_subprocess_client.py`: Client wrapper providing llama_cpp.Llama-compatible API over subprocess protocol.
+- Windows event loop policy set to `WindowsSelectorEventLoopPolicy` for better threading compatibility with Textual.
+- Manual threading implementation for model loading on Windows, bypassing Textual's `@work` decorator to prevent deadlocks.
+- Queue-based communication between worker threads and main thread for reliable state updates.
+
 ## v0.1.21: Vector Chat with Optional Encryption
 ### 🧠 New Feature: Vector Chat (RAG)
 - **Long-Term Memory**: Seamlessly integrate local vector databases into your roleplay for persistent long-term memory and knowledge retrieval.
