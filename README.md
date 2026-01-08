@@ -9,8 +9,6 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
 
 ## ✨ Features
 
-Looking for a detailed guide? Check out the **[USER_GUIDE.md](./USER_GUIDE.md)** for a comprehensive walkthrough.
-
 ### 🎭 Character & Content
 - **Character Card Support**: Load SillyTavern PNG cards directly from the top menu.
 - **AI-Assisted Editing**: Built-in **Metadata Editor** with **real-time streaming AI assistance** for generating and modifying character data without leaving the app.
@@ -83,7 +81,6 @@ Looking for a detailed guide? Check out the **[USER_GUIDE.md](./USER_GUIDE.md)**
 > **Windows-Specific Notes**:
 > - The app uses a subprocess-based architecture on Windows to prevent UI freezes during model loading.
 > - Model loading may take longer on Windows due to subprocess initialization, but the UI remains fully responsive.
-> - The Regenerate button is automatically disabled during AI generation on Windows to prevent crashes.
 
 ---
 

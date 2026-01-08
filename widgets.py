@@ -2268,15 +2268,38 @@ class VectorInspectScreen(ModalScreen):
                 return
         
         try:
+            # Detect available collections - name may be 'chat_memory' or 'chat_memory_768' etc.
+            collections = client.get_collections().collections
+            collection_names = [c.name for c in collections]
+            
+            target_collection = "chat_memory"
+            if target_collection not in collection_names:
+                # Look for suffixed version
+                for name in collection_names:
+                    if name.startswith("chat_memory"):
+                        target_collection = name
+                        break
+            else:
+                # If 'chat_memory' exists but is empty, and a suffixed one exists, use the suffixed one
+                try:
+                    count = client.count(collection_name="chat_memory").count
+                    if count == 0:
+                        for name in collection_names:
+                            if name.startswith("chat_memory_"):
+                                target_collection = name
+                                break
+                except Exception:
+                    pass
+
             scroll_result = client.scroll(
-                collection_name="chat_memory",
+                collection_name=target_collection,
                 limit=100,
                 with_payload=True,
                 with_vectors=False
             )
             points = scroll_result[0]
             if not points:
-                content = "No vectors found in this database."
+                content = f"No vectors found in collection '{target_collection}'."
             else:
                 lines = []
                 lines.append(f"Total Vectors: {len(points)}")
