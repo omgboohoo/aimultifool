@@ -254,17 +254,10 @@ class InferenceMixin:
                         python_exe=sys.executable,
                         worker_path=str(Path(__file__).parent / "llm_subprocess_worker.py"),
                     )
-                    # Try requested GPU layers first (so -1 / >0 actually uses GPU), then fallback to CPU.
-                    req = int(requested_gpu_layers)
-                    try_layers = []
-                    if req != 0:
-                        try_layers.append(req)
-                    if 0 not in try_layers:
-                        try_layers.append(0)
-
                     last_err = None
-                    for layers in try_layers:
+                    for layers in layers_to_try:
                         try:
+                            self.call_from_thread(setattr, self, "status_text", f"Loading (GPU Layers: {layers})...")
                             # If CUDA init hangs, timeout and restart subprocess, then try next option.
                             client.load(
                                 model_path=model_path_str,
@@ -275,6 +268,11 @@ class InferenceMixin:
                             )
                             llm = client
                             actual_layers = int(layers)
+                            
+                            # Cache the successful result
+                            cache = load_model_cache()
+                            cache[cache_key] = {"gpu_layers": layers, "model_path": model_path_str, "context_size": int(context_size)}
+                            save_model_cache(cache)
                             break
                         except Exception as e:
                             last_err = e
@@ -302,6 +300,7 @@ class InferenceMixin:
 
                     for layers in layers_to_try:
                         try:
+                            self.call_from_thread(setattr, self, "status_text", f"Loading (GPU Layers: {layers})...")
                             llm = Llama(
                                 model_path=model_path_str,
                                 n_ctx=context_size,
@@ -310,7 +309,7 @@ class InferenceMixin:
                             )
                             actual_layers = layers
                             cache = load_model_cache()
-                            cache[cache_key] = {"gpu_layers": layers, "model_path": model_path, "context_size": context_size}
+                            cache[cache_key] = {"gpu_layers": layers, "model_path": model_path_str, "context_size": context_size}
                             save_model_cache(cache)
                             break
                         except Exception:
