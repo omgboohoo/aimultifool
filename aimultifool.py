@@ -341,7 +341,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         if self.screen:
             all_selects.extend(list(self.screen.query(Select)))
         for select in all_selects:
-            select.disabled = is_busy
+            # Disable dropdowns while busy OR while AI is actively speaking
+            select.disabled = is_busy or is_ai_generating
             
         all_inputs = list(self.query(Input))
         if self.screen:
