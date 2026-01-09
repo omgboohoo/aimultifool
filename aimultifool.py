@@ -254,10 +254,9 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         # Allow typing while loading
         self.query_one("#chat-input").disabled = False
         self.query_one("#btn-stop").disabled = not is_loading
-        # Windows safety: disable regenerate while streaming to avoid protocol/race crashes
+        # Safety: disable regenerate while streaming to avoid protocol/race crashes
         try:
-            if sys.platform == "win32":
-                self.query_one("#btn-regenerate").disabled = bool(is_loading)
+            self.query_one("#btn-regenerate").disabled = bool(is_loading)
         except Exception:
             pass
         
@@ -325,8 +324,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             elif btn.id in ["btn-continue", "btn-regenerate", "btn-rewind", "btn-restart", "btn-clear-chat"]:
                 # Disable if busy OR if no model is loaded
                 btn.disabled = is_busy or not self.llm
-                # Windows safety: disable regenerate while streaming to avoid crashes
-                if sys.platform == "win32" and btn.id == "btn-regenerate":
+                # Safety: disable regenerate while streaming to avoid crashes
+                if btn.id == "btn-regenerate":
                     btn.disabled = btn.disabled or bool(self.is_loading)
             elif btn.id == "btn-clear-search":
                 # Only enabled if there is text in the search box

@@ -765,10 +765,10 @@ class ActionsMixin:
 
     async def action_regenerate(self) -> None:
         """Regenerate the last AI reply by removing it and re-running inference."""
-        # Windows safety: disable regenerate during streaming (UI also disables button)
-        # to avoid subprocess protocol interleaving / crashes.
-        if sys.platform == "win32" and getattr(self, "is_loading", False):
-            self.notify("Regenerate is disabled while AI is speaking on Windows. Stop first, then Regenerate.", severity="warning")
+        # Safety: disable regenerate during streaming (UI also disables button)
+        # to avoid protocol interleaving / crashes.
+        if getattr(self, "is_loading", False):
+            self.notify("Regenerate is disabled while AI is speaking. Stop first, then Regenerate.", severity="warning")
             return
         
         # Check if stop cleanup is in progress - wait briefly if so
