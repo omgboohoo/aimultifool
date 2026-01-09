@@ -39,7 +39,7 @@ from logic_mixins import InferenceMixin, ActionsMixin, VectorMixin
 from ui_mixin import UIMixin
 
 # Module Functions
-from utils import _get_action_menu_data, load_settings, save_settings, DOWNLOAD_AVAILABLE, get_style_prompt, save_action_menu_data
+from utils import _get_action_menu_data, load_settings, save_settings, DOWNLOAD_AVAILABLE, get_style_prompt, save_action_menu_data, encrypt_data
 from character_manager import extract_chara_metadata, process_character_metadata, create_initial_messages, write_chara_metadata
 from ai_engine import get_models
 from widgets import MessageWidget, AddActionScreen, EditCharacterScreen, CharactersScreen, ParametersScreen, MiscScreen, ThemeScreen, ActionsManagerScreen, ModelScreen, ChatManagerScreen, VectorChatScreen
@@ -975,8 +975,6 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                 password = password.strip() if password else None
                     
                 await self.action_stop_generation()
-                self.vector_chat_name = name
-                self.enable_vector_chat = True
                 self.vector_password = password
                 
                 if action == "create" and password:
@@ -984,6 +982,14 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                     vectors_dir = self.root_path / "vectors" / name
                     vectors_dir.mkdir(parents=True, exist_ok=True)
                     (vectors_dir / ".encrypted").touch()
+                    
+                    # Create password verification file
+                    try:
+                        verify_data = encrypt_data("verification_string", password)
+                        with open(vectors_dir / "verify.bin", "w") as f:
+                            f.write(verify_data)
+                    except Exception:
+                        pass
                 
                 # Initialize DB with error handling
                 try:
@@ -994,6 +1000,10 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                     self.vector_chat_name = None
                     self.vector_password = None
                     return
+                
+                # SUCCESS: Set active state only after successful initialization
+                self.vector_chat_name = name
+                self.enable_vector_chat = True
                 
                 self.query_one("#chat-scroll").query("*").remove()
                 self.messages = [{"role": "system", "content": "Vector Chat enabled."}]

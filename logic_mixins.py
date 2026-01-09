@@ -17,7 +17,7 @@ from ai_engine import (
     get_models
 )
 from character_manager import create_initial_messages
-from utils import DOWNLOAD_AVAILABLE, save_settings, load_settings, get_style_prompt
+from utils import DOWNLOAD_AVAILABLE, save_settings, load_settings, get_style_prompt, encrypt_data, decrypt_data
 from widgets import MessageWidget
 from llm_subprocess_client import SubprocessLlama, SubprocessEmbedder
 
@@ -884,6 +884,64 @@ class VectorMixin:
             if "already exists" not in str(e).lower():
                 raise
 
+    def validate_vector_password(self, name: str, password: str):
+        """Pre-validation check for vector chat passwords without setting state."""
+        if not qdrant_client:
+            return # No-op if client not available
+            
+        vectors_dir = Path(__file__).parent / "vectors" / name
+        if not (vectors_dir / ".encrypted").exists():
+            return True # Not encrypted
+            
+        if not password:
+            raise ValueError("Password required for encrypted vector chat.")
+            
+        # 1. Try verify.bin first
+        verify_file = vectors_dir / "verify.bin"
+        if verify_file.exists():
+            try:
+                with open(verify_file, "r") as f:
+                    enc_v = f.read()
+                decrypt_data(enc_v, password)
+                return True
+            except Exception:
+                raise ValueError("Incorrect password for encrypted vector chat.")
+        
+        # 2. If no verify.bin, try scrolling points to find an encrypted one
+        # Use a temporary client for validation to avoid locking the main process if possible
+        temp_client = None
+        try:
+            temp_client = qdrant_client.QdrantClient(path=str(vectors_dir))
+            collections = temp_client.get_collections().collections
+            verified = False
+            found_encrypted = False
+            for coll in collections:
+                res = temp_client.scroll(collection_name=coll.name, limit=10, with_payload=True)
+                if res and res[0]:
+                    for point in res[0]:
+                        if point.payload.get("encrypted"):
+                            found_encrypted = True
+                            try:
+                                decrypt_data(point.payload["text"], password)
+                                verified = True
+                                break
+                            except Exception:
+                                pass # Try next point
+                if verified: break
+            
+            if found_encrypted and not verified:
+                raise ValueError("Incorrect password for encrypted vector chat.")
+            
+            return True
+        except Exception as e:
+            if "Incorrect password" in str(e) or isinstance(e, ValueError):
+                raise e
+            return True # If we can't open it to check, allow fallthrough to main init
+        finally:
+            if temp_client:
+                try: temp_client.close()
+                except Exception: pass
+
     def initialize_vector_db(self, name: str):
         try:
             if not qdrant_client:
@@ -905,9 +963,30 @@ class VectorMixin:
             try:
                 self.qdrant_instance.get_collection(self.vector_collection_name)
                 # Collection exists, we're good to go
-                return
             except Exception:
                 # Collection doesn't exist, need to create it
+                pass
+
+            # Password validation for encrypted chats
+            if (vectors_dir / ".encrypted").exists():
+                self.validate_vector_password(name, self.vector_password)
+                
+                # Create verify.bin if it doesn't exist yet (and we haven't failed yet)
+                verify_file = vectors_dir / "verify.bin"
+                if not verify_file.exists():
+                    try:
+                        enc_v = encrypt_data("verification_string", self.vector_password)
+                        with open(verify_file, "w") as f:
+                            f.write(enc_v)
+                    except Exception:
+                        pass
+            
+            # If we reached here, either it's not encrypted or password is correct
+            # If collection exists, we can return now
+            try:
+                self.qdrant_instance.get_collection(self.vector_collection_name)
+                return
+            except Exception:
                 pass
             
             # Default dimension for nomic models (will be verified on first embedding)
@@ -923,7 +1002,7 @@ class VectorMixin:
                 if "already exists" not in err_msg:
                     self.notify(f"Database initialization error: {e}", severity="error")
         except Exception as e:
-            self.notify(f"Failed to initialize vector database: {e}", severity="error")
+            raise e
             
     def close_vector_db(self):
         """Safely close and clear the current vector database instance."""
@@ -1031,7 +1110,6 @@ class VectorMixin:
                         # Should have been caught earlier, but safety first
                         continue
                     try:
-                        from utils import decrypt_data
                         text = decrypt_data(text, self.vector_password)
                     except Exception:
                         continue
@@ -1065,7 +1143,6 @@ class VectorMixin:
         is_encrypted = False
         if self.vector_password:
             try:
-                from utils import encrypt_data
                 payload_text = encrypt_data(combined_text, self.vector_password)
                 is_encrypted = True
             except Exception as e:

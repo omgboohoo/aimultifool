@@ -2120,6 +2120,17 @@ class VectorChatScreen(ModalScreen):
                         self.app.notify("This vector chat is encrypted! Please enter the password below.", severity="warning")
                         self.query_one("#input-vector-password").focus()
                         return
+                    
+                    # Validate password before dismissing modal
+                    if selected.is_encrypted:
+                        try:
+                            self.app.validate_vector_password(selected.chat_name, password)
+                        except Exception as e:
+                            self.app.notify(str(e), severity="error")
+                            self.query_one("#input-vector-password").value = ""
+                            self.query_one("#input-vector-password").focus()
+                            return
+
                     self.dismiss({"action": "load", "name": selected.chat_name, "password": password})
                 else:
                     self.app.notify("No vector chat selected.", severity="warning")
