@@ -47,7 +47,7 @@ from widgets import MessageWidget, AddActionScreen, EditCharacterScreen, Charact
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.1.22"
+    TITLE = "aiMultiFool v0.1.23"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -192,7 +192,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.1.22", id="status-version")
+            yield Static("aiMultiFool v0.1.23", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -269,6 +269,10 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             self.query_one("#btn-regenerate").display = True
         except Exception:
             pass
+        
+        # Update action menu state when loading state changes
+        # This disables action menu while AI is generating
+        self.update_ui_state()
 
     def watch_is_downloading(self, is_downloading: bool) -> None:
         """Called when is_downloading changes."""
@@ -301,6 +305,9 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     def update_ui_state(self):
         """Disable or enable UI elements based on app state."""
         is_busy = self.is_model_loading or self.is_downloading
+        # Also disable action menu while AI is actively generating
+        is_ai_generating = self.is_loading
+        
         # Query both the main app and the active screen to ensure modals are covered
         all_buttons = list(self.query(Button))
         if self.screen:
@@ -360,11 +367,12 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             pass
 
         # Action lists and collapsibles on both
+        # Disable action menu while AI is actively generating to prevent conflicts
         for root in [self, self.screen]:
             for lv in root.query(".action-list"):
-                lv.disabled = is_busy or not self.llm
+                lv.disabled = is_busy or not self.llm or is_ai_generating
             for collapsible in root.query(Collapsible):
-                collapsible.disabled = is_busy
+                collapsible.disabled = is_busy or is_ai_generating
 
     def update_model_list(self):
         """Update model list on the active ModelScreen if it's open."""
@@ -575,6 +583,11 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                 # Selection here doesn't trigger AI, only highlights and loads metadata (handled in on_list_view_highlighted).
                 pass
             elif event.list_view.has_class("action-list"):
+                # Prevent action menu usage while AI is actively generating
+                if self.is_loading:
+                    self.notify("Please wait for AI to finish speaking before using actions.", severity="warning")
+                    return
+                
                 data_packed = getattr(event.item, "name", "")
                 if ":::" in data_packed:
                     parts = data_packed.split(":::", 2)
@@ -590,54 +603,78 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             self.notify(f"Selection error: {e}", severity="error")
 
     async def load_character_from_path(self, card_path, chara_json_obj=None):
-        if self.is_loading:
-            await self.action_stop_generation()
-
-        try:
-            if chara_json_obj:
-                chara_json = json.dumps(chara_json_obj)
-            else:
-                chara_json = extract_chara_metadata(card_path)
+        # Serialize with actions lock to prevent race conditions
+        async with self._get_actions_lock():
+            if self.is_loading:
+                await self._stop_generation_unlocked()
             
-            if not chara_json:
-                self.notify("No metadata found in PNG!", severity="error")
-                return
-            chara_obj, talk_prompt, depth_prompt = process_character_metadata(chara_json, self.user_name)
-            if not chara_obj:
-                self.notify("Failed to process metadata!", severity="error")
-                return
-            self.current_character = chara_obj
-            self.messages = create_initial_messages(chara_obj, self.user_name)
-            await self.update_system_prompt_style(self.style)
-            self.query_one("#chat-scroll").query("*").remove()
-            self.notify(f"Loaded character: {Path(card_path).name}")
-            if self.llm and self.force_ai_speak_first:
-                if len(self.messages) > 1 and self.messages[-1]["role"] == "user":
-                    self.messages[-1]["content"] = "continue"
+            # Wait for cleanup to finish if it's in progress
+            await self._wait_for_cleanup_if_needed()
+
+            try:
+                if chara_json_obj:
+                    chara_json = json.dumps(chara_json_obj)
                 else:
-                    self.messages.append({"role": "user", "content": "continue"})
-                self.is_loading = True
-                self._inference_worker = self.run_inference("continue")
-        except Exception as e:
-            self.notify(f"Error loading character: {e}", severity="error")
+                    chara_json = extract_chara_metadata(card_path)
+                
+                if not chara_json:
+                    self.notify("No metadata found in PNG!", severity="error")
+                    return
+                chara_obj, talk_prompt, depth_prompt = process_character_metadata(chara_json, self.user_name)
+                if not chara_obj:
+                    self.notify("Failed to process metadata!", severity="error")
+                    return
+                self.current_character = chara_obj
+                self.messages = create_initial_messages(chara_obj, self.user_name)
+                await self.update_system_prompt_style(self.style)
+                self.query_one("#chat-scroll").query("*").remove()
+                self.notify(f"Loaded character: {Path(card_path).name}")
+                if self.llm and self.force_ai_speak_first:
+                    # Final safety check before starting inference
+                    if not await self._can_start_inference():
+                        await self._wait_for_cleanup_if_needed(max_wait_seconds=1.0)
+                        if not await self._can_start_inference():
+                            self.notify("Please wait for current operation to finish.", severity="warning")
+                            return
+                    
+                    if len(self.messages) > 1 and self.messages[-1]["role"] == "user":
+                        self.messages[-1]["content"] = "continue"
+                    else:
+                        self.messages.append({"role": "user", "content": "continue"})
+                    self.is_loading = True
+                    self._inference_worker = self.run_inference("continue")
+            except Exception as e:
+                self.notify(f"Error loading character: {e}", severity="error")
 
     async def handle_menu_action(self, section_name: str, item_name: str, prompt: str):
-        if self.is_loading:
-            await self.action_stop_generation()
+        # Serialize with actions lock to prevent race conditions
+        async with self._get_actions_lock():
+            if self.is_loading:
+                await self._stop_generation_unlocked()
+            
+            # Wait for cleanup to finish if it's in progress
+            await self._wait_for_cleanup_if_needed()
+            
+            # Replace {{user}} with the user's name
+            prompt = re.sub(r'\{\{user\}\}', self.user_name, prompt, flags=re.IGNORECASE)
 
-        # Replace {{user}} with the user's name
-        prompt = re.sub(r'\{\{user\}\}', self.user_name, prompt, flags=re.IGNORECASE)
-
-        if section_name == "System Prompts":
-            await self.set_system_prompt(prompt, item_name)
-        else:
-            if not self.current_character and self.first_user_message is None:
-                self.first_user_message = prompt
+            if section_name == "System Prompts":
+                await self.set_system_prompt(prompt, item_name)
+            else:
+                # Final safety check before starting inference
+                if not await self._can_start_inference():
+                    await self._wait_for_cleanup_if_needed(max_wait_seconds=1.0)
+                    if not await self._can_start_inference():
+                        self.notify("Please wait for current operation to finish.", severity="warning")
+                        return
                 
-            self.notify(f"Action: {item_name}")
-            await self.add_message("user", prompt)
-            self.is_loading = True
-            self._inference_worker = self.run_inference(prompt)
+                if not self.current_character and self.first_user_message is None:
+                    self.first_user_message = prompt
+                    
+                self.notify(f"Action: {item_name}")
+                await self.add_message("user", prompt)
+                self.is_loading = True
+                self._inference_worker = self.run_inference(prompt)
 
     async def set_system_prompt(self, prompt: str, name: str):
         if self.messages and self.messages[0]["role"] == "system":
@@ -711,16 +748,55 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "chat-input":
-            if self.is_loading:
-                await self.action_stop_generation()
+            # Serialize with actions lock to prevent race conditions
+            async with self._get_actions_lock():
+                # If currently loading OR if status is "Stopping..." (from typing while AI speaks), stop first
+                if self.is_loading or getattr(self, "status_text", "") == "Stopping...":
+                    await self._stop_generation_unlocked()
+                
+                # Wait for cleanup to finish if it's in progress
+                await self._wait_for_cleanup_if_needed()
+                
+                # Ensure status is not stuck on "Stopping..."
+                if getattr(self, "status_text", "") == "Stopping...":
+                    # Wait a bit more for cleanup to complete
+                    await self._wait_for_cleanup_if_needed(max_wait_seconds=1.0)
+                    # Force status update if still stuck
+                    if getattr(self, "status_text", "") == "Stopping...":
+                        self.status_text = "Ready"
+                
+                # Final safety check before starting
+                if not await self._can_start_inference():
+                    # Still not ready, wait a bit more
+                    await self._wait_for_cleanup_if_needed(max_wait_seconds=1.0)
+                    if not await self._can_start_inference():
+                        self.notify("Please wait for current operation to finish.", severity="warning")
+                        self.status_text = "Ready"
+                        return
 
-            user_text = event.value.strip() or "continue"
-            event.input.value = ""
-            if not self.current_character and self.first_user_message is None:
-                self.first_user_message = user_text
-            await self.add_message("user", user_text)
-            self.is_loading = True
-            self._inference_worker = self.run_inference(user_text)
+                # Set flag to prevent rapid typing from starting multiple inferences
+                if getattr(self, "_inference_starting", False):
+                    # Another submission is already starting inference, ignore this one
+                    return
+                
+                setattr(self, "_inference_starting", True)
+                try:
+                    user_text = event.value.strip() or "continue"
+                    event.input.value = ""
+                    if not self.current_character and self.first_user_message is None:
+                        self.first_user_message = user_text
+                    await self.add_message("user", user_text)
+                    
+                    # Set loading state and start inference
+                    # Note: run_inference() will set status to "Thinking..." after acquiring lock
+                    # If lock acquisition fails, it will reset is_loading and status
+                    self.is_loading = True
+                    self._inference_worker = self.run_inference(user_text)
+                finally:
+                    # Clear flag after a brief delay to allow inference to actually start
+                    # This prevents rapid submissions from interfering
+                    await asyncio.sleep(0.1)
+                    setattr(self, "_inference_starting", False)
 
     def start_model_load(self, model_path, ctx, gpu):
         """Helper to safely start model loading from modals."""

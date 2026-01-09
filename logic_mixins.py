@@ -39,18 +39,25 @@ class InferenceMixin:
     
     @work(exclusive=True, thread=True)
     def run_inference(self, user_text: str):
+        # Clear the starting flag once inference actually begins (or fails)
+        self.call_from_thread(setattr, self, "_inference_starting", False)
+        
         # Try to acquire the lock with a timeout to prevent deadlocks
         if not _inference_lock.acquire(timeout=5.0):
             self.call_from_thread(self.notify, "Another inference is still running. Please wait.", severity="warning")
             self.call_from_thread(setattr, self, "is_loading", False)
+            self.call_from_thread(setattr, self, "status_text", "Ready")
             return
         
         try:
             if not self.llm:
                 self.call_from_thread(self.notify, "Model not loaded! Load a model from the sidebar first.", severity="error")
                 self.call_from_thread(setattr, self, "is_loading", False)
+                self.call_from_thread(setattr, self, "status_text", "Ready")
+                self.call_from_thread(setattr, self, "_inference_starting", False)
                 return
 
+            # Only set status after lock is acquired and model is confirmed loaded
             self.call_from_thread(setattr, self, "status_text", "Thinking...")
             
             # Get a snapshot of current messages to avoid race conditions
@@ -456,36 +463,138 @@ class ActionsMixin:
             lock = asyncio.Lock()
             setattr(self, "_actions_lock", lock)
         return lock
+    
+    async def _check_lock_available(self) -> bool:
+        """Check if the inference lock is actually available (not held by another thread)."""
+        # Run lock check in thread executor to avoid blocking async event loop
+        loop = asyncio.get_event_loop()
+        def try_lock():
+            # Try to acquire lock with very short timeout
+            acquired = _inference_lock.acquire(timeout=0.01)
+            if acquired:
+                _inference_lock.release()
+                return True
+            return False
+        
+        try:
+            return await loop.run_in_executor(None, try_lock)
+        except Exception:
+            return False
+    
+    async def _wait_for_cleanup_if_needed(self, max_wait_seconds: float = 2.0) -> None:
+        """Wait for stop cleanup to finish if it's in progress. Used before starting new inference."""
+        max_wait = int(max_wait_seconds * 20)  # 20 iterations per second
+        while max_wait > 0:
+            # Check multiple conditions that indicate we should wait
+            cleanup_in_progress = getattr(self, "_stop_cleanup_in_progress", False)
+            has_worker = hasattr(self, "_inference_worker") and self._inference_worker is not None
+            is_loading_state = getattr(self, "is_loading", False)
+            
+            # If any of these indicate work is happening, wait
+            if cleanup_in_progress or (has_worker and is_loading_state):
+                await asyncio.sleep(0.05)
+                max_wait -= 1
+            else:
+                break
+        
+        # One final check - if still in cleanup, wait a bit more
+        if getattr(self, "_stop_cleanup_in_progress", False):
+            await asyncio.sleep(0.1)
+        
+        # Wait for lock to actually be available (not just worker cleared)
+        # This adapts to context size - larger contexts take longer to release lock
+        max_lock_waits = 100  # Up to 5 seconds (100 * 0.05)
+        lock_waits = 0
+        while lock_waits < max_lock_waits:
+            if await self._check_lock_available():
+                break
+            await asyncio.sleep(0.05)
+            lock_waits += 1
+    
+    async def _can_start_inference(self) -> bool:
+        """Check if it's safe to start new inference. Returns True if safe, False otherwise."""
+        # Don't start if cleanup is in progress
+        if getattr(self, "_stop_cleanup_in_progress", False):
+            return False
+        # Don't start if there's still a worker active
+        if hasattr(self, "_inference_worker") and self._inference_worker is not None:
+            return False
+        # Don't start if is_loading is still True (shouldn't happen, but check anyway)
+        if getattr(self, "is_loading", False):
+            return False
+        # Don't start if another inference start is already in progress (prevents rapid typing issues)
+        if getattr(self, "_inference_starting", False):
+            return False
+        return True
 
     async def _stop_generation_unlocked(self) -> None:
         """Inner stop logic. Caller must hold `_actions_lock`."""
         if self.is_loading or (hasattr(self, "_inference_worker") and self._inference_worker):
+            # Set cleanup flag FIRST (before is_loading) to prevent race conditions
+            setattr(self, "_stop_cleanup_in_progress", True)
+            # Then set flag immediately for responsive UI
             self.is_loading = False
-            # Immediate feedback; full stop requires worker/drain to finish (Windows subprocess streaming).
+            
+            # Immediate feedback
             try:
                 self.status_text = "Stopping..."
             except Exception:
                 pass
+            
+            # Store worker reference before releasing lock
+            worker_ref = getattr(self, "_inference_worker", None)
+            
+            # Release lock immediately so buttons become responsive
+            # The cleanup will happen in background
+            
+            # Start background cleanup task
+            asyncio.create_task(self._cleanup_stopped_worker(worker_ref))
+        else:
+            # Ensure cleanup flag is cleared if nothing was running
+            setattr(self, "_stop_cleanup_in_progress", False)
+            self.status_text = "Ready"
+    
+    async def _cleanup_stopped_worker(self, worker_ref) -> None:
+        """Background task to clean up stopped worker without blocking UI."""
+        try:
             # Wait gracefully for the worker thread to catch the is_loading=False flag and exit its finally block
             max_waits = 40  # Increased from 20 to give more time for lock release
-            while (hasattr(self, "_inference_worker") and self._inference_worker) and max_waits > 0:
+            while worker_ref and max_waits > 0:
                 await asyncio.sleep(0.05)
                 max_waits -= 1
+                # Check if worker is still active - if it's been replaced or cleared, we're done
+                current_worker = getattr(self, "_inference_worker", None)
+                if current_worker != worker_ref:
+                    # Worker has been replaced or cleared, cleanup is done
+                    break
 
             # If still stuck after graceful wait, then and only then attempt a cancel
-            if hasattr(self, "_inference_worker") and self._inference_worker:
+            current_worker = getattr(self, "_inference_worker", None)
+            if current_worker == worker_ref:
                 try:
-                    self._inference_worker.cancel()
+                    current_worker.cancel()
                     await asyncio.sleep(0.1)
                 except Exception:
                     pass
-                self._inference_worker = None
+                # Only clear if it's still the same worker
+                if getattr(self, "_inference_worker", None) == worker_ref:
+                    self._inference_worker = None
 
-            # Extra delay to ensure the lock is fully released
-            await asyncio.sleep(0.15)
+            # Small delay to ensure worker thread has started cleanup
+            # The actual lock release is checked in _wait_for_cleanup_if_needed()
+            await asyncio.sleep(0.05)
 
-            self.status_text = "Stopped"
-            self.notify("Generation stopped.")
+            # Update status and clear cleanup flag (CRITICAL: must always clear this)
+            try:
+                self.status_text = "Stopped"
+                # Don't show notification on Windows - buttons are already responsive
+                if sys.platform != "win32":
+                    self.notify("Generation stopped.")
+            except Exception:
+                pass
+        finally:
+            # ALWAYS clear cleanup flag, even if errors occurred
+            setattr(self, "_stop_cleanup_in_progress", False)
     
     def action_toggle_sidebar(self) -> None:
         """Toggle both sidebars simultaneously."""
@@ -497,8 +606,10 @@ class ActionsMixin:
 
     async def action_stop_generation(self) -> None:
         """Gracefully stop the AI by setting the flag and waiting for the worker to exit."""
+        # Use lock only to prevent concurrent stop calls, but release immediately
         async with self._get_actions_lock():
             await self._stop_generation_unlocked()
+        # Lock is released here, making buttons immediately responsive
 
     def action_clear_history(self) -> None:
         if self.current_character:
@@ -512,113 +623,146 @@ class ActionsMixin:
         self.notify("History cleared.")
 
     async def action_reset_chat(self) -> None:
-        # 1. Stop the AI gracefully (same method as Clear/Wipe All)
-        await self.action_stop_generation()
-        
-        # 2. Safety gap for CUDA to settle
-        await asyncio.sleep(0.2)
-        
-        # 3. Clear UI state
-        try:
-            self.query_one("#chat-input").value = ""
-        except Exception:
-            pass
+        # Serialize with actions lock to prevent race conditions from rapid clicking
+        async with self._get_actions_lock():
+            # 1. Stop the AI gracefully (same method as Clear/Wipe All)
+            await self._stop_generation_unlocked()
+            
+            # 2. Wait for cleanup to finish
+            await self._wait_for_cleanup_if_needed()
+            
+            # 3. Safety gap for CUDA to settle
+            await asyncio.sleep(0.2)
+            
+            # 4. Clear UI state
+            try:
+                self.query_one("#chat-input").value = ""
+            except Exception:
+                pass
 
-        # 4. Reset messages
-        if self.current_character:
-            self.messages = create_initial_messages(self.current_character, self.user_name)
-        else:
-            self.messages = [{"role": "system", "content": ""}]
-        
-        # 5. Clear chat window
-        self.query_one("#chat-scroll").query("*").remove()
-        
-        # 6. Apply style and print instructions
-        if hasattr(self, "update_system_prompt_style"):
-            # Suppress info message if restarting with a character card to keep it clean
-            await self.update_system_prompt_style(self.style, suppress_info=bool(self.current_character))
-        # 6. Restart the inference
-        if self.current_character and getattr(self, "force_ai_speak_first", True):
-            # For character cards, we send 'continue' to trigger the character's first response
-            if self.messages and self.messages[-1]["role"] == "user":
-                self.messages[-1]["content"] = "continue"
+            # 5. Reset messages
+            if self.current_character:
+                self.messages = create_initial_messages(self.current_character, self.user_name)
             else:
-                self.messages.append({"role": "user", "content": "continue"})
-            self.is_loading = True
-            self._inference_worker = self.run_inference("continue")
-        elif self.first_user_message:
-            user_text = self.first_user_message
-            if user_text:
+                self.messages = [{"role": "system", "content": ""}]
+            
+            # 6. Clear chat window
+            self.query_one("#chat-scroll").query("*").remove()
+            
+            # 7. Apply style and print instructions
+            if hasattr(self, "update_system_prompt_style"):
+                # Suppress info message if restarting with a character card to keep it clean
+                await self.update_system_prompt_style(self.style, suppress_info=bool(self.current_character))
+            
+            # 8. Restart the inference
+            # Final safety check before starting
+            if not await self._can_start_inference():
+                await self._wait_for_cleanup_if_needed(max_wait_seconds=1.0)
+                if not await self._can_start_inference():
+                    self.notify("Please wait for current operation to finish.", severity="warning")
+                    self.status_text = "Reset complete (inference delayed)"
+                    self.focus_chat_input()
+                    return
+            
+            if self.current_character and getattr(self, "force_ai_speak_first", True):
+                # For character cards, we send 'continue' to trigger the character's first response
+                if self.messages and self.messages[-1]["role"] == "user":
+                    self.messages[-1]["content"] = "continue"
+                else:
+                    self.messages.append({"role": "user", "content": "continue"})
+                self.is_loading = True
+                self._inference_worker = self.run_inference("continue")
+            elif self.first_user_message:
+                user_text = self.first_user_message
+                if user_text:
+                    await self.add_message("user", user_text)
+                    self.is_loading = True
+                    self._inference_worker = self.run_inference(user_text)
+                    
+            self.status_text = "Reset complete"
+            self.focus_chat_input()
+
+    async def action_rewind(self) -> None:
+        # Serialize with actions lock to prevent race conditions from rapid clicking
+        async with self._get_actions_lock():
+            if self.is_loading:
+                await self._stop_generation_unlocked()
+                await self._wait_for_cleanup_if_needed()
+
+            if len(self.messages) <= 1:
+                self.notify("Nothing to rewind.", severity="warning")
+                return
+
+            # 1. Pop the last interaction from the context window
+            last_user_content = ""
+            
+            # Remove assistant message if it's the last one
+            if self.messages[-1]["role"] == "assistant":
+                self.messages.pop()
+            
+            # Remove user message if it's the last one
+            if len(self.messages) > 1 and self.messages[-1]["role"] == "user":
+                user_msg = self.messages.pop()
+                last_user_content = user_msg.get("content", "")
+                if self.first_user_message == last_user_content:
+                    self.first_user_message = None
+                
+            # 2. Put the user's message back into the input box for editing
+            try:
+                if last_user_content and last_user_content != "continue":
+                    self.query_one("#chat-input").value = last_user_content
+            except Exception:
+                pass
+
+            # 3. Synchronize the UI perfectly with the new state
+            if hasattr(self, "full_sync_chat_ui"):
+                await self.full_sync_chat_ui()
+            else:
+                # Fallback for manual removal (less robust but safe)
+                chat_scroll = self.query_one("#chat-scroll")
+                # Remove trailing info widgets and the last context widgets
+                widgets = [w for w in chat_scroll.children if isinstance(w, MessageWidget)]
+                while widgets and (widgets[-1].is_info or len(list(w for w in widgets if not w.is_info)) > len(self.messages)-1):
+                    widgets.pop().remove()
+
+            self.notify("Rewound last interaction.")
+            self.focus_chat_input()
+
+    async def action_wipe_all(self) -> None:
+        # Serialize with actions lock to prevent race conditions from rapid clicking
+        async with self._get_actions_lock():
+            await self._stop_generation_unlocked()
+            await self._wait_for_cleanup_if_needed()
+            
+            self.current_character = None
+            self.first_user_message = None
+            self.messages = [{"role": "system", "content": ""}]
+            
+            self.query_one("#chat-scroll").query("*").remove()
+            
+            if hasattr(self, "update_system_prompt_style"):
+                await self.update_system_prompt_style(self.style)
+                
+            self.notify("Chat wiped clean.")
+
+    async def action_continue_chat(self) -> None:
+        # Serialize with actions lock to prevent race conditions
+        async with self._get_actions_lock():
+            if not self.is_loading and self.llm:
+                # Wait for cleanup to finish if it's in progress
+                await self._wait_for_cleanup_if_needed()
+                
+                # Final safety check before starting
+                if not await self._can_start_inference():
+                    await self._wait_for_cleanup_if_needed(max_wait_seconds=1.0)
+                    if not await self._can_start_inference():
+                        self.notify("Please wait for current operation to finish.", severity="warning")
+                        return
+                
+                user_text = "continue"
                 await self.add_message("user", user_text)
                 self.is_loading = True
                 self._inference_worker = self.run_inference(user_text)
-                
-        self.status_text = "Reset complete"
-        self.focus_chat_input()
-
-    async def action_rewind(self) -> None:
-        if self.is_loading:
-            await self.action_stop_generation()
-
-        if len(self.messages) <= 1:
-            self.notify("Nothing to rewind.", severity="warning")
-            return
-
-        # 1. Pop the last interaction from the context window
-        last_user_content = ""
-        
-        # Remove assistant message if it's the last one
-        if self.messages[-1]["role"] == "assistant":
-            self.messages.pop()
-        
-        # Remove user message if it's the last one
-        if len(self.messages) > 1 and self.messages[-1]["role"] == "user":
-            user_msg = self.messages.pop()
-            last_user_content = user_msg.get("content", "")
-            if self.first_user_message == last_user_content:
-                self.first_user_message = None
-            
-        # 2. Put the user's message back into the input box for editing
-        try:
-            if last_user_content and last_user_content != "continue":
-                self.query_one("#chat-input").value = last_user_content
-        except Exception:
-            pass
-
-        # 3. Synchronize the UI perfectly with the new state
-        if hasattr(self, "full_sync_chat_ui"):
-            await self.full_sync_chat_ui()
-        else:
-            # Fallback for manual removal (less robust but safe)
-            chat_scroll = self.query_one("#chat-scroll")
-            # Remove trailing info widgets and the last context widgets
-            widgets = [w for w in chat_scroll.children if isinstance(w, MessageWidget)]
-            while widgets and (widgets[-1].is_info or len(list(w for w in widgets if not w.is_info)) > len(self.messages)-1):
-                widgets.pop().remove()
-
-        self.notify("Rewound last interaction.")
-        self.focus_chat_input()
-
-    async def action_wipe_all(self) -> None:
-        await self.action_stop_generation()
-        
-        self.current_character = None
-        self.first_user_message = None
-        self.messages = [{"role": "system", "content": ""}]
-        
-        self.query_one("#chat-scroll").query("*").remove()
-        
-        if hasattr(self, "update_system_prompt_style"):
-            await self.update_system_prompt_style(self.style)
-            
-        self.notify("Chat wiped clean.")
-
-    async def action_continue_chat(self) -> None:
-        if not self.is_loading and self.llm:
-            user_text = "continue"
-            await self.add_message("user", user_text)
-            self.is_loading = True
-            self._inference_worker = self.run_inference(user_text)
 
     async def action_regenerate(self) -> None:
         """Regenerate the last AI reply by removing it and re-running inference."""
@@ -627,6 +771,10 @@ class ActionsMixin:
         if sys.platform == "win32" and getattr(self, "is_loading", False):
             self.notify("Regenerate is disabled while AI is speaking on Windows. Stop first, then Regenerate.", severity="warning")
             return
+        
+        # Check if stop cleanup is in progress - wait briefly if so
+        await self._wait_for_cleanup_if_needed(max_wait_seconds=1.0)
+        
         # Serialize regenerate requests so repeated button presses can't interleave
         # with stop / UI rebuild / worker startup.
         async with self._get_actions_lock():
@@ -648,10 +796,11 @@ class ActionsMixin:
                     self.notify("Nothing to regenerate.", severity="warning")
                     return
 
-                # If currently generating, stop first and give it time to fully unwind.
+                # If currently generating, stop first (but don't wait long - cleanup is async)
                 if was_loading:
                     await self._stop_generation_unlocked()
-                    await asyncio.sleep(0.25)
+                    # Brief wait for worker to start shutting down, but don't block UI
+                    await asyncio.sleep(0.1)
 
                 # If the last message is an assistant (possibly partial from a cancelled stream), remove it.
                 if self.messages and self.messages[-1].get("role") == "assistant":
@@ -672,6 +821,13 @@ class ActionsMixin:
                 if hasattr(self, "full_sync_chat_ui"):
                     await self.full_sync_chat_ui()
 
+                # Final safety check before starting inference
+                if not await self._can_start_inference():
+                    await self._wait_for_cleanup_if_needed(max_wait_seconds=1.0)
+                    if not await self._can_start_inference():
+                        self.notify("Please wait for current operation to finish.", severity="warning")
+                        return
+                
                 # Re-run inference with the same user message
                 self.is_loading = True
                 self._inference_worker = self.run_inference(user_text)

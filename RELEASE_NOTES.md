@@ -1,5 +1,8 @@
 # Release Notes
 
+## v0.1.23: Parity & Stability
+- **Mirror Operation**: Changes to make Windows use mirror Linux operation for consistent cross-platform experience.
+
 ## v0.1.22: Initial Windows Release (Strictly Alpha)
 ### 🪟 Windows Support
 - **Cross-Platform Compatibility**: Full Windows 10/11 support with native subprocess-based architecture to prevent UI freezes.
