@@ -816,6 +816,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         
         # Store if we need to clean up existing model (do this in thread, not main thread)
         needs_cleanup = bool(self.llm)
+        old_llm = None
         if needs_cleanup:
             self.disable_character_list()
             old_llm = self.llm

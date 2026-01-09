@@ -242,6 +242,7 @@ class InferenceMixin:
         
         # Define the blocking function to run in a manual thread
         def _load_llama_thread():
+            nonlocal old_llm
             llm = None
             actual_layers = 0
             
@@ -293,7 +294,7 @@ class InferenceMixin:
                     if needs_cleanup and old_llm is not None:
                         try:
                             llama_cpp.llama_backend_free()
-                            del old_llm
+                            old_llm = None
                             gc.collect()
                             llama_cpp.llama_backend_init()
                         except Exception:
@@ -323,12 +324,11 @@ class InferenceMixin:
         # Start the thread (daemon=True so it doesn't block app shutdown)
         # Windows: Use manual threading, NOT Textual's @work decorator
         thread = threading.Thread(target=_load_llama_thread, daemon=True, name="ModelLoadThread")
-        thread.start()
-        
-        # Verify thread started (for debugging)
-        if not thread.is_alive():
+        try:
+            thread.start()
+        except Exception as e:
             self.is_model_loading = False
-            self.status_text = "Failed to start load thread"
+            self.status_text = f"Thread start failed: {e}"
             return
         
         # Set up a periodic check for the result

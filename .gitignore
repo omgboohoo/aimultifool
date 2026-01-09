@@ -127,5 +127,5 @@ cards/*
 !cards/Zombie Outbreak.png
 
 # Debug Scripts
-debug_vectors.py
+inspect_vectors.py
 vectors/
