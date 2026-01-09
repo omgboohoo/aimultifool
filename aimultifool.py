@@ -32,7 +32,6 @@ from textual.containers import Vertical, Horizontal, ScrollableContainer, Contai
 from textual.widgets import Header, Input, Static, Label, Button, Select, ListView, ListItem, Collapsible
 from textual.reactive import reactive
 from textual.binding import Binding
-import llama_cpp
 
 # Modular Logic Mixins
 from logic_mixins import InferenceMixin, ActionsMixin, VectorMixin
@@ -42,7 +41,7 @@ from ui_mixin import UIMixin
 from utils import _get_action_menu_data, load_settings, save_settings, DOWNLOAD_AVAILABLE, get_style_prompt, save_action_menu_data, encrypt_data
 from character_manager import extract_chara_metadata, process_character_metadata, create_initial_messages, write_chara_metadata
 from ai_engine import get_models
-from widgets import MessageWidget, AddActionScreen, EditCharacterScreen, CharactersScreen, ParametersScreen, MiscScreen, ThemeScreen, ActionsManagerScreen, ModelScreen, ChatManagerScreen, VectorChatScreen
+from widgets import MessageWidget, CharactersScreen, ParametersScreen, MiscScreen, ThemeScreen, ActionsManagerScreen, ModelScreen, ChatManagerScreen, VectorChatScreen
 
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     """The main aiMultiFool application."""
@@ -84,7 +83,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     is_char_edit_mode = reactive(False)
     vector_chat_name = reactive(None)
     enable_vector_chat = reactive(False)
-    force_ai_speak_first = reactive(True)
+    force_ai_speak_first = True
     _inference_worker = None
     _last_action_list = None
 
@@ -192,7 +191,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.1.23", id="status-version")
+            yield Static("aiMultiFool v0.1.24", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -209,7 +208,6 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         self.selected_model = settings.get("selected_model", "")
         self.theme = settings.get("theme", "textual-dark")
         self.speech_styling = settings.get("speech_styling", "highlight")
-        self.force_ai_speak_first = settings.get("force_ai_speak_first", True)
         
         # Defer character list update until Cards screen is opened
         
@@ -444,8 +442,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             "minp": self.minp,
             "selected_model": self.selected_model,
             "theme": self.theme,
-            "speech_styling": self.speech_styling,
-            "force_ai_speak_first": self.force_ai_speak_first
+            "speech_styling": self.speech_styling
         }
         save_settings(settings)
 
@@ -831,7 +828,6 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         if event.button.id == "btn-stop": await self.action_stop_generation()
         elif event.button.id == "btn-continue": await self.action_continue_chat()
         elif event.button.id == "btn-regenerate": await self.action_regenerate()
-        # elif event.button.id == "btn-toggle-sidebar": self.action_toggle_sidebar() # Sidebar is gone
         elif event.button.id == "btn-model-settings":
              self.push_screen(ModelScreen(), self.model_screen_callback)
         elif event.button.id == "btn-restart": await self.action_reset_chat()

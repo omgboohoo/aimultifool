@@ -1,5 +1,11 @@
 # Release Notes
 
+## v0.1.24: Unified Architecture & Smooth Streaming
+- **Unified Threading Model**: Linux now uses the same robust subprocess-based architecture as Windows, preventing UI freezes and improving overall stability.
+- **Buttery Smooth Streaming**: Implemented time-based batching for UI updates. The chat now refreshes every 50ms, eliminating the "jerky" stutter caused by high-frequency layout calculations and regex-based styling.
+- **Optimized Status Bar**: Throttled status bar updates to 500ms intervals, reducing overhead while maintaining readability of TPS and context metrics.
+- **Streamlined Codebase**: Removed platform-specific branching for core AI operations, moving to a single maintainable cross-platform standard.
+
 ## v0.1.23: Parity & Stability
 - **Mirror Operation**: Changes to make Windows use mirror Linux operation for consistent cross-platform experience.
 

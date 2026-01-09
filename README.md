@@ -1,4 +1,4 @@
-# aiMultiFool v0.1.23
+# aiMultiFool v0.1.24
 
 **The Premium Cross-Platform Terminal-Based Sandbox for Private AI Roleplay.** 
 Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favorite SillyTavern character cards with zero lag and full privacy.
@@ -81,6 +81,11 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
 > **Windows-Specific Notes**:
 > - The app uses a subprocess-based architecture on Windows to prevent UI freezes during model loading.
 > - Model loading may take longer on Windows due to subprocess initialization, but the UI remains fully responsive.
+
+### ✨ Recent Updates
+- **v0.1.24**: **Unified Cross-Platform Core**. Linux and Windows now share a robust subprocess architecture, eliminating UI freezes and jitter. Added **Time-Based Batching** for buttery-smooth streaming.
+- **v0.1.23**: **Parity & Stability**. Cross-platform refinements for consistent behavior across Linux and Windows.
+- **v0.1.22**: **Official Windows Release**. Subprocess architecture for Windows UI stability.
 
 ---
 

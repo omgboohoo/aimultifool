@@ -82,7 +82,6 @@ class InferenceMixin:
             assistant_content = ""
             
             try:
-                from llama_cpp import Llama  # Local import to avoid top-level issues if any
                 
                 self.call_from_thread(setattr, self, "status_text", f"Thinking (T:{self.temp} P:{self.topp})...")
                 
@@ -117,11 +116,15 @@ class InferenceMixin:
                 )
                 
                 start_time = time.time()
+                last_ui_update = 0  # Force first update
+                last_status_update = 0
                 token_count = 0
                 peak_tps = 0.0
                 
                 was_cancelled = False
                 for output in stream:
+                    # Check for cancellation FIRST, before processing output
+                    # This makes interruption detection immediate
                     if self.is_loading == False: # Cancelled
                         was_cancelled = True
                         # IMPORTANT (subprocess LLM): close the generator so it can drain any remaining
@@ -132,6 +135,19 @@ class InferenceMixin:
                         except Exception:
                             pass
                         break
+                    
+                    # Handle None yields from timeout-based reading (allows interruption checks)
+                    if output is None:
+                        # This is a timeout yield - check cancellation and continue
+                        if self.is_loading == False:
+                            was_cancelled = True
+                            try:
+                                if hasattr(stream, "close"):
+                                    stream.close()
+                            except Exception:
+                                pass
+                            break
+                        continue
                         
                     text_chunk = output["choices"][0].get("delta", {}).get("content", "")
                     if not text_chunk:
@@ -139,34 +155,45 @@ class InferenceMixin:
                     
                     assistant_content += text_chunk
                     
-                    if assistant_widget is None:
-                        try:
-                            assistant_widget = self.call_from_thread(self.sync_add_assistant_widget, assistant_content)
-                        except Exception:
-                            was_cancelled = True
-                            break
-                    else:
-                        try:
-                            self.call_from_thread(self.sync_update_assistant_widget, assistant_widget, assistant_content)
-                        except Exception:
-                            was_cancelled = True
-                            break
-                    
-                    # Stats
-                    # NOTE: If llm is the subprocess-backed implementation, we must NOT
-                    # call tokenize_count during streaming (can't interleave commands).
+                    # Stats calculation (internal only, not UI yet)
                     if isinstance(self.llm, SubprocessLlama):
                         token_count += max(1, len(text_chunk) // 4) if text_chunk else 0
                     else:
                         chunk_tokens = self.llm.tokenize(text_chunk.encode("utf-8"), add_bos=False, special=False)
                         token_count += len(chunk_tokens)
-                    elapsed = time.time() - start_time
-                    tps = token_count / elapsed if elapsed > 0 else 0
-                    peak_tps = max(peak_tps, tps)
                     
-                    total_tokens = prompt_tokens + token_count
-                    ctx_pct = (total_tokens / self.context_size) * 100
-                    self.call_from_thread(setattr, self, "status_text", f"TPS: {tps:.1f} | Peak: {peak_tps:.1f} | Context: {ctx_pct:.1f}% | Tokens: {token_count}")
+                    now = time.time()
+                    
+                    # Batch UI updates: 每 50ms 更新一次界面
+                    if assistant_widget is None:
+                        try:
+                            assistant_widget = self.call_from_thread(self.sync_add_assistant_widget, assistant_content)
+                            last_ui_update = now
+                        except Exception:
+                            was_cancelled = True
+                            break
+                    elif now - last_ui_update > 0.05:
+                        try:
+                            self.call_from_thread(self.sync_update_assistant_widget, assistant_widget, assistant_content)
+                            last_ui_update = now
+                        except Exception:
+                            was_cancelled = True
+                            break
+                    
+                    # Batch Status updates: 每 500ms 更新一次状态栏
+                    if now - last_status_update > 0.5:
+                        elapsed = now - start_time
+                        tps = token_count / elapsed if elapsed > 0 else 0
+                        peak_tps = max(peak_tps, tps)
+                        
+                        total_tokens = prompt_tokens + token_count
+                        ctx_pct = (total_tokens / self.context_size) * 100
+                        self.call_from_thread(setattr, self, "status_text", f"TPS: {tps:.1f} | Peak: {peak_tps:.1f} | Context: {ctx_pct:.1f}% | Tokens: {token_count}")
+                        last_status_update = now
+
+                # FINAL UPDATE: Ensure everything is flushed to UI after the stream finishes
+                if assistant_widget and assistant_content:
+                    self.call_from_thread(self.sync_update_assistant_widget, assistant_widget, assistant_content)
 
                 if assistant_content:
                     try:
@@ -195,7 +222,7 @@ class InferenceMixin:
             _inference_lock.release()
 
     def load_model_task(self, model_path, context_size, requested_gpu_layers, needs_cleanup=False, old_llm=None):
-        # Windows fix: Manual threading completely bypassing Textual's @work decorator
+        # Unified fix: Manual threading completely bypassing Textual's @work decorator
         # Use a queue to communicate back to the main thread
         # ALL blocking operations (including backend cleanup) happen in the thread
         
@@ -247,73 +274,53 @@ class InferenceMixin:
             actual_layers = 0
             
             try:
-                # On Windows, run llama in a subprocess to avoid UI freezes (GIL held in native load)
-                if sys.platform == "win32":
-                    # We ignore old_llm cleanup here; parent already nulled it. Subprocess owns its own state.
-                    client = SubprocessLlama(
-                        python_exe=sys.executable,
-                        worker_path=str(Path(__file__).parent / "llm_subprocess_worker.py"),
-                    )
-                    last_err = None
-                    for layers in layers_to_try:
-                        try:
-                            self.call_from_thread(setattr, self, "status_text", f"Loading (GPU Layers: {layers})...")
-                            # If CUDA init hangs, timeout and restart subprocess, then try next option.
-                            client.load(
-                                model_path=model_path_str,
-                                n_ctx=int(context_size),
-                                n_gpu_layers=int(layers),
-                                verbose=False,
-                                timeout_s=120.0,
-                            )
-                            llm = client
-                            actual_layers = int(layers)
-                            
-                            # Cache the successful result
-                            cache = load_model_cache()
-                            cache[cache_key] = {"gpu_layers": layers, "model_path": model_path_str, "context_size": int(context_size)}
-                            save_model_cache(cache)
-                            break
-                        except Exception as e:
-                            last_err = e
-                            try:
-                                client.restart()
-                            except Exception:
-                                pass
-                            continue
+                # Always run llama in a subprocess to avoid UI freezes (GIL held in native load)
+                # and to provide a unified experience across Linux and Windows.
+                
+                # Clean up old model if needed (do this in thread, not main thread!)
+                if old_llm is not None:
+                    try:
+                        if hasattr(old_llm, "close"):
+                            old_llm.close()
+                        old_llm = None
+                        gc.collect()
+                    except Exception:
+                        pass
 
-                    if llm is None and last_err is not None:
-                        raise last_err
-                else:
-                    import llama_cpp
-                    from llama_cpp import Llama
-
-                    # Clean up old model if needed (do this in thread, not main thread!)
-                    if needs_cleanup and old_llm is not None:
+                client = SubprocessLlama(
+                    python_exe=sys.executable,
+                    worker_path=str(Path(__file__).parent / "llm_subprocess_worker.py"),
+                )
+                last_err = None
+                for layers in layers_to_try:
+                    try:
+                        self.call_from_thread(setattr, self, "status_text", f"Loading (GPU Layers: {layers})...")
+                        # If model load hangs or fails, timeout and restart subprocess, then try next option.
+                        client.load(
+                            model_path=model_path_str,
+                            n_ctx=int(context_size),
+                            n_gpu_layers=int(layers),
+                            verbose=False,
+                            timeout_s=120.0,
+                        )
+                        llm = client
+                        actual_layers = int(layers)
+                        
+                        # Cache the successful result
+                        cache = load_model_cache()
+                        cache[cache_key] = {"gpu_layers": layers, "model_path": model_path_str, "context_size": int(context_size)}
+                        save_model_cache(cache)
+                        break
+                    except Exception as e:
+                        last_err = e
                         try:
-                            llama_cpp.llama_backend_free()
-                            old_llm = None
-                            gc.collect()
-                            llama_cpp.llama_backend_init()
+                            client.restart()
                         except Exception:
-                            pass  # Continue even if cleanup fails
+                            pass
+                        continue
 
-                    for layers in layers_to_try:
-                        try:
-                            self.call_from_thread(setattr, self, "status_text", f"Loading (GPU Layers: {layers})...")
-                            llm = Llama(
-                                model_path=model_path_str,
-                                n_ctx=context_size,
-                                n_gpu_layers=layers,
-                                verbose=False
-                            )
-                            actual_layers = layers
-                            cache = load_model_cache()
-                            cache[cache_key] = {"gpu_layers": layers, "model_path": model_path_str, "context_size": context_size}
-                            save_model_cache(cache)
-                            break
-                        except Exception:
-                            continue
+                if llm is None and last_err is not None:
+                    raise last_err
                 
                 # Put result in queue
                 result_queue.put(("success", llm, actual_layers))
@@ -321,7 +328,7 @@ class InferenceMixin:
                 result_queue.put(("error", str(e), None))
         
         # Start the thread (daemon=True so it doesn't block app shutdown)
-        # Windows: Use manual threading, NOT Textual's @work decorator
+        # Unified: Use manual threading, NOT Textual's @work decorator
         thread = threading.Thread(target=_load_llama_thread, daemon=True, name="ModelLoadThread")
         try:
             thread.start()
@@ -482,7 +489,7 @@ class ActionsMixin:
     
     async def _wait_for_cleanup_if_needed(self, max_wait_seconds: float = 2.0) -> None:
         """Wait for stop cleanup to finish if it's in progress. Used before starting new inference."""
-        max_wait = int(max_wait_seconds * 20)  # 20 iterations per second
+        max_wait = int(max_wait_seconds * 33)  # 33 iterations per second (check every 0.03s)
         while max_wait > 0:
             # Check multiple conditions that indicate we should wait
             cleanup_in_progress = getattr(self, "_stop_cleanup_in_progress", False)
@@ -491,23 +498,23 @@ class ActionsMixin:
             
             # If any of these indicate work is happening, wait
             if cleanup_in_progress or (has_worker and is_loading_state):
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(0.03)  # Reduced from 0.05 to 0.03 for faster checking
                 max_wait -= 1
             else:
                 break
         
-        # One final check - if still in cleanup, wait a bit more
+        # One final check - if still in cleanup, wait a bit more (further reduced)
         if getattr(self, "_stop_cleanup_in_progress", False):
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.03)  # Reduced from 0.05 to 0.03
         
         # Wait for lock to actually be available (not just worker cleared)
-        # This adapts to context size - larger contexts take longer to release lock
-        max_lock_waits = 100  # Up to 5 seconds (100 * 0.05)
+        # Further reduced wait time since interruption is now more responsive
+        max_lock_waits = 30  # Reduced from 40 to 30 (1.5 seconds max instead of 2)
         lock_waits = 0
         while lock_waits < max_lock_waits:
             if await self._check_lock_available():
                 break
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(0.03)  # Reduced from 0.05 to 0.03 for faster checking
             lock_waits += 1
     
     async def _can_start_inference(self) -> bool:
@@ -556,8 +563,9 @@ class ActionsMixin:
     async def _cleanup_stopped_worker(self, worker_ref) -> None:
         """Background task to clean up stopped worker without blocking UI."""
         try:
-            # Wait gracefully for the worker thread to catch the is_loading=False flag and exit its finally block
-            max_waits = 40  # Increased from 20 to give more time for lock release
+            # Further reduced wait time for faster response - worker should exit quickly now
+            # with more frequent interruption checks (every 0.1s)
+            max_waits = 15  # Reduced from 20 to 15 (0.75 seconds max wait)
             while worker_ref and max_waits > 0:
                 await asyncio.sleep(0.05)
                 max_waits -= 1
@@ -572,37 +580,28 @@ class ActionsMixin:
             if current_worker == worker_ref:
                 try:
                     current_worker.cancel()
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.03)  # Reduced from 0.05 to 0.03
                 except Exception:
                     pass
                 # Only clear if it's still the same worker
                 if getattr(self, "_inference_worker", None) == worker_ref:
                     self._inference_worker = None
 
-            # Small delay to ensure worker thread has started cleanup
-            # The actual lock release is checked in _wait_for_cleanup_if_needed()
-            await asyncio.sleep(0.05)
+            # Minimal delay - worker should respond very quickly now
+            await asyncio.sleep(0.01)  # Reduced from 0.02 to 0.01
 
             # Update status and clear cleanup flag (CRITICAL: must always clear this)
             try:
                 self.status_text = "Stopped"
                 # Don't show notification on Windows - buttons are already responsive
-                if sys.platform != "win32":
-                    self.notify("Generation stopped.")
+                # No persistent notification needed - UI buttons are already responsive
+                pass
             except Exception:
                 pass
         finally:
             # ALWAYS clear cleanup flag, even if errors occurred
             setattr(self, "_stop_cleanup_in_progress", False)
     
-    def action_toggle_sidebar(self) -> None:
-        """Toggle both sidebars simultaneously."""
-        sidebar_left = self.query_one("#sidebar")
-        sidebar_right = self.query_one("#right-sidebar")
-        new_state = not sidebar_left.has_class("-visible")
-        sidebar_left.set_class(new_state, "-visible")
-        sidebar_right.set_class(new_state, "-visible")
-
     async def action_stop_generation(self) -> None:
         """Gracefully stop the AI by setting the flag and waiting for the worker to exit."""
         # Use lock only to prevent concurrent stop calls, but release immediately
@@ -1015,71 +1014,34 @@ class VectorMixin:
 
     def get_embedding(self, text: str, task: str = "document"):
         """Get embedding for text. task can be 'document' or 'query' for Nomic 1.5 prefixes."""
-        # Windows: use embedding subprocess to avoid in-process llama embedding load freezing / blocking inference.
-        if sys.platform == "win32":
-            try:
-                if not hasattr(self, "_embedder") or self._embedder is None:
-                    self._embedder = SubprocessEmbedder(
-                        python_exe=sys.executable,
-                        worker_path=str(Path(__file__).parent / "llm_subprocess_worker.py"),
-                    )
-                    embed_model_path = Path(__file__).parent / "models" / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
-                    if not embed_model_path.exists():
-                        self.call_from_thread(self.notify, "Embedding model not found! Download it first.", severity="error")
-                        return None
-                    self._embedder.load(model_path=str(embed_model_path), n_ctx=2048, timeout_s=120.0)
-                emb = self._embedder.embed(text, task=task, timeout_s=30.0)
-                # Ensure collection dimension matches embeddings
-                if emb:
-                    try:
-                        self._ensure_collection_dim(len(emb))
-                    except Exception as e:
-                        try:
-                            self.call_from_thread(self.notify, f"Vector DB dimension setup failed: {e}", severity="error")
-                        except Exception:
-                            pass
-                return emb
-            except Exception as e:
-                try:
-                    self.call_from_thread(self.notify, f"Embedding error: {e}", severity="error")
-                except Exception:
-                    pass
-                return None
-
-        if not self.embed_llm:
-            embed_model_path = Path(__file__).parent / "models" / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
-            if not embed_model_path.exists():
-                self.notify("Embedding model not found! Download it first.", severity="error")
-                return None
-            
-            try:
-                from llama_cpp import Llama
-                self.embed_llm = Llama(
-                    model_path=str(embed_model_path),
-                    embedding=True,
-                    n_ctx=2048,
-                    verbose=False,
-                    n_gpu_layers=0 # Force CPU
-                )
-            except Exception as e:
-                self.notify(f"Failed to load embedding model: {e}", severity="error")
-                return None
-        
-        # Nomic 1.5 specific instructions
-        prefix = "search_document: " if task == "document" else "search_query: "
-        prefixed_text = prefix + text
-            
+        # Use embedding subprocess to avoid in-process llama embedding load freezing / blocking inference.
         try:
-            emb = self.embed_llm.create_embedding(prefixed_text)
-            vec = emb['data'][0]['embedding']
-            if vec:
+            if not hasattr(self, "_embedder") or self._embedder is None:
+                self._embedder = SubprocessEmbedder(
+                    python_exe=sys.executable,
+                    worker_path=str(Path(__file__).parent / "llm_subprocess_worker.py"),
+                )
+                embed_model_path = Path(__file__).parent / "models" / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
+                if not embed_model_path.exists():
+                    self.call_from_thread(self.notify, "Embedding model not found! Download it first.", severity="error")
+                    return None
+                self._embedder.load(model_path=str(embed_model_path), n_ctx=2048, timeout_s=120.0)
+            emb = self._embedder.embed(text, task=task, timeout_s=30.0)
+            # Ensure collection dimension matches embeddings
+            if emb:
                 try:
-                    self._ensure_collection_dim(len(vec))
-                except Exception:
-                    pass
-            return vec
+                    self._ensure_collection_dim(len(emb))
+                except Exception as e:
+                    try:
+                        self.call_from_thread(self.notify, f"Vector DB dimension setup failed: {e}", severity="error")
+                    except Exception:
+                        pass
+            return emb
         except Exception as e:
-            self.notify(f"Embedding error: {e}", severity="error")
+            try:
+                self.call_from_thread(self.notify, f"Embedding error: {e}", severity="error")
+            except Exception:
+                pass
             return None
 
     def retrieve_similar_context(self, user_text: str, k=3):
