@@ -540,6 +540,8 @@ class ActionsMixin:
             setattr(self, "_stop_cleanup_in_progress", True)
             # Then set flag immediately for responsive UI
             self.is_loading = False
+            # Clear inference starting flag to allow new inference after stop
+            setattr(self, "_inference_starting", False)
             
             # Immediate feedback
             try:
@@ -558,6 +560,8 @@ class ActionsMixin:
         else:
             # Ensure cleanup flag is cleared if nothing was running
             setattr(self, "_stop_cleanup_in_progress", False)
+            # Also clear inference starting flag
+            setattr(self, "_inference_starting", False)
             self.status_text = "Ready"
     
     async def _cleanup_stopped_worker(self, worker_ref) -> None:
@@ -601,6 +605,8 @@ class ActionsMixin:
         finally:
             # ALWAYS clear cleanup flag, even if errors occurred
             setattr(self, "_stop_cleanup_in_progress", False)
+            # Also clear inference starting flag to ensure clean state
+            setattr(self, "_inference_starting", False)
     
     async def action_stop_generation(self) -> None:
         """Gracefully stop the AI by setting the flag and waiting for the worker to exit."""
@@ -731,6 +737,10 @@ class ActionsMixin:
         async with self._get_actions_lock():
             await self._stop_generation_unlocked()
             await self._wait_for_cleanup_if_needed()
+            
+            # Ensure all inference state flags are cleared after cleanup
+            setattr(self, "_inference_starting", False)
+            setattr(self, "_inference_worker", None)
             
             self.current_character = None
             self.first_user_message = None
