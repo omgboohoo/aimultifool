@@ -750,9 +750,17 @@ class CharactersScreen(ModalScreen):
                         **params
                     )
                     for chunk in stream:
-                        delta = chunk["choices"][0]["delta"].get("content", "")
-                        if delta:
-                            token_queue.put(delta)
+                        # Handle None chunks (timeout yields)
+                        if chunk is None:
+                            continue
+                        # Safely access delta content with proper None checks
+                        choices = chunk.get("choices")
+                        if choices and len(choices) > 0:
+                            delta = choices[0].get("delta", {})
+                            if delta:
+                                content = delta.get("content", "")
+                                if content:
+                                    token_queue.put(content)
                     token_queue.put(None)
                 except Exception as e:
                     token_queue.put(e)
