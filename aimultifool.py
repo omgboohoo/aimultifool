@@ -318,9 +318,9 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                 btn.loading = self.is_model_loading
                 continue
 
-            # Always keep these top menu buttons enabled
+            # Disable top menu buttons while AI is actively speaking
             if btn.id in ["btn-file", "btn-misc", "btn-theme", "btn-cards", "btn-parameters", "btn-model-settings", "btn-manage-actions", "btn-vector-chat"]:
-                btn.disabled = False
+                btn.disabled = is_ai_generating or is_busy
             elif btn.id in ["btn-continue", "btn-regenerate", "btn-rewind", "btn-restart", "btn-clear-chat"]:
                 # Disable if busy OR if no model is loaded
                 btn.disabled = is_busy or not self.llm
@@ -351,7 +351,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             if inp.id == "chat-input":
                 inp.disabled = is_busy or not self.llm
             else:
-                inp.disabled = is_busy
+                # Disable other inputs (username, search, etc.) while busy OR while AI is actively speaking
+                inp.disabled = is_busy or is_ai_generating
             
         try:
             # Check app and screen for these specific widgets
