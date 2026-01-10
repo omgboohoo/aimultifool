@@ -336,93 +336,6 @@ class ModelScreen(ModalScreen):
         # Standard pattern in this app is bubbling for main actions, but we need to ensure the app can read values.
         # Since on_select_changed updates app state, bubbling is fine IF app reads from app state, not widgets.
 
-class AddActionScreen(ModalScreen):
-    """Screen for adding or editing an action."""
-
-    def __init__(self, edit_data=None):
-        super().__init__()
-        self.edit_data = edit_data
-
-    def compose(self) -> ComposeResult:
-        title = "Edit Action" if self.edit_data else "Add New Action"
-        yield Vertical(
-            Label(title, classes="dialog-title"),
-            Label("Name", classes="label"),
-            Input(placeholder="e.g. Category: Action Name", id="name"),
-            Label("Prompt", classes="label"),
-            TextArea(id="prompt"),
-            Label("Type", classes="label"),
-            Select([("Action", False), ("System Prompt", True)], id="type", value=False, allow_blank=False),
-            Horizontal(
-                Button("Cancel", variant="default", id="cancel"),
-                Button("Save", variant="default", id="save"),
-                classes="buttons"
-            ),
-            id="dialog",
-            classes="modal-dialog"
-        )
-
-    def on_mount(self) -> None:
-        if self.edit_data:
-            self.query_one("#name").value = self.edit_data.get("name", "")
-            self.query_one("#prompt").text = self.edit_data.get("prompt", "") # TextArea uses .text
-            self.query_one("#type").value = self.edit_data.get("isSystem", False)
-        self.query_one("#name").focus()
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "save":
-            name = self.query_one("#name").value
-            prompt = self.query_one("#prompt").text
-            is_system = self.query_one("#type").value
-            if name and prompt:
-                new_data = {"name": name, "prompt": prompt, "isSystem": is_system}
-                self.dismiss({"original": self.edit_data, "new": new_data})
-        elif event.button.id == "cancel":
-            self.dismiss(None)
-
-class EditCharacterScreen(ModalScreen):
-    """Screen for editing character PNG metadata."""
-    def __init__(self, chara_json, chara_path):
-        super().__init__()
-        self.chara_json = chara_json
-        self.chara_path = chara_path
-
-    def compose(self) -> ComposeResult:
-        try:
-            # Try to pretty print the JSON
-            parsed = json.loads(self.chara_json)
-            pretty_json = json.dumps(parsed, indent=4)
-        except Exception:
-            pretty_json = self.chara_json
-
-        yield Vertical(
-            Label(f"Edit Character: {self.chara_path.name}", classes="dialog-title"),
-            Label("Metadata (JSON)", classes="label"),
-            TextArea(pretty_json, id="metadata-text"),
-            Horizontal(
-                Button("Cancel", variant="default", id="cancel"),
-                Button("Save to PNG", variant="default", id="save"),
-                classes="buttons"
-            ),
-            id="edit-character-dialog",
-            classes="modal-dialog"
-        )
-
-    def on_mount(self) -> None:
-        self.query_one("#metadata-text").focus()
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "save":
-            metadata_str = self.query_one("#metadata-text").text
-            try:
-                # Validate JSON
-                metadata_obj = json.loads(metadata_str)
-                self.dismiss(metadata_obj)
-            except json.JSONDecodeError as e:
-                self.app.notify(f"Invalid JSON: {e}", severity="error")
-                pass
-        elif event.button.id == "cancel":
-            self.dismiss(None)
 
 class ContextWindowScreen(ModalScreen):
     """Screen for showing the current chat context."""
@@ -687,9 +600,6 @@ class CharactersScreen(ModalScreen):
         if event.input.id == "input-search-meta":
             self.perform_search(event.value, start_from=0)
 
-    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
-        if event.checkbox.id == "chk-force-speak":
-            self.app.force_ai_speak_first = event.value
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "input-search-meta":
@@ -840,9 +750,17 @@ class CharactersScreen(ModalScreen):
                         **params
                     )
                     for chunk in stream:
-                        delta = chunk["choices"][0]["delta"].get("content", "")
-                        if delta:
-                            token_queue.put(delta)
+                        # Handle None chunks (timeout yields)
+                        if chunk is None:
+                            continue
+                        # Safely access delta content with proper None checks
+                        choices = chunk.get("choices")
+                        if choices and len(choices) > 0:
+                            delta = choices[0].get("delta", {})
+                            if delta:
+                                content = delta.get("content", "")
+                                if content:
+                                    token_queue.put(content)
                     token_queue.put(None)
                 except Exception as e:
                     token_queue.put(e)

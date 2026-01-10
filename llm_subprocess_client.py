@@ -178,8 +178,27 @@ class SubprocessLlama:
                 self._streaming = True
                 try:
                     self._send({"cmd": "chat", "messages": messages, "params": params})
+                    # First read uses blocking read (no timeout) to ensure we capture
+                    # the first chunk completely - this prevents missing the first character
+                    # Subsequent reads use timeout-based reading for interruption responsiveness
+                    first_read = True
                     while True:
-                        resp = self._recv()
+                        try:
+                            if first_read:
+                                # Blocking read for first chunk - guarantees we get it completely
+                                resp = self._recv()
+                                first_read = False
+                            else:
+                                # Timeout-based read for subsequent chunks - allows interruption checks
+                                # 0.08s balances responsiveness with thread creation overhead
+                                # Going lower (e.g., 0.05s) creates too many threads and has diminishing returns
+                                resp = self._recv_with_timeout(0.08)
+                        except TimeoutError:
+                            # Timeout is expected for subsequent reads - yield None to allow
+                            # caller to check interruption flag
+                            yield None
+                            continue
+                        
                         t = resp.get("type")
                         if t == "delta":
                             yield {"choices": [{"delta": {"content": resp.get("content", "")}}]}

@@ -90,14 +90,6 @@ class UIMixin:
     def watch_status_text(self, new_status):
         self.query_one("#status-text").update(new_status)
 
-    def watch_is_loading(self, is_loading: bool) -> None:
-        try:
-            self.query_one("#btn-stop").display = is_loading
-            self.query_one("#btn-continue").display = not is_loading
-            # Regenerate button stays visible during generation so user can stop and regen
-            self.query_one("#btn-regenerate").display = True
-        except Exception:
-            pass
 
     def watch_user_name(self, name):
         if hasattr(self, "title"):

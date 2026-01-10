@@ -52,11 +52,7 @@ def count_tokens_in_messages(llm, messages):
             text = content
         else:
             text = f"Assistant: {content}"
-        if hasattr(llm, "tokenize_count"):
-            total_tokens += int(llm.tokenize_count(text, add_bos=False, special=False))
-        else:
-            tokens = llm.tokenize(text.encode("utf-8"), add_bos=False, special=False)
-            total_tokens += len(tokens)
+        total_tokens += int(llm.tokenize_count(text, add_bos=False, special=False))
     total_tokens += (len(messages) - 1) * 2
     return total_tokens
 
