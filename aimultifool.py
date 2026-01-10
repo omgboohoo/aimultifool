@@ -47,7 +47,7 @@ from widgets import MessageWidget, AddActionScreen, EditCharacterScreen, Charact
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.1.23"
+    TITLE = "aiMultiFool v0.1.25"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -192,7 +192,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.1.23", id="status-version")
+            yield Static("aiMultiFool v0.1.25", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -254,12 +254,6 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         # Allow typing while loading
         self.query_one("#chat-input").disabled = False
         self.query_one("#btn-stop").disabled = not is_loading
-        # Windows safety: disable regenerate while streaming to avoid protocol/race crashes
-        try:
-            if sys.platform == "win32":
-                self.query_one("#btn-regenerate").disabled = bool(is_loading)
-        except Exception:
-            pass
         
         # Sync visibility
         try:
@@ -271,7 +265,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             pass
         
         # Update action menu state when loading state changes
-        # This disables action menu while AI is generating
+        # This disables action menu, top menus, regenerate, and rewind while AI is generating
         self.update_ui_state()
 
     def watch_is_downloading(self, is_downloading: bool) -> None:
@@ -319,15 +313,13 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                 btn.loading = self.is_model_loading
                 continue
 
-            # Always keep these top menu buttons enabled
+            # Disable top menu buttons when AI is generating
             if btn.id in ["btn-file", "btn-misc", "btn-theme", "btn-cards", "btn-parameters", "btn-model-settings", "btn-manage-actions", "btn-vector-chat"]:
-                btn.disabled = False
+                btn.disabled = is_ai_generating
             elif btn.id in ["btn-continue", "btn-regenerate", "btn-rewind", "btn-restart", "btn-clear-chat"]:
-                # Disable if busy OR if no model is loaded
-                btn.disabled = is_busy or not self.llm
-                # Windows safety: disable regenerate while streaming to avoid crashes
-                if sys.platform == "win32" and btn.id == "btn-regenerate":
-                    btn.disabled = btn.disabled or bool(self.is_loading)
+                # Disable if busy OR if no model is loaded OR if AI is generating
+                # Regenerate and rewind are always disabled while AI is speaking
+                btn.disabled = is_busy or not self.llm or is_ai_generating
             elif btn.id == "btn-clear-search":
                 # Only enabled if there is text in the search box
                 try:
@@ -350,6 +342,9 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         for inp in all_inputs:
             if inp.id == "chat-input":
                 inp.disabled = is_busy or not self.llm
+            elif inp.id == "input-username":
+                # Disable username field while AI is generating
+                inp.disabled = is_busy or is_ai_generating
             else:
                 inp.disabled = is_busy
             

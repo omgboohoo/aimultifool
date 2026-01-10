@@ -1,5 +1,15 @@
 # Release Notes
 
+## v0.1.25: Platform-Specific Threading Architecture
+- **Linux Threading Reinstatement**: Reinstated Textual's `@work` decorator for Linux operations. While this approach can be unreliable under certain conditions, it provides better integration with the Textual framework on Linux systems.
+- **Windows Threading Stability**: Windows continues to use the proven subprocess-based threading method, which has demonstrated superior reliability and stability for Windows environments.
+
+## v0.1.24: Subprocess Architecture & Smooth Streaming
+- **Subprocess Threading Model**: Linux uses the same robust subprocess-based architecture as Windows, preventing UI freezes and improving overall stability.
+- **Buttery Smooth Streaming**: Implemented time-based batching for UI updates. The chat now refreshes every 50ms, eliminating the "jerky" stutter caused by high-frequency layout calculations and regex-based styling.
+- **Optimized Status Bar**: Throttled status bar updates to 500ms intervals, reducing overhead while maintaining readability of TPS and context metrics.
+- **Streamlined Codebase**: Removed platform-specific branching for core AI operations, moving to a single maintainable cross-platform standard.
+
 ## v0.1.23: Parity & Stability
 - **Mirror Operation**: Changes to make Windows use mirror Linux operation for consistent cross-platform experience.
 

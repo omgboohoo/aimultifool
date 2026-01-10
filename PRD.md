@@ -1,4 +1,4 @@
-# System Reference Document: aiMultiFool v0.1.23
+# System Reference Document: aiMultiFool v0.1.25
 
 ## 1. Executive Summary
 aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox. It leverages **Textual** for a responsive, desktop-class TUI and **llama-cpp-python** for high-performance local inference. The architecture prioritizes separation of concerns via a Mixin pattern, enabling clean extensibility for theming, encryption, and complex character logic.
@@ -13,7 +13,7 @@ aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox.
 | **Inference Engine** | llama-cpp-python | Python bindings for GGUF model execution |
 | **Cryptography** | cryptography (Hazmat) | AES-256-GCM + Argon2id for file security |
 | **Vector DB** | Qdrant (Local) | Persistent long-term memory via embeddings |
-| **Concurrency** | asyncio + Threads (Linux) / Subprocess (Windows) | Non-blocking UI input during blocking inference |
+| **Concurrency** | asyncio + Subprocess (Platform-Specific) | Non-blocking UI input via platform-specific threading (subprocess on Windows, @work decorator on Linux) |
 | **Data Format** | JSON / PNG (Chunked) | Metadata storage for Settings and Character Cards |
 
 ---
@@ -50,14 +50,14 @@ classDiagram
 ### 3.2 Core Modules
 - **`aimultifool.py`**: The entry point. Initializes the `App`, loads settings, and composes the primary layout. Sets Windows event loop policy for threading compatibility.
 - **`logic_mixins.py` (`InferenceMixin`, `ActionsMixin`, `VectorMixin`)**:
-    - **Inference**: On Linux, uses `@work(thread=True)` to offload blocking Llama.cpp calls to a background thread. On Windows, uses subprocess-based architecture (`SubprocessLlama`) to prevent GIL-related UI freezes. Uses `call_from_thread` (Linux) or direct updates (Windows subprocess) to push updates back to the main event loop.
+    - **Inference**: Uses platform-specific threading approaches to prevent GIL-related UI freezes. Windows uses a subprocess-based architecture (`SubprocessLlama`), while Linux uses Textual's `@work` decorator. This ensures the main Textual event loop remains responsive even during heavy model loading or inference.
     - **State**: Manages the message history list, pruning logic, and token counting.
-    - **Vector Chat**: On Windows, embeddings run in a separate subprocess (`SubprocessEmbedder`) to maintain UI responsiveness.
+    - **Vector Chat**: Embeddings run in a separate subprocess (`SubprocessEmbedder`) to maintain UI responsiveness.
 - **`ui_mixin.py` (`UIMixin`)**: Centralizes DOM manipulation. Handles the mounting of `MessageWidget`s and synchronizing the specific visual state with the backend `messages` list.
 - **`styles.tcss`**: The primary stylesheet. Supports dynamic runtime modification (see **3.3 Theming**) via generic CSS variable overrides or string replacement.
-- **`llm_subprocess_worker.py`**: Windows-only subprocess worker that loads llama-cpp-python models and handles inference/embedding requests. Communicates via JSONL protocol over stdin/stdout. Prevents GIL-related UI freezes by isolating blocking operations in a separate process.
-- **`llm_subprocess_client.py`**: Windows-only client wrapper providing a `llama_cpp.Llama`-compatible API over the subprocess protocol. Handles process lifecycle, JSONL communication, and stream management. Automatically manages subprocess startup/shutdown and protocol synchronization.
-- **`ai_engine.py`**: Model discovery, token counting utilities, and context pruning logic. Handles both native `llama_cpp.Llama` and `SubprocessLlama` instances for token counting.
+- **`llm_subprocess_worker.py`**: Subprocess worker (Windows) that loads llama-cpp-python models and handles inference/embedding requests. Communicates via JSONL protocol over stdin/stdout. Prevents GIL-related UI freezes by isolating blocking operations in a separate process.
+- **`llm_subprocess_client.py`**: Client wrapper (Windows) providing a `llama_cpp.Llama`-compatible API over the subprocess protocol. Handles process lifecycle, JSONL communication, and stream management. Automatically manages subprocess startup/shutdown and protocol synchronization.
+- **`ai_engine.py`**: Model discovery, token counting utilities, and context pruning logic. Handles `SubprocessLlama` instances for token counting.
 
 ### 3.3 Styling & Theming
 The application uses Textual's CSS system with theme variables (`$primary`, `$accent`, `$background`, `$surface`, `$text`, `$text-muted`, `$boost`) for consistent styling across the interface.
@@ -77,7 +77,7 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **Iterative Decoding**: The `Llama.create_chat_completion` method is called with `stream=True`.
 - **Text Assembly**: Chunks are yielded back to the main thread in real-time.
 - **Visual Updates**: The `UIMixin` appends text to the active `MessageWidget` on every token, calculating TPS (Tokens Per Second) on the fly.
-- **Windows Subprocess Streaming**: On Windows, streaming tokens are received via JSONL protocol from the subprocess worker, maintaining the same real-time update behavior as Linux.
+- **Platform-Specific Streaming**: On Windows, streaming tokens are received via JSONL protocol from the subprocess worker. On Linux, tokens stream directly from the model. Both approaches maintain real-time update behavior while keeping the UI responsive.
 
 ### 4.2 Context Management
 - **Smart Pruning**: Before generation, the prompt is evaluated. If `total_tokens > 85% of context_size`, the system prunes messages from the middle of the conversation history, preserving:
@@ -127,10 +127,8 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 ### 5.2 Modal Screens
 - **ModelScreen**: Model selection, context size, and GPU layer configuration.
 - **ParametersScreen**: AI sampling parameter controls (Temperature, Top P, Top K, Repeat Penalty, Min P) with slider interfaces.
-- **CharactersScreen**: Character card browser with search, load, edit, and encryption capabilities.
-- **EditCharacterScreen**: Character metadata editor with AI-assisted editing and real-time streaming.
-- **ActionsManagerScreen**: Full action menu management with search, filtering, and category organization.
-- **AddActionScreen**: Create new actions or system prompts.
+- **CharactersScreen**: Character card browser with search, load, and unified metadata editor with AI-assisted editing.
+- **ActionsManagerScreen**: Unified action menu management with search, filtering, and category organization.
 - **ChatManagerScreen**: Save and load conversation histories with optional encryption.
 - **ThemeScreen**: Theme selection and speech styling options.
 - **MiscScreen**: About screen with links to website, Discord, and support.
