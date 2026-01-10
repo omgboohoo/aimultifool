@@ -42,7 +42,7 @@ from ui_mixin import UIMixin
 from utils import _get_action_menu_data, load_settings, save_settings, DOWNLOAD_AVAILABLE, get_style_prompt, save_action_menu_data, encrypt_data
 from character_manager import extract_chara_metadata, process_character_metadata, create_initial_messages, write_chara_metadata
 from ai_engine import get_models
-from widgets import MessageWidget, AddActionScreen, EditCharacterScreen, CharactersScreen, ParametersScreen, MiscScreen, ThemeScreen, ActionsManagerScreen, ModelScreen, ChatManagerScreen, VectorChatScreen
+from widgets import MessageWidget, CharactersScreen, ParametersScreen, MiscScreen, ThemeScreen, ActionsManagerScreen, ModelScreen, ChatManagerScreen, VectorChatScreen
 
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     """The main aiMultiFool application."""
@@ -438,8 +438,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             "minp": self.minp,
             "selected_model": self.selected_model,
             "theme": self.theme,
-            "speech_styling": self.speech_styling,
-            "force_ai_speak_first": self.force_ai_speak_first
+            "speech_styling": self.speech_styling
         }
         save_settings(settings)
 
