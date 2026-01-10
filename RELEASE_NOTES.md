@@ -1,5 +1,24 @@
 # Release Notes
 
+## v0.1.26: Linux Direct llama_cpp Integration & Performance Improvements
+### 🐧 Linux Optimization
+- **Direct llama_cpp Integration**: Linux now uses direct `llama_cpp.Llama` objects instead of subprocess/JSONL protocol, eliminating unnecessary complexity and improving performance.
+- **Simplified Architecture**: Removed subprocess overhead on Linux - models load and run directly in-process, providing faster response times and simpler code paths.
+- **No More JSONL Protocol**: Linux no longer needs JSONL protocol synchronization, eliminating stream draining issues that caused problems with larger models (12B+).
+- **Better Stop/Reprompt Performance**: Direct llama_cpp integration means stopping AI speech and reprompting is instant on Linux, especially with larger models.
+
+### 🔧 Technical Improvements
+- **Platform-Specific Model Loading**: Automatic detection of platform - Windows uses subprocess (for GIL avoidance), Linux uses direct llama_cpp.
+- **Platform-Specific Embeddings**: Linux embeddings now use direct llama_cpp instead of subprocess, matching the main model architecture.
+- **Token Counting Fix**: Updated `count_tokens_in_messages()` to handle both SubprocessLlama wrapper (Windows) and direct llama_cpp.Llama (Linux) objects.
+- **Stream Handling**: Direct llama_cpp generators work seamlessly without needing complex stream draining logic.
+
+### 🎯 Benefits
+- **Faster Performance**: No subprocess communication overhead on Linux
+- **Better Reliability**: Eliminates JSONL protocol sync issues that caused problems with 12B models
+- **Simpler Code**: Direct Python objects instead of JSON serialization/deserialization
+- **Improved UX**: Instant stop/reprompt response, especially noticeable with larger models
+
 ## v0.1.25: Platform-Specific Threading Architecture
 - **Linux Threading Reinstatement**: Reinstated Textual's `@work` decorator for Linux operations. While this approach can be unreliable under certain conditions, it provides better integration with the Textual framework on Linux systems.
 - **Windows Threading Stability**: Windows continues to use the proven subprocess-based threading method, which has demonstrated superior reliability and stability for Windows environments.

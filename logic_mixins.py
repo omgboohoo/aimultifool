@@ -127,8 +127,8 @@ class InferenceMixin:
                     # This makes interruption detection immediate
                     if self.is_loading == False: # Cancelled
                         was_cancelled = True
-                        # IMPORTANT (subprocess LLM): close the generator so it can drain any remaining
-                        # deltas and keep the JSONL protocol aligned for the next command.
+                        # Windows (subprocess): close generator to drain remaining deltas and keep JSONL protocol aligned
+                        # Linux (direct llama_cpp): closing is optional but harmless
                         try:
                             if hasattr(stream, "close"):
                                 stream.close()
@@ -136,7 +136,7 @@ class InferenceMixin:
                             pass
                         break
                     
-                    # Handle None yields from timeout-based reading (allows interruption checks)
+                    # Handle None yields from timeout-based reading (Windows subprocess only - allows interruption checks)
                     if output is None:
                         # This is a timeout yield - check cancellation and continue
                         if self.is_loading == False:
@@ -274,8 +274,9 @@ class InferenceMixin:
             actual_layers = 0
             
             try:
-                # Always run llama in a subprocess to avoid UI freezes (GIL held in native load)
-                # and to provide a unified experience across Linux and Windows.
+                # Platform-specific model loading:
+                # - Windows: Use subprocess to avoid GIL-related UI freezes
+                # - Linux: Use direct llama_cpp (no subprocess/JSONL complexity needed)
                 
                 # Clean up old model if needed (do this in thread, not main thread!)
                 if old_llm is not None:
@@ -287,37 +288,62 @@ class InferenceMixin:
                     except Exception:
                         pass
 
-                client = SubprocessLlama(
-                    python_exe=sys.executable,
-                    worker_path=str(Path(__file__).parent / "llm_subprocess_worker.py"),
-                )
                 last_err = None
-                for layers in layers_to_try:
-                    try:
-                        self.call_from_thread(setattr, self, "status_text", f"Loading (GPU Layers: {layers})...")
-                        # If model load hangs or fails, timeout and restart subprocess, then try next option.
-                        client.load(
-                            model_path=model_path_str,
-                            n_ctx=int(context_size),
-                            n_gpu_layers=int(layers),
-                            verbose=False,
-                            timeout_s=120.0,
-                        )
-                        llm = client
-                        actual_layers = int(layers)
-                        
-                        # Cache the successful result
-                        cache = load_model_cache()
-                        cache[cache_key] = {"gpu_layers": layers, "model_path": model_path_str, "context_size": int(context_size)}
-                        save_model_cache(cache)
-                        break
-                    except Exception as e:
-                        last_err = e
+                
+                if sys.platform == "win32":
+                    # Windows: Use subprocess to avoid GIL issues
+                    client = SubprocessLlama(
+                        python_exe=sys.executable,
+                        worker_path=str(Path(__file__).parent / "llm_subprocess_worker.py"),
+                    )
+                    for layers in layers_to_try:
                         try:
-                            client.restart()
-                        except Exception:
-                            pass
-                        continue
+                            self.call_from_thread(setattr, self, "status_text", f"Loading (GPU Layers: {layers})...")
+                            # If model load hangs or fails, timeout and restart subprocess, then try next option.
+                            client.load(
+                                model_path=model_path_str,
+                                n_ctx=int(context_size),
+                                n_gpu_layers=int(layers),
+                                verbose=False,
+                                timeout_s=120.0,
+                            )
+                            llm = client
+                            actual_layers = int(layers)
+                            
+                            # Cache the successful result
+                            cache = load_model_cache()
+                            cache[cache_key] = {"gpu_layers": layers, "model_path": model_path_str, "context_size": int(context_size)}
+                            save_model_cache(cache)
+                            break
+                        except Exception as e:
+                            last_err = e
+                            try:
+                                client.restart()
+                            except Exception:
+                                pass
+                            continue
+                else:
+                    # Linux: Use direct llama_cpp (simpler, no JSONL protocol needed)
+                    import llama_cpp
+                    for layers in layers_to_try:
+                        try:
+                            self.call_from_thread(setattr, self, "status_text", f"Loading (GPU Layers: {layers})...")
+                            llm = llama_cpp.Llama(
+                                model_path=model_path_str,
+                                n_ctx=int(context_size),
+                                n_gpu_layers=int(layers),
+                                verbose=False,
+                            )
+                            actual_layers = int(layers)
+                            
+                            # Cache the successful result
+                            cache = load_model_cache()
+                            cache[cache_key] = {"gpu_layers": layers, "model_path": model_path_str, "context_size": int(context_size)}
+                            save_model_cache(cache)
+                            break
+                        except Exception as e:
+                            last_err = e
+                            continue
 
                 if llm is None and last_err is not None:
                     raise last_err
@@ -1024,19 +1050,35 @@ class VectorMixin:
 
     def get_embedding(self, text: str, task: str = "document"):
         """Get embedding for text. task can be 'document' or 'query' for Nomic 1.5 prefixes."""
-        # Use embedding subprocess to avoid in-process llama embedding load freezing / blocking inference.
         try:
-            if not hasattr(self, "_embedder") or self._embedder is None:
-                self._embedder = SubprocessEmbedder(
-                    python_exe=sys.executable,
-                    worker_path=str(Path(__file__).parent / "llm_subprocess_worker.py"),
-                )
-                embed_model_path = Path(__file__).parent / "models" / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
-                if not embed_model_path.exists():
-                    self.call_from_thread(self.notify, "Embedding model not found! Download it first.", severity="error")
-                    return None
-                self._embedder.load(model_path=str(embed_model_path), n_ctx=2048, timeout_s=120.0)
-            emb = self._embedder.embed(text, task=task, timeout_s=30.0)
+            embed_model_path = Path(__file__).parent / "models" / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
+            if not embed_model_path.exists():
+                self.call_from_thread(self.notify, "Embedding model not found! Download it first.", severity="error")
+                return None
+            
+            if sys.platform == "win32":
+                # Windows: Use subprocess to avoid blocking
+                if not hasattr(self, "_embedder") or self._embedder is None:
+                    self._embedder = SubprocessEmbedder(
+                        python_exe=sys.executable,
+                        worker_path=str(Path(__file__).parent / "llm_subprocess_worker.py"),
+                    )
+                    self._embedder.load(model_path=str(embed_model_path), n_ctx=2048, timeout_s=120.0)
+                emb = self._embedder.embed(text, task=task, timeout_s=30.0)
+            else:
+                # Linux: Use direct llama_cpp (simpler, no subprocess needed)
+                if not hasattr(self, "_embed_llm") or self._embed_llm is None:
+                    import llama_cpp
+                    self._embed_llm = llama_cpp.Llama(
+                        model_path=str(embed_model_path),
+                        n_ctx=2048,
+                        n_gpu_layers=0,
+                        embedding=True,
+                        verbose=False,
+                    )
+                prefix = "search_document: " if task == "document" else "search_query: "
+                emb_result = self._embed_llm.create_embedding(prefix + text)
+                emb = emb_result["data"][0]["embedding"]
             # Ensure collection dimension matches embeddings
             if emb:
                 try:

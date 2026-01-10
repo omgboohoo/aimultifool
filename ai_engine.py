@@ -52,7 +52,16 @@ def count_tokens_in_messages(llm, messages):
             text = content
         else:
             text = f"Assistant: {content}"
-        total_tokens += int(llm.tokenize_count(text, add_bos=False, special=False))
+        
+        # Handle both SubprocessLlama (has tokenize_count) and direct llama_cpp.Llama (uses tokenize)
+        if hasattr(llm, "tokenize_count"):
+            # SubprocessLlama wrapper (Windows)
+            total_tokens += int(llm.tokenize_count(text, add_bos=False, special=False))
+        else:
+            # Direct llama_cpp.Llama (Linux)
+            tokens = llm.tokenize(text.encode("utf-8"), add_bos=False, special=False)
+            total_tokens += len(tokens)
+    
     total_tokens += (len(messages) - 1) * 2
     return total_tokens
 

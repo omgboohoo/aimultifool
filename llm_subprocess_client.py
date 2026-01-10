@@ -75,15 +75,33 @@ class SubprocessLlama:
 
     def _drain_stream_locked(self) -> None:
         """Drain any pending streaming output until we see 'done' or an error."""
+        # Use timeout-based reads to avoid hanging on slow models (e.g., 12B)
+        # If draining takes too long, just give up - subprocess will handle it
+        max_drain_time = 2.0  # 2 seconds max to drain
+        start_time = time.time()
+        max_iterations = 50  # Safety limit
+        
         try:
-            while True:
-                resp = self._recv()
+            iteration = 0
+            while iteration < max_iterations:
+                # Check if we've exceeded max drain time
+                if time.time() - start_time > max_drain_time:
+                    break
+                
+                try:
+                    # Use timeout read instead of blocking read
+                    resp = self._recv_with_timeout(0.1)  # 100ms timeout per read
+                except TimeoutError:
+                    # No more data available quickly, assume drained
+                    break
+                
                 t = resp.get("type")
                 if t == "done":
                     return
                 if t == "error":
                     return
                 # ignore deltas and anything else
+                iteration += 1
         except Exception:
             # If the subprocess died while draining, that's fine for our purposes.
             return
