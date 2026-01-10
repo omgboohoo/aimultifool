@@ -1,5 +1,21 @@
 # Release Notes
 
+## v0.2.0: Unified Direct Integration & Robust Threading
+### 🪟 Windows Stability & Threading Improvements
+- **Robust Model Loading**: Fixed the intermittent "failed to start load thread" error on Windows by transitioning from subprocess-based loading to a manual thread-and-queue system.
+- **Unified Direct Integration**: Windows now uses the same direct `llama_cpp.Llama` integration as Linux, eliminating the overhead of the JSONL protocol and improving token streaming efficiency.
+- **Manual Threading Sync**: Implemented reliable manual threading with proper GIL management to ensure the Windows UI remains perfectly responsive during heavy GPU model loading.
+- **Improved Performance**: Direct object access reduces latency and improves overall stability for Windows users, especially with larger models.
+
+### 🐧 Linux & Cross-Platform Unification
+- **Architectural Parity**: Main chat inference is now unified across all platforms using direct `llama_cpp` bindings with Textual's `@work` (inference) and manual `threading` (loading) decorators.
+- **Consistency**: All platforms now benefit from the same high-performance API, ensuring predictable behavior for features like token counting and context pruning.
+- **Streamlined Codebase**: Removed complex subprocess lifecycle management for main chat, leading to a more maintainable and less error-prone application.
+
+### 🧠 Vector Chat (RAG)
+- **Subprocess Embeddings (Windows)**: Continued use of subprocess isolation for embeddings on Windows to ensure maximum UI stability during long-term memory retrieval.
+- **Direct Embeddings (Linux)**: Maintained high-performance direct integration for embeddings on Linux systems.
+
 ## v0.1.26: Linux Direct llama_cpp Integration & Performance Improvements
 ### 🐧 Linux Optimization
 - **Direct llama_cpp Integration**: Linux now uses direct `llama_cpp.Llama` objects instead of subprocess/JSONL protocol, eliminating unnecessary complexity and improving performance.

@@ -1,4 +1,4 @@
-# System Reference Document: aiMultiFool v0.1.26
+# System Reference Document: aiMultiFool v0.2.0
 
 ## 1. Executive Summary
 aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox. It leverages **Textual** for a responsive, desktop-class TUI and **llama-cpp-python** for high-performance local inference. The architecture prioritizes separation of concerns via a Mixin pattern, enabling clean extensibility for theming, encryption, and complex character logic.
@@ -13,7 +13,7 @@ aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox.
 | **Inference Engine** | llama-cpp-python | Python bindings for GGUF model execution |
 | **Cryptography** | cryptography (Hazmat) | AES-256-GCM + Argon2id for file security |
 | **Vector DB** | Qdrant (Local) | Persistent long-term memory via embeddings |
-| **Concurrency** | asyncio + Subprocess (Platform-Specific) | Non-blocking UI input via platform-specific threading (subprocess on Windows, @work decorator on Linux) |
+| **Concurrency** | asyncio + Multi-threading | Non-blocking UI input via Textual @work (inference) and manual threading (loading) |
 | **Data Format** | JSON / PNG (Chunked) | Metadata storage for Settings and Character Cards |
 
 ---
@@ -50,14 +50,14 @@ classDiagram
 ### 3.2 Core Modules
 - **`aimultifool.py`**: The entry point. Initializes the `App`, loads settings, and composes the primary layout. Sets Windows event loop policy for threading compatibility.
 - **`logic_mixins.py` (`InferenceMixin`, `ActionsMixin`, `VectorMixin`)**:
-    - **Inference**: Uses platform-specific threading approaches to prevent GIL-related UI freezes. Windows uses a subprocess-based architecture (`SubprocessLlama`), while Linux uses Textual's `@work` decorator. This ensures the main Textual event loop remains responsive even during heavy model loading or inference.
+    - **Inference**: Uses unified direct llama-cpp-python integration across all platforms. To prevent GIL-related UI freezes, model loading is handled via manual `threading.Thread` with a result `Queue`, while inference is orchestrated by Textual's `@work(thread=True)` decorator.
     - **State**: Manages the message history list, pruning logic, and token counting.
-    - **Vector Chat**: Embeddings run in a separate subprocess (`SubprocessEmbedder`) to maintain UI responsiveness.
+    - **Vector Chat**: On Windows, embeddings run in a separate subprocess (`SubprocessEmbedder`) to maintain UI responsiveness. On Linux, direct integration is used.
 - **`ui_mixin.py` (`UIMixin`)**: Centralizes DOM manipulation. Handles the mounting of `MessageWidget`s and synchronizing the specific visual state with the backend `messages` list.
 - **`styles.tcss`**: The primary stylesheet. Supports dynamic runtime modification (see **3.3 Theming**) via generic CSS variable overrides or string replacement.
-- **`llm_subprocess_worker.py`**: Subprocess worker (Windows) that loads llama-cpp-python models and handles inference/embedding requests. Communicates via JSONL protocol over stdin/stdout. Prevents GIL-related UI freezes by isolating blocking operations in a separate process.
-- **`llm_subprocess_client.py`**: Client wrapper (Windows) providing a `llama_cpp.Llama`-compatible API over the subprocess protocol. Handles process lifecycle, JSONL communication, and stream management. Automatically manages subprocess startup/shutdown and protocol synchronization.
-- **`ai_engine.py`**: Model discovery, token counting utilities, and context pruning logic. Handles `SubprocessLlama` instances for token counting.
+- **`llm_subprocess_worker.py`**: Subprocess worker (primarily for Windows embeddings) that loads llama-cpp-python models and handles requests. Prevents GIL-related UI freezes by isolating blocking operations.
+- **`llm_subprocess_client.py`**: Client wrapper providing subprocess protocol support for isolated operations (like Windows embeddings).
+- **`ai_engine.py`**: Model discovery, token counting utilities, and context pruning logic. Operates directly on the `llama_cpp.Llama` instance.
 
 ### 3.3 Styling & Theming
 The application uses Textual's CSS system with theme variables (`$primary`, `$accent`, `$background`, `$surface`, `$text`, `$text-muted`, `$boost`) for consistent styling across the interface.
@@ -77,7 +77,7 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **Iterative Decoding**: The `Llama.create_chat_completion` method is called with `stream=True`.
 - **Text Assembly**: Chunks are yielded back to the main thread in real-time.
 - **Visual Updates**: The `UIMixin` appends text to the active `MessageWidget` on every token, calculating TPS (Tokens Per Second) on the fly.
-- **Platform-Specific Streaming**: On Windows, streaming tokens are received via JSONL protocol from the subprocess worker. On Linux, tokens stream directly from the model. Both approaches maintain real-time update behavior while keeping the UI responsive.
+- **Unified Streaming**: Inference tokens stream directly from the LLM instance to the UI thread using Textual's worker system. This maintains real-time update behavior while keeping the UI responsive across all platforms.
 
 ### 4.2 Context Management
 - **Smart Pruning**: Before generation, the prompt is evaluated. If `total_tokens > 85% of context_size`, the system prunes messages from the middle of the conversation history, preserving:
