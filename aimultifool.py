@@ -82,6 +82,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     is_model_loading = reactive(False)
     is_downloading = reactive(False)
     is_char_edit_mode = reactive(False)
+    is_analyzing_emotions = reactive(False)
     vector_chat_name = reactive(None)
     enable_vector_chat = reactive(False)
     force_ai_speak_first = reactive(True)
@@ -290,6 +291,10 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         """Called when is_char_edit_mode changes."""
         self.update_ui_state()
 
+    def watch_is_analyzing_emotions(self, is_analyzing_emotions: bool) -> None:
+        """Called when is_analyzing_emotions changes."""
+        self.update_ui_state()
+
     def watch_enable_vector_chat(self, enable_vector_chat: bool) -> None:
         """Called when enable_vector_chat changes."""
         try:
@@ -308,8 +313,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     def update_ui_state(self):
         """Disable or enable UI elements based on app state."""
         is_busy = self.is_model_loading or self.is_downloading
-        # Also disable action menu while AI is actively generating
-        is_ai_generating = self.is_loading
+        # Also disable action menu while AI is actively generating or analyzing emotions
+        is_ai_generating = self.is_loading or self.is_analyzing_emotions
         
         # Query both the main app and the active screen to ensure modals are covered
         all_buttons = list(self.query(Button))
@@ -1041,6 +1046,9 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         if not self.llm or not assistant_content:
             return
         
+        # Set flag to indicate emotional dynamics analysis is starting
+        self.call_from_thread(setattr, self, "is_analyzing_emotions", True)
+        
         try:
             # Get messages from main thread
             messages_snapshot = self.call_from_thread(lambda: list(self.messages))
@@ -1119,6 +1127,9 @@ You MUST include every character mentioned in the conversation. Do NOT refer to 
             except:
                 pass
             traceback.print_exc()
+        finally:
+            # Always clear the flag when analysis completes (success or failure)
+            self.call_from_thread(setattr, self, "is_analyzing_emotions", False)
     
     def _update_emotional_dynamics(self, content: str):
         """Update the emotional dynamics display. Clears old content and shows new."""
