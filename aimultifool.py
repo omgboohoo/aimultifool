@@ -658,8 +658,12 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             # Wait for cleanup to finish if it's in progress
             await self._wait_for_cleanup_if_needed()
             
-            # Replace {{user}} with the user's name
-            prompt = re.sub(r'\{\{user\}\}', self.user_name, prompt, flags=re.IGNORECASE)
+            # Replace {{user}} with the user's name only when a character card is loaded
+            if self.current_character:
+                prompt = re.sub(r'\{\{user\}\}', self.user_name, prompt, flags=re.IGNORECASE)
+            else:
+                # When no character card is loaded, remove {{user}} references instead of replacing them
+                prompt = re.sub(r'\{\{user\}\}', '', prompt, flags=re.IGNORECASE)
 
             if section_name == "System Prompts":
                 await self.set_system_prompt(prompt, item_name)
@@ -735,7 +739,11 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             base_prompt = temp_msgs[0]["content"]
             new_content = f"{base_prompt}\n\n[Style Instruction: {style_instruction}]"
         else:
-            new_content = style_instruction
+            # When no character card is loaded, explicitly instruct AI not to use the username
+            username_note = ""
+            if self.user_name and self.user_name != "User":
+                username_note = f"\n\nIMPORTANT: Do NOT use or reference the username '{self.user_name}' from the user name field. The user name field is for display purposes only and should not be mentioned in your responses."
+            new_content = f"{style_instruction}{username_note}"
 
         if self.messages and self.messages[0]["role"] == "system":
             self.messages[0]["content"] = new_content
@@ -1032,51 +1040,47 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         await self.action_wipe_all()
         self.save_user_settings()
 
-    def get_character_names(self):
-        """Extract character names from current character and user name."""
-        names = []
-        if self.current_character:
-            char_name = self.current_character.get("name") or self.current_character.get("data", {}).get("name")
-            if char_name:
-                names.append(char_name)
-        if self.user_name:
-            names.append(self.user_name)
-        return names if names else ["Character", "User"]
-    
     def analyze_emotions(self, assistant_content: str):
         """Analyze emotions of each character after AI reply. Called from worker thread."""
         if not self.llm or not assistant_content:
             return
         
         try:
-            # Get character names and messages from main thread
-            character_names = self.call_from_thread(self.get_character_names)
+            # Get messages from main thread
             messages_snapshot = self.call_from_thread(lambda: list(self.messages))
             
-            # Build prompt for emotion analysis
-            recent_messages = messages_snapshot[-6:] if len(messages_snapshot) > 6 else messages_snapshot
+            # Get the last 3 user/assistant exchanges (6 messages total)
+            recent_messages = []
+            for msg in reversed(messages_snapshot):
+                if msg['role'] in ['user', 'assistant']:
+                    recent_messages.insert(0, msg)
+                    if len(recent_messages) >= 6:  # 3 exchanges = 6 messages
+                        break
+            
+            # Need at least one exchange to analyze
+            if len(recent_messages) < 2:
+                return
+            
             conversation_context = "\n".join([
-                f"{msg['role'].capitalize()}: {msg['content'][:500]}"
+                f"{msg['role'].capitalize()}: {msg['content']}"
                 for msg in recent_messages
             ])
             
-            emotion_prompt = f"""Analyze the emotional state of each character based on the recent conversation. Be concise and specific.
+            emotion_prompt = f"""Analyze the emotional state of each character mentioned in the conversation below. Be concise and specific.
 
-IMPORTANT: Use the exact character names provided below. Do NOT refer to characters as "assistant", "user", "AI", or any other generic terms.
-
-Characters: {', '.join(character_names)}
+CRITICAL: You MUST analyze EVERY character mentioned or appearing in the last 3 user/assistant exchanges below. Do NOT skip any characters. Provide an emotional summary for EACH character you find.
 
 Recent conversation:
 {conversation_context}
 
-Provide a brief summary (one sentence per character) of how each character feels right now. Format as:
+For each character mentioned or appearing in the conversation above, provide a one-sentence emotional summary. Format your response as:
 [Character Name]: [one sentence emotional summary]
 
-Use the exact character names from the list above. If a character hasn't appeared or spoken, you can skip them."""
+You MUST include every character mentioned in the conversation. Do NOT refer to characters as "assistant", "user", "AI", or any other generic terms. If a character appears multiple times, still analyze them once."""
             
             # Use the same LLM to analyze emotions
             messages_for_analysis = [
-                {"role": "system", "content": "You are an expert at analyzing emotional states from dialogue. Always use the exact character names provided by the user. Never refer to characters as 'assistant', 'user', 'AI', or other generic terms. Provide concise, accurate summaries."},
+                {"role": "system", "content": "You are an expert at analyzing emotional states from dialogue. You MUST identify and analyze EVERY character mentioned in the conversation. Do not skip any characters. Provide a one-sentence emotional summary for EACH character you find. Never refer to characters as 'assistant', 'user', 'AI', or other generic terms. Be thorough and complete - analyze ALL characters."},
                 {"role": "user", "content": emotion_prompt}
             ]
             
@@ -1117,9 +1121,13 @@ Use the exact character names from the list above. If a character hasn't appeare
         try:
             self._emotional_dynamics_content = content
             widget = self.query_one("#emotional-dynamics-content", Static)
+            scroll_container = self.query_one("#emotional-dynamics-scroll")
             if widget:
                 # Clear old content and update with new
                 widget.update(content)
+                # Scroll to top when updating
+                if scroll_container:
+                    scroll_container.scroll_to(0, 0, animate=False)
             else:
                 self.notify("Emotional dynamics widget not found!", severity="warning")
         except Exception as e:
