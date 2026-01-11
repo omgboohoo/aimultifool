@@ -739,11 +739,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             base_prompt = temp_msgs[0]["content"]
             new_content = f"{base_prompt}\n\n[Style Instruction: {style_instruction}]"
         else:
-            # When no character card is loaded, explicitly instruct AI not to use the username
-            username_note = ""
-            if self.user_name and self.user_name != "User":
-                username_note = f"\n\nIMPORTANT: Do NOT use or reference the username '{self.user_name}' from the user name field. The user name field is for display purposes only and should not be mentioned in your responses."
-            new_content = f"{style_instruction}{username_note}"
+            new_content = style_instruction
 
         if self.messages and self.messages[0]["role"] == "system":
             self.messages[0]["content"] = new_content
