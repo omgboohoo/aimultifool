@@ -249,7 +249,7 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 
 ### 7.3 Character Management
 - **Character Loading**: Load SillyTavern PNG cards with automatic metadata extraction.
-- **Auto-First Response**: When loading a character card, the AI can automatically generate the character's first message. This behavior can be toggled via "Play (AI Speak First)" vs "Play (User Speak First)" buttons in the CharactersScreen. The preference is saved to `settings.json` as `force_ai_speak_first`.
+- **Auto-First Response**: When loading a character card, users can choose whether the AI generates the first message automatically. Two separate buttons are available in the CharactersScreen: "Play (AI Speak First)" and "Play (User Speak First)".
 - **Character Editing**: Full metadata editor with AI-assisted generation and modification.
 - **Character Encryption**: Encrypt character cards with password protection.
 - **Character Browser**: Search and filter character cards by name.
