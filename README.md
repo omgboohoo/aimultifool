@@ -13,7 +13,7 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
 - **Character Card Support**: Load SillyTavern PNG cards directly from the top menu.
 - **AI-Assisted Editing**: Built-in **Metadata Editor** with **real-time streaming AI assistance** for generating and modifying character data without leaving the app.
     > *Tip: Use a small model like **Llama-3.2-3B-Instruct-uncensored-Q4_K_M** for responsive AI editing.*
-- **Narrative Styles**: Choose from **44 custom presets** covering a wide range of tones.
+- **Narrative Styles**: Choose from **45 custom presets** covering a wide range of tones.
 - **On-Demand Encryption**: Secure individual character cards with **AES-256-GCM** encryption.
 - **Vector Chat (RAG)**: Enhance roleplay with long-term memory via local vector databases. Supports optional **AES-256-GCM** encryption for database payloads. Duplicate, rename, and manage multiple knowledge bases with ease.
 
@@ -33,7 +33,7 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
 - **Theme Support**: Choose from 11 built-in themes including Textual Dark/Light, Catppuccin, Dracula, Gruvbox, Monokai, Nord, Solarized, Tokyo Night, and Flexoki. Themes apply consistently across the entire interface.
 - **Action Sidebar**: Right Sidebar containing roleplay tools and system prompts.
 - **Action Manager**: Full in-app manager with real-time search and category filtering.
-- **Context Window Viewer**: Inspect the raw JSON context and system prompts being sent to the LLM.
+- **Context Window Viewer**: Inspect the raw JSON context and system prompts being sent to the LLM. Accessible via the About screen.
 
 ---
 
@@ -58,6 +58,8 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
    ./run.sh
    ```
 
+> [!NOTE]
+> **GPU Acceleration**: On first launch, `run.sh` will automatically download a **Linux Multi-Arch Wheel** (~339MB) to enable CUDA support across GTX 10-series through RTX 40-series GPUs.
 
 ### Windows
 
@@ -79,7 +81,7 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
 3. **Launch**:
    - Double-click `run.bat`
 
-> [!TIP]
+> [!NOTE]
 > **GPU Acceleration**: On first launch, `run.bat` will automatically download a **Windows Multi-Arch Wheel** (~235MB) to enable CUDA support across GTX 10-series through RTX 40-series GPUs.
 > 
 

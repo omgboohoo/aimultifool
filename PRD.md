@@ -112,6 +112,7 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **Privacy & Telemetry**: Qdrant telemetry is explicitly disabled via the `QDRANT__TELEMETRY_DISABLED` environment variable to ensure zero usage reporting.
 - **Optional Encryption**: Vector databases support optional **AES-256-GCM** encryption. When enabled, embeddings and metadata are mathematically scrambled on disk and decrypted in-memory during search.
 - **Database Management**: Users can create, duplicate, rename, and delete vector databases. The system handles lifecycle management to ensure clean file handles.
+- **Vector Inspection**: Users can inspect stored vectors in active databases via the "Inspect" button, viewing decrypted content when password is provided.
 - **Similarity Search**: Performs real-time similarity searches against active databases to retrieve relevant context for the current conversation.
 
 ---
@@ -131,8 +132,8 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **ActionsManagerScreen**: Unified action menu management with search, filtering, and category organization.
 - **ChatManagerScreen**: Save and load conversation histories with optional encryption.
 - **ThemeScreen**: Theme selection and speech styling options.
-- **MiscScreen**: About screen with links to website, Discord, and support.
-- **ContextWindowScreen**: Inspect the raw JSON context and system prompts being sent to the LLM.
+- **MiscScreen**: About screen with links to website, Discord, and support. Also provides access to the Context Window Viewer.
+- **ContextWindowScreen**: Inspect the raw JSON context and system prompts being sent to the LLM. Accessible via the About (Misc) screen.
 
 ### 5.3 Keyboard Shortcuts
 - **Ctrl+S**: Stop AI generation
@@ -151,7 +152,7 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 
 ## 6. Security & Cryptography
 
-### 5.1 Encryption Standards
+### 6.1 Encryption Standards
 - **Algorithm**: AES-256-GCM (Galois/Counter Mode). Authenticated encryption ensures data integrity.
 - **Key Derivation**: Argon2id.
     - *Memory Cost*: 64MB
@@ -160,7 +161,7 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
     - *Nonce*: Random 12 bytes per encryption
 - **Scope**: Applied to Saved Chat files (`.json`) and Character Card metadata.
 
-### 5.2 Local Persistence
+### 6.2 Local Persistence
 - **No Cloud Sync**: All data is strictly local.
 - **Passphrase Handling**: Passphrases are never stored; they are used strictly for transient key derivation and then discarded from memory.
 
@@ -248,12 +249,13 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 
 ### 7.3 Character Management
 - **Character Loading**: Load SillyTavern PNG cards with automatic metadata extraction.
+- **Auto-First Response**: When loading a character card, the AI can automatically generate the character's first message. This behavior can be toggled via "Play (AI Speak First)" vs "Play (User Speak First)" buttons in the CharactersScreen. The preference is saved to `settings.json` as `force_ai_speak_first`.
 - **Character Editing**: Full metadata editor with AI-assisted generation and modification.
 - **Character Encryption**: Encrypt character cards with password protection.
 - **Character Browser**: Search and filter character cards by name.
 
 ### 7.4 Narrative Styles
-- **44 Presets**: Extensive library of narrative style presets covering various tones and genres.
+- **45 Presets**: Extensive library of narrative style presets covering various tones and genres (including "Default").
 - **Style Application**: Styles modify the system prompt and apply immediately to active conversations.
 - **Style Persistence**: Selected style is saved to settings and persists across restarts.
 
