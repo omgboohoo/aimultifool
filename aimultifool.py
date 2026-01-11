@@ -47,7 +47,7 @@ from widgets import MessageWidget, CharactersScreen, ParametersScreen, MiscScree
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.2.0"
+    TITLE = "aiMultiFool v0.2.1"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -87,6 +87,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     force_ai_speak_first = reactive(True)
     _inference_worker = None
     _last_action_list = None
+    _emotional_dynamics_content = reactive("")
 
     def notify(self, message: str, *, title: str = "", severity: str = "information", timeout: float = 1.5) -> None:
         """Override notify to halve the default display time."""
@@ -127,7 +128,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                 Container(
                     Label("User Name", classes="sidebar-label"),
                     Input(placeholder="Name", id="input-username"),
-                    classes="sidebar-setting-group"
+                    classes="sidebar-setting-group username-group"
                 ),
                 Container(
                     Label("Style", classes="sidebar-label"),
@@ -178,7 +179,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                         ("Victorian", "victorian"),
                         ("Whimsical", "whimsical")
                     ], id="select-style", value="descriptive", allow_blank=False),
-                    classes="sidebar-setting-group"
+                    classes="sidebar-setting-group style-group"
                 ),
                 Horizontal(
                     Input(placeholder="Search actions...", id="input-action-search"),
@@ -186,13 +187,21 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                     id="search-container"
                 ),
                 Vertical(id="action-sections"),
+                Container(
+                    Label("Emotion Dynamics", classes="sidebar-label"),
+                    ScrollableContainer(
+                        Static("", id="emotional-dynamics-content", classes="emotional-dynamics"),
+                        id="emotional-dynamics-scroll"
+                    ),
+                    classes="sidebar-setting-group emotional-dynamics-group"
+                ),
                 id="right-sidebar"
             ),
             id="main-layout"
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.2.0", id="status-version")
+            yield Static("aiMultiFool v0.2.1", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -1022,6 +1031,114 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         # Normal chat reset
         await self.action_wipe_all()
         self.save_user_settings()
+
+    def get_character_names(self):
+        """Extract character names from current character and user name."""
+        names = []
+        if self.current_character:
+            char_name = self.current_character.get("name") or self.current_character.get("data", {}).get("name")
+            if char_name:
+                names.append(char_name)
+        if self.user_name:
+            names.append(self.user_name)
+        return names if names else ["Character", "User"]
+    
+    def analyze_emotions(self, assistant_content: str):
+        """Analyze emotions of each character after AI reply. Called from worker thread."""
+        if not self.llm or not assistant_content:
+            return
+        
+        try:
+            # Get character names and messages from main thread
+            character_names = self.call_from_thread(self.get_character_names)
+            messages_snapshot = self.call_from_thread(lambda: list(self.messages))
+            
+            # Build prompt for emotion analysis
+            recent_messages = messages_snapshot[-6:] if len(messages_snapshot) > 6 else messages_snapshot
+            conversation_context = "\n".join([
+                f"{msg['role'].capitalize()}: {msg['content'][:500]}"
+                for msg in recent_messages
+            ])
+            
+            emotion_prompt = f"""Analyze the emotional state of each character based on the recent conversation. Be concise and specific.
+
+IMPORTANT: Use the exact character names provided below. Do NOT refer to characters as "assistant", "user", "AI", or any other generic terms.
+
+Characters: {', '.join(character_names)}
+
+Recent conversation:
+{conversation_context}
+
+Provide a brief summary (one sentence per character) of how each character feels right now. Format as:
+[Character Name]: [one sentence emotional summary]
+
+Use the exact character names from the list above. If a character hasn't appeared or spoken, you can skip them."""
+            
+            # Use the same LLM to analyze emotions
+            messages_for_analysis = [
+                {"role": "system", "content": "You are an expert at analyzing emotional states from dialogue. Always use the exact character names provided by the user. Never refer to characters as 'assistant', 'user', 'AI', or other generic terms. Provide concise, accurate summaries."},
+                {"role": "user", "content": emotion_prompt}
+            ]
+            
+            # Get sampling parameters from main thread
+            temp = self.call_from_thread(lambda: self.temp)
+            topp = self.call_from_thread(lambda: self.topp)
+            topk = self.call_from_thread(lambda: self.topk)
+            repeat = self.call_from_thread(lambda: self.repeat)
+            minp = self.call_from_thread(lambda: self.minp)
+            
+            # Run non-streaming inference for emotion analysis
+            response = self.llm.create_chat_completion(
+                messages=messages_for_analysis,
+                max_tokens=200,
+                temperature=temp,
+                top_p=topp,
+                top_k=topk,
+                repeat_penalty=repeat,
+                min_p=minp,
+                stream=False
+            )
+            
+            emotion_summary = response["choices"][0]["message"]["content"].strip()
+            
+            # Update UI from thread
+            self.call_from_thread(self._update_emotional_dynamics, emotion_summary)
+        except Exception as e:
+            # Log error for debugging but don't crash
+            import traceback
+            try:
+                self.call_from_thread(self.notify, f"Emotion analysis failed: {str(e)}", severity="warning")
+            except:
+                pass
+            traceback.print_exc()
+    
+    def _update_emotional_dynamics(self, content: str):
+        """Update the emotional dynamics display. Clears old content and shows new."""
+        try:
+            self._emotional_dynamics_content = content
+            widget = self.query_one("#emotional-dynamics-content", Static)
+            if widget:
+                # Clear old content and update with new
+                widget.update(content)
+            else:
+                self.notify("Emotional dynamics widget not found!", severity="warning")
+        except Exception as e:
+            # Log error for debugging
+            import traceback
+            traceback.print_exc()
+            try:
+                self.notify(f"Failed to update emotional dynamics: {e}", severity="warning")
+            except:
+                pass
+    
+    def clear_emotional_dynamics(self):
+        """Clear the emotional dynamics display."""
+        try:
+            self._emotional_dynamics_content = ""
+            widget = self.query_one("#emotional-dynamics-content", Static)
+            widget.update("")
+        except Exception:
+            pass
 
     async def model_screen_callback(self, result):
         if not result:

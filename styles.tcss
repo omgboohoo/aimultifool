@@ -64,8 +64,8 @@ Button {
 
 .setting-group {
     height: auto;
-    margin-top: 1;
-    margin-bottom: 1;
+    margin-top: 0;
+    margin-bottom: 0;
 }
 
 .setting-group Label {
@@ -186,8 +186,13 @@ MessageWidget.-assistant {
     width: 40;
     background: $surface;
     border-left: solid $primary;
-    padding: 1;
+    padding: 0 1;
     display: none;
+    layout: vertical;
+}
+
+#right-sidebar > Vertical {
+    height: 1fr;
 }
 
 #right-sidebar.-visible {
@@ -196,7 +201,7 @@ MessageWidget.-assistant {
 
 #right-sidebar Select {
     width: 100%;
-    margin-bottom: 1;
+    margin-bottom: 0;
     border: none;
     background: $surface;
 }
@@ -204,6 +209,23 @@ MessageWidget.-assistant {
 #right-sidebar Select:focus {
     background: $boost;
     border-left: solid $accent;
+}
+
+#emotional-dynamics-scroll {
+    width: 100%;
+    height: 1fr;
+    border: solid $primary;
+    background: $surface;
+}
+
+#emotional-dynamics-content {
+    width: 100%;
+    padding: 1;
+    background: $surface;
+}
+
+.emotional-dynamics {
+    margin-top: 0;
 }
 
 /* Accordion / Collapsible Styling */
@@ -615,15 +637,33 @@ ActionsManagerScreen {
 /* Sidebar Settings */
 .sidebar-setting-group {
     height: auto;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.emotional-dynamics-group {
+    height: 1fr;
+    display: block;
     margin-top: 1;
+}
+
+.username-group {
+    margin-bottom: 1;
+}
+
+.style-group {
     margin-bottom: 1;
 }
 
 .sidebar-label {
     padding-left: 1;
+    padding-top: 0;
+    padding-bottom: 0;
     color: $text-muted;
     text-style: bold;
     margin-bottom: 0;
+    margin-top: 0;
+    height: 1;
 }
 
 .sidebar-setting-group Input {

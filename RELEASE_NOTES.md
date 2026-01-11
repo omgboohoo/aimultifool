@@ -1,5 +1,10 @@
 # Release Notes
 
+## v0.2.1: Emotion Dynamics & UI Improvements
+### 🎭 New Feature: Emotion Dynamics Panel
+- **Character Emotion Analysis**: Added a new "Emotion Dynamics" panel at the bottom of the sidebar that automatically analyzes and displays how each character feels after each AI reply.
+- **Real-time Updates**: The panel updates automatically after each AI response, providing one-sentence emotional summaries for each character.
+
 ## v0.2.0: Unified Direct Integration & Robust Threading
 ### 🪟 Windows Stability & Threading Improvements
 - **Robust Model Loading**: Fixed the intermittent "failed to start load thread" error on Windows by transitioning from subprocess-based loading to a manual thread-and-queue system.

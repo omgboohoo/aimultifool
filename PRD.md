@@ -1,4 +1,4 @@
-# System Reference Document: aiMultiFool v0.2.0
+# System Reference Document: aiMultiFool v0.2.1
 
 ## 1. Executive Summary
 aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox. It leverages **Textual** for a responsive, desktop-class TUI and **llama-cpp-python** for high-performance local inference. The architecture prioritizes separation of concerns via a Mixin pattern, enabling clean extensibility for theming, encryption, and complex character logic.
@@ -124,6 +124,8 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **Chat Scroll Area**: Displays conversation history with role-based styling (user messages bold, assistant messages normal).
 - **Status Bar**: Shows current model name, generation status, TPS, token counts, and context usage.
 - **Top Menu Bar**: Provides access to all major features via buttons.
+- **Right Sidebar**: Contains user settings (username, style), action menu with search, and Emotion Dynamics panel.
+  - **Emotion Dynamics Panel**: Located at the bottom of the sidebar, automatically analyzes and displays character emotional states after each AI reply. Shows one-sentence summaries per character, scrollable when content exceeds visible area. Panel splits remaining sidebar space equally with the action menu (50/50).
 
 ### 5.2 Modal Screens
 - **ModelScreen**: Model selection, context size, and GPU layer configuration.
@@ -258,6 +260,14 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **45 Presets**: Extensive library of narrative style presets covering various tones and genres (including "Default").
 - **Style Application**: Styles modify the system prompt and apply immediately to active conversations.
 - **Style Persistence**: Selected style is saved to settings and persists across restarts.
+
+### 7.5 Emotion Dynamics
+- **Automatic Analysis**: After each AI reply completes, the system automatically analyzes the emotional state of each character in the conversation.
+- **Character Recognition**: Extracts character names from the current character card and user name, ensuring accurate identification.
+- **One-Sentence Summaries**: Provides concise one-sentence emotional summaries for each character, displayed in a dedicated sidebar panel.
+- **Real-time Updates**: The Emotion Dynamics panel updates automatically after each AI response, replacing previous analysis with new insights.
+- **Smart Prompting**: Uses enhanced prompts to ensure the AI uses actual character names instead of generic terms like "assistant" or "user".
+- **Layout Integration**: Panel shares remaining sidebar space equally with the action menu (50/50), automatically resizing based on available space.
 
 ---
 
