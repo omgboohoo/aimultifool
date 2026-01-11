@@ -544,6 +544,14 @@ class CharactersScreen(ModalScreen):
                  def on_pass(password):
                      if password:
                          self.load_metadata(card_path, password_attempt=password)
+                     else:
+                         # User cancelled - deselect the card
+                         list_view = self.query_one("#list-characters", ListView)
+                         list_view.index = None
+                         # Clear metadata text
+                         self.query_one("#metadata-text", TextArea).text = ""
+                         # Update button states to disable play buttons
+                         self.update_button_states()
                  
                  self.app.push_screen(GenericPasswordModal(title="Enter Password to Unlock"), on_pass)
 
