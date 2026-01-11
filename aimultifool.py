@@ -1046,8 +1046,16 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             messages_snapshot = self.call_from_thread(lambda: list(self.messages))
             
             # Get the last 3 user/assistant exchanges (6 messages total)
+            # Filter out RAG context messages to avoid huge prompts
             recent_messages = []
             for msg in reversed(messages_snapshot):
+                # Skip RAG context messages - they're very long and not relevant for emotion analysis
+                content = msg.get('content', '')
+                if msg['role'] == 'user' and content.startswith('[Past Context]:'):
+                    continue
+                if msg['role'] == 'system' and content.startswith('Relevant past context:'):
+                    continue
+                
                 if msg['role'] in ['user', 'assistant']:
                     recent_messages.insert(0, msg)
                     if len(recent_messages) >= 6:  # 3 exchanges = 6 messages
