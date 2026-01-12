@@ -1,5 +1,12 @@
 # Release Notes
 
+## v0.2.2: Emotion Analysis Optimization & Performance
+### ⚡ Performance Improvement: Manual Emotion Analysis
+- **On-Demand Emotion Analysis**: Moved emotion analysis from automatic sidebar updates to an on-demand "Emotion Analysis" button in the main action bar. This eliminates the automatic analysis overhead after every AI reply, significantly speeding up normal chat interactions.
+- **Faster Chat Experience**: By removing automatic emotion analysis, chat responses now complete faster without waiting for emotion processing. Users can trigger emotion analysis manually when needed via the dedicated button.
+- **Improved Chat Window Integration**: Emotion analysis results now appear directly in the main chat window as informational messages, providing better visibility and context without requiring sidebar navigation.
+- **Enhanced Control**: Users have full control over when to analyze emotions, allowing them to focus on fast-paced conversations without interruption.
+
 ## v0.2.1: Emotion Dynamics & UI Improvements
 ### 🎭 New Feature: Emotion Dynamics Panel
 - **Character Emotion Analysis**: Added a new "Emotion Dynamics" panel at the bottom of the sidebar that automatically analyzes and displays how each character feels after each AI reply.

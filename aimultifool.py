@@ -32,6 +32,7 @@ from textual.containers import Vertical, Horizontal, ScrollableContainer, Contai
 from textual.widgets import Header, Input, Static, Label, Button, Select, ListView, ListItem, Collapsible
 from textual.reactive import reactive
 from textual.binding import Binding
+from textual import work
 import llama_cpp
 
 # Modular Logic Mixins
@@ -47,7 +48,7 @@ from widgets import MessageWidget, CharactersScreen, ParametersScreen, MiscScree
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.2.1"
+    TITLE = "aiMultiFool v0.2.2"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -88,7 +89,6 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     force_ai_speak_first = reactive(True)
     _inference_worker = None
     _last_action_list = None
-    _emotional_dynamics_content = reactive("")
 
     def notify(self, message: str, *, title: str = "", severity: str = "information", timeout: float = 1.5) -> None:
         """Override notify to halve the default display time."""
@@ -119,6 +119,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                         Button("Rewind", id="btn-rewind", variant="default"),
                         Button("Restart", id="btn-restart", variant="default"),
                         Button("Clear", id="btn-clear-chat", variant="default"),
+                        Button("Emotion Analysis", id="btn-emotions", variant="default"),
                         id="action-buttons"
                     ),
                     id="input-container"
@@ -188,21 +189,13 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                     id="search-container"
                 ),
                 Vertical(id="action-sections"),
-                Container(
-                    Label("Emotion Dynamics", classes="sidebar-label"),
-                    ScrollableContainer(
-                        Static("", id="emotional-dynamics-content", classes="emotional-dynamics"),
-                        id="emotional-dynamics-scroll"
-                    ),
-                    classes="sidebar-setting-group emotional-dynamics-group"
-                ),
                 id="right-sidebar"
             ),
             id="main-layout"
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.2.1", id="status-version")
+            yield Static("aiMultiFool v0.2.2", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -330,9 +323,10 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             # Disable top menu buttons when AI is generating
             if btn.id in ["btn-file", "btn-misc", "btn-theme", "btn-cards", "btn-parameters", "btn-model-settings", "btn-manage-actions", "btn-vector-chat"]:
                 btn.disabled = is_ai_generating
-            elif btn.id in ["btn-continue", "btn-regenerate", "btn-rewind", "btn-restart", "btn-clear-chat"]:
+            elif btn.id in ["btn-continue", "btn-regenerate", "btn-rewind", "btn-restart", "btn-clear-chat", "btn-emotions"]:
                 # Disable if busy OR if no model is loaded OR if AI is generating
                 # Regenerate and rewind are always disabled while AI is speaking
+                # Emotions button is disabled while analyzing emotions or generating
                 btn.disabled = is_busy or not self.llm or is_ai_generating
             elif btn.id == "btn-clear-search":
                 # Only enabled if there is text in the search box
@@ -355,7 +349,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             all_inputs.extend(list(self.screen.query(Input)))
         for inp in all_inputs:
             if inp.id == "chat-input":
-                inp.disabled = is_busy or not self.llm
+                # Disable chat input while busy, no model loaded, or analyzing emotions (but NOT during normal AI generation)
+                inp.disabled = is_busy or not self.llm or self.is_analyzing_emotions
             elif inp.id == "input-username":
                 # Disable username field while AI is generating
                 inp.disabled = is_busy or is_ai_generating
@@ -848,6 +843,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         elif event.button.id == "btn-restart": await self.action_reset_chat()
         elif event.button.id == "btn-rewind": await self.action_rewind()
         elif event.button.id == "btn-clear-chat": await self.action_wipe_all()
+        elif event.button.id == "btn-emotions": self.analyze_emotions()
         elif event.button.id == "btn-manage-actions":
             self.push_screen(ActionsManagerScreen(), self.actions_mgmt_callback)
         elif event.button.id == "btn-cards":
@@ -1041,13 +1037,16 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         await self.action_wipe_all()
         self.save_user_settings()
 
-    def analyze_emotions(self, assistant_content: str):
-        """Analyze emotions of each character after AI reply. Called from worker thread."""
-        if not self.llm or not assistant_content:
+    @work(exclusive=True, thread=True)
+    def analyze_emotions(self):
+        """Analyze emotions of each character and print to chat window. Called from button press."""
+        if not self.llm:
+            self.call_from_thread(self.notify, "No model loaded. Please load a model first.", severity="warning")
             return
         
         # Set flag to indicate emotional dynamics analysis is starting
         self.call_from_thread(setattr, self, "is_analyzing_emotions", True)
+        self.call_from_thread(setattr, self, "status_text", "Analyzing emotions...")
         
         try:
             # Get messages from main thread
@@ -1071,6 +1070,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             
             # Need at least one exchange to analyze
             if len(recent_messages) < 2:
+                self.call_from_thread(self.notify, "Not enough conversation to analyze emotions. Need at least one exchange.", severity="information")
                 return
             
             conversation_context = "\n".join([
@@ -1106,7 +1106,6 @@ You MUST include every character mentioned in the conversation. Do NOT refer to 
             # Run non-streaming inference for emotion analysis
             response = self.llm.create_chat_completion(
                 messages=messages_for_analysis,
-                max_tokens=200,
                 temperature=temp,
                 top_p=topp,
                 top_k=topk,
@@ -1117,8 +1116,8 @@ You MUST include every character mentioned in the conversation. Do NOT refer to 
             
             emotion_summary = response["choices"][0]["message"]["content"].strip()
             
-            # Update UI from thread
-            self.call_from_thread(self._update_emotional_dynamics, emotion_summary)
+            # Print to chat window instead of sidebar
+            self.call_from_thread(self._print_emotions_to_chat, emotion_summary)
         except Exception as e:
             # Log error for debugging but don't crash
             import traceback
@@ -1130,38 +1129,26 @@ You MUST include every character mentioned in the conversation. Do NOT refer to 
         finally:
             # Always clear the flag when analysis completes (success or failure)
             self.call_from_thread(setattr, self, "is_analyzing_emotions", False)
+            self.call_from_thread(setattr, self, "status_text", "Ready")
+            # Re-enable and focus the chat input after analysis completes
+            self.call_from_thread(self.focus_chat_input)
     
-    def _update_emotional_dynamics(self, content: str):
-        """Update the emotional dynamics display. Clears old content and shows new."""
+    def _print_emotions_to_chat(self, content: str):
+        """Print emotion analysis results to the chat window."""
         try:
-            self._emotional_dynamics_content = content
-            widget = self.query_one("#emotional-dynamics-content", Static)
-            scroll_container = self.query_one("#emotional-dynamics-scroll")
-            if widget:
-                # Clear old content and update with new
-                widget.update(content)
-                # Scroll to top when updating
-                if scroll_container:
-                    scroll_container.scroll_to(0, 0, animate=False)
-            else:
-                self.notify("Emotional dynamics widget not found!", severity="warning")
+            # Add message to chat synchronously (similar to sync_add_assistant_widget)
+            chat_scroll = self.query_one("#chat-scroll")
+            msg_widget = MessageWidget("system", f"**Emotion Analysis:**\n\n{content}", user_name=self.user_name, is_info=True)
+            chat_scroll.mount(msg_widget)
+            chat_scroll.scroll_end(animate=False)
         except Exception as e:
             # Log error for debugging
             import traceback
             traceback.print_exc()
             try:
-                self.notify(f"Failed to update emotional dynamics: {e}", severity="warning")
+                self.notify(f"Failed to print emotions to chat: {e}", severity="warning")
             except:
                 pass
-    
-    def clear_emotional_dynamics(self):
-        """Clear the emotional dynamics display."""
-        try:
-            self._emotional_dynamics_content = ""
-            widget = self.query_one("#emotional-dynamics-content", Static)
-            widget.update("")
-        except Exception:
-            pass
 
     async def model_screen_callback(self, result):
         if not result:

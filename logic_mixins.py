@@ -201,18 +201,6 @@ class InferenceMixin:
                         final_pct = (final_tokens / self.context_size) * 100
                         
                         self.call_from_thread(setattr, self, "status_text", f"{'Stopped' if was_cancelled else 'Finished'}. {token_count} tokens. Peak TPS: {peak_tps:.1f} | Context: {final_pct:.1f}%")
-                        
-                        # Analyze emotions after inference completes (if not cancelled)
-                        if not was_cancelled and assistant_content:
-                            # Call analyze_emotions directly (it's a @work method that handles threading)
-                            if hasattr(self, "analyze_emotions"):
-                                try:
-                                    self.analyze_emotions(assistant_content)
-                                except Exception as e:
-                                    # Log but don't crash inference
-                                    import traceback
-                                    traceback.print_exc()
-                                    self.call_from_thread(self.notify, f"Emotion analysis error: {e}", severity="warning")
                     except Exception:
                         pass
                 
