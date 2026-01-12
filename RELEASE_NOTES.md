@@ -1,5 +1,11 @@
 # Release Notes
 
+## v0.2.3: Streaming Emotion Analysis & Vector Chat Fixes
+### ⚡ Emotion Analysis Improvements
+- **Streaming Responses**: Emotion analysis now streams responses in real-time, just like regular AI replies. Users no longer need to wait for the complete analysis - results appear incrementally as they're generated.
+- **Simplified Prompt**: Removed unnecessary notes and extra information from emotion analysis output. The prompt now focuses solely on providing concise emotional summaries for each character.
+- **Vector Chat Compatibility**: Fixed emotion analysis to properly detect all characters when using Vector Chat (RAG). Vector context messages are now correctly filtered out, ensuring emotion analysis only examines the actual recent conversation, not historical context.
+
 ## v0.2.2: Emotion Analysis Optimization & Performance
 ### ⚡ Performance Improvement: Manual Emotion Analysis
 - **On-Demand Emotion Analysis**: Moved emotion analysis from automatic sidebar updates to an on-demand "Emotion Analysis" button in the main action bar. This eliminates the automatic analysis overhead after every AI reply, significantly speeding up normal chat interactions.

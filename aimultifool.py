@@ -48,7 +48,7 @@ from widgets import MessageWidget, CharactersScreen, ParametersScreen, MiscScree
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.2.2"
+    TITLE = "aiMultiFool v0.2.3"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -195,7 +195,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.2.2", id="status-version")
+            yield Static("aiMultiFool v0.2.3", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -1054,19 +1054,34 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             
             # Get the last 3 user/assistant exchanges (6 messages total)
             # Filter out RAG context messages to avoid huge prompts
-            recent_messages = []
-            for msg in reversed(messages_snapshot):
-                # Skip RAG context messages - they're very long and not relevant for emotion analysis
+            # First, filter out all vector context messages by iterating forward
+            filtered_messages = []
+            i = 0
+            while i < len(messages_snapshot):
+                msg = messages_snapshot[i]
                 content = msg.get('content', '')
+                
+                # Skip vector context user messages and the assistant message that follows
                 if msg['role'] == 'user' and content.startswith('[Past Context]:'):
-                    continue
-                if msg['role'] == 'system' and content.startswith('Relevant past context:'):
+                    i += 1  # Skip this user message
+                    # Also skip the next assistant message if it exists (it's from vector context)
+                    if i < len(messages_snapshot) and messages_snapshot[i]['role'] == 'assistant':
+                        i += 1
                     continue
                 
+                # Skip system messages with vector context
+                if msg['role'] == 'system' and content.startswith('Relevant past context:'):
+                    i += 1
+                    continue
+                
+                # Keep regular user/assistant messages
                 if msg['role'] in ['user', 'assistant']:
-                    recent_messages.insert(0, msg)
-                    if len(recent_messages) >= 6:  # 3 exchanges = 6 messages
-                        break
+                    filtered_messages.append(msg)
+                
+                i += 1
+            
+            # Now get the last 6 messages (3 exchanges) from filtered messages
+            recent_messages = filtered_messages[-6:] if len(filtered_messages) >= 6 else filtered_messages
             
             # Need at least one exchange to analyze
             if len(recent_messages) < 2:
@@ -1078,21 +1093,14 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                 for msg in recent_messages
             ])
             
-            emotion_prompt = f"""Analyze the emotional state of each character mentioned in the conversation below. Be concise and specific.
-
-CRITICAL: You MUST analyze EVERY character mentioned or appearing in the last 3 user/assistant exchanges below. Do NOT skip any characters. Provide an emotional summary for EACH character you find.
-
-Recent conversation:
+            emotion_prompt = f"""Recent conversation:
 {conversation_context}
 
-For each character mentioned or appearing in the conversation above, provide a one-sentence emotional summary. Format your response as:
-[Character Name]: [one sentence emotional summary]
-
-You MUST include every character mentioned in the conversation. Do NOT refer to characters as "assistant", "user", "AI", or any other generic terms. If a character appears multiple times, still analyze them once."""
+Analyze the emotional state of each character mentioned above."""
             
             # Use the same LLM to analyze emotions
             messages_for_analysis = [
-                {"role": "system", "content": "You are an expert at analyzing emotional states from dialogue. You MUST identify and analyze EVERY character mentioned in the conversation. Do not skip any characters. Provide a one-sentence emotional summary for EACH character you find. Never refer to characters as 'assistant', 'user', 'AI', or other generic terms. Be thorough and complete - analyze ALL characters."},
+                {"role": "system", "content": "You are an expert at analyzing emotional states from dialogue. You MUST identify and analyze EVERY character mentioned in the conversation. Do not skip any characters. Provide a one-sentence emotional summary for EACH character you find. Format as: [Character Name]: [one sentence emotional summary]. Never refer to characters as 'assistant', 'user', 'AI', or other generic terms. Do not add any notes or other information - only the emotional summaries. Be thorough and complete - analyze ALL characters."},
                 {"role": "user", "content": emotion_prompt}
             ]
             
@@ -1103,21 +1111,50 @@ You MUST include every character mentioned in the conversation. Do NOT refer to 
             repeat = self.call_from_thread(lambda: self.repeat)
             minp = self.call_from_thread(lambda: self.minp)
             
-            # Run non-streaming inference for emotion analysis
-            response = self.llm.create_chat_completion(
+            # Create initial widget for streaming
+            emotion_widget = None
+            emotion_content = ""
+            
+            # Run streaming inference for emotion analysis
+            stream = self.llm.create_chat_completion(
                 messages=messages_for_analysis,
                 temperature=temp,
                 top_p=topp,
                 top_k=topk,
                 repeat_penalty=repeat,
                 min_p=minp,
-                stream=False
+                stream=True
             )
             
-            emotion_summary = response["choices"][0]["message"]["content"].strip()
+            import time
+            last_ui_update = 0
             
-            # Print to chat window instead of sidebar
-            self.call_from_thread(self._print_emotions_to_chat, emotion_summary)
+            for output in stream:
+                text_chunk = output["choices"][0].get("delta", {}).get("content", "")
+                if not text_chunk:
+                    continue
+                
+                emotion_content += text_chunk
+                
+                now = time.time()
+                
+                # Batch UI updates: update every 50ms
+                if emotion_widget is None:
+                    try:
+                        emotion_widget = self.call_from_thread(self._create_emotion_widget, emotion_content)
+                        last_ui_update = now
+                    except Exception:
+                        break
+                elif now - last_ui_update > 0.05:
+                    try:
+                        self.call_from_thread(self._update_emotion_widget, emotion_widget, emotion_content)
+                        last_ui_update = now
+                    except Exception:
+                        break
+            
+            # Final update to ensure everything is flushed
+            if emotion_widget and emotion_content:
+                self.call_from_thread(self._update_emotion_widget, emotion_widget, emotion_content)
         except Exception as e:
             # Log error for debugging but don't crash
             import traceback
@@ -1133,20 +1170,36 @@ You MUST include every character mentioned in the conversation. Do NOT refer to 
             # Re-enable and focus the chat input after analysis completes
             self.call_from_thread(self.focus_chat_input)
     
-    def _print_emotions_to_chat(self, content: str):
-        """Print emotion analysis results to the chat window."""
+    def _create_emotion_widget(self, content: str):
+        """Create initial emotion analysis widget for streaming."""
         try:
-            # Add message to chat synchronously (similar to sync_add_assistant_widget)
             chat_scroll = self.query_one("#chat-scroll")
             msg_widget = MessageWidget("system", f"**Emotion Analysis:**\n\n{content}", user_name=self.user_name, is_info=True)
             chat_scroll.mount(msg_widget)
             chat_scroll.scroll_end(animate=False)
+            return msg_widget
         except Exception as e:
-            # Log error for debugging
             import traceback
             traceback.print_exc()
             try:
-                self.notify(f"Failed to print emotions to chat: {e}", severity="warning")
+                self.notify(f"Failed to create emotion widget: {e}", severity="warning")
+            except:
+                pass
+            return None
+    
+    def _update_emotion_widget(self, widget, content: str):
+        """Update emotion analysis widget with new content during streaming."""
+        try:
+            if widget:
+                widget.content = f"**Emotion Analysis:**\n\n{content}"
+                widget.refresh()
+                chat_scroll = self.query_one("#chat-scroll")
+                chat_scroll.scroll_end(animate=False)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            try:
+                self.notify(f"Failed to update emotion widget: {e}", severity="warning")
             except:
                 pass
 
