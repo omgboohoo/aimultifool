@@ -120,12 +120,12 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 ## 5. User Interface & Modals
 
 ### 5.1 Main Interface Components
-- **Chat Input**: Primary text input for user messages, disabled during model loading or generation.
+- **Chat Input**: Primary text input for user messages, disabled during model loading, generation, or emotion analysis.
 - **Chat Scroll Area**: Displays conversation history with role-based styling (user messages bold, assistant messages normal).
 - **Status Bar**: Shows current model name, generation status, TPS, token counts, and context usage.
 - **Top Menu Bar**: Provides access to all major features via buttons.
-- **Right Sidebar**: Contains user settings (username, style), action menu with search, and Emotion Dynamics panel.
-  - **Emotion Dynamics Panel**: Located at the bottom of the sidebar, automatically analyzes and displays character emotional states after each AI reply. Shows one-sentence summaries per character, scrollable when content exceeds visible area. Panel splits remaining sidebar space equally with the action menu (50/50).
+- **Action Buttons**: Located below the chat input, includes Stop, Continue, Regenerate, Rewind, Restart, Clear, and Emotion Analysis buttons for controlling chat interactions.
+- **Right Sidebar**: Contains user settings (username, style) and action menu with search.
 
 ### 5.2 Modal Screens
 - **ModelScreen**: Model selection, context size, and GPU layer configuration.
@@ -261,13 +261,14 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **Style Application**: Styles modify the system prompt and apply immediately to active conversations.
 - **Style Persistence**: Selected style is saved to settings and persists across restarts.
 
-### 7.5 Emotion Dynamics
-- **Automatic Analysis**: After each AI reply completes, the system automatically analyzes the emotional state of each character in the conversation.
-- **Character Recognition**: Extracts character names from the current character card and user name, ensuring accurate identification.
-- **One-Sentence Summaries**: Provides concise one-sentence emotional summaries for each character, displayed in a dedicated sidebar panel.
-- **Real-time Updates**: The Emotion Dynamics panel updates automatically after each AI response, replacing previous analysis with new insights.
+### 7.5 Emotion Analysis
+- **Manual Analysis**: Emotion analysis is triggered on-demand via the "Emotion Analysis" button in the main action bar, allowing users to control when to analyze character emotional states.
+- **Performance Optimization**: By removing automatic analysis after each AI reply, normal chat interactions complete faster without waiting for emotion processing overhead.
+- **Chat Window Integration**: Analysis results appear directly in the main chat window as informational messages, providing better visibility and context without requiring sidebar navigation.
+- **Character Recognition**: Extracts character names from recent conversation context, ensuring accurate identification of all characters mentioned.
+- **One-Sentence Summaries**: Provides concise one-sentence emotional summaries for each character identified in the conversation.
 - **Smart Prompting**: Uses enhanced prompts to ensure the AI uses actual character names instead of generic terms like "assistant" or "user".
-- **Layout Integration**: Panel shares remaining sidebar space equally with the action menu (50/50), automatically resizing based on available space.
+- **UI State Management**: During analysis, the chat input and action buttons are disabled, with status text showing "Analyzing emotions..." to provide user feedback.
 
 ---
 
