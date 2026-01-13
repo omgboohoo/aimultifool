@@ -48,7 +48,7 @@ from widgets import MessageWidget, CharactersScreen, ParametersScreen, MiscScree
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.2.3"
+    TITLE = "aiMultiFool v0.2.4"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -84,6 +84,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     is_downloading = reactive(False)
     is_char_edit_mode = reactive(False)
     is_analyzing_emotions = reactive(False)
+    is_analyzing_stats = reactive(False)
     vector_chat_name = reactive(None)
     enable_vector_chat = reactive(False)
     force_ai_speak_first = reactive(True)
@@ -119,7 +120,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                         Button("Rewind", id="btn-rewind", variant="default"),
                         Button("Restart", id="btn-restart", variant="default"),
                         Button("Clear", id="btn-clear-chat", variant="default"),
-                        Button("Emotion Analysis", id="btn-emotions", variant="default"),
+                        Button("Emotions", id="btn-emotions", variant="default"),
+                        Button("Stats", id="btn-stats", variant="default"),
                         id="action-buttons"
                     ),
                     id="input-container"
@@ -195,7 +197,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.2.3", id="status-version")
+            yield Static("aiMultiFool v0.2.4", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -288,6 +290,10 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         """Called when is_analyzing_emotions changes."""
         self.update_ui_state()
 
+    def watch_is_analyzing_stats(self, is_analyzing_stats: bool) -> None:
+        """Called when is_analyzing_stats changes."""
+        self.update_ui_state()
+
     def watch_enable_vector_chat(self, enable_vector_chat: bool) -> None:
         """Called when enable_vector_chat changes."""
         try:
@@ -306,8 +312,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     def update_ui_state(self):
         """Disable or enable UI elements based on app state."""
         is_busy = self.is_model_loading or self.is_downloading
-        # Also disable action menu while AI is actively generating or analyzing emotions
-        is_ai_generating = self.is_loading or self.is_analyzing_emotions
+        # Also disable action menu while AI is actively generating or analyzing emotions/stats
+        is_ai_generating = self.is_loading or self.is_analyzing_emotions or self.is_analyzing_stats
         
         # Query both the main app and the active screen to ensure modals are covered
         all_buttons = list(self.query(Button))
@@ -323,10 +329,10 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             # Disable top menu buttons when AI is generating
             if btn.id in ["btn-file", "btn-misc", "btn-theme", "btn-cards", "btn-parameters", "btn-model-settings", "btn-manage-actions", "btn-vector-chat"]:
                 btn.disabled = is_ai_generating
-            elif btn.id in ["btn-continue", "btn-regenerate", "btn-rewind", "btn-restart", "btn-clear-chat", "btn-emotions"]:
+            elif btn.id in ["btn-continue", "btn-regenerate", "btn-rewind", "btn-restart", "btn-clear-chat", "btn-emotions", "btn-stats"]:
                 # Disable if busy OR if no model is loaded OR if AI is generating
                 # Regenerate and rewind are always disabled while AI is speaking
-                # Emotions button is disabled while analyzing emotions or generating
+                # Emotions and Stats buttons are disabled while analyzing or generating
                 btn.disabled = is_busy or not self.llm or is_ai_generating
             elif btn.id == "btn-clear-search":
                 # Only enabled if there is text in the search box
@@ -349,8 +355,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             all_inputs.extend(list(self.screen.query(Input)))
         for inp in all_inputs:
             if inp.id == "chat-input":
-                # Disable chat input while busy, no model loaded, or analyzing emotions (but NOT during normal AI generation)
-                inp.disabled = is_busy or not self.llm or self.is_analyzing_emotions
+                # Disable chat input while busy, no model loaded, or analyzing emotions/stats (but NOT during normal AI generation)
+                inp.disabled = is_busy or not self.llm or self.is_analyzing_emotions or self.is_analyzing_stats
             elif inp.id == "input-username":
                 # Disable username field while AI is generating
                 inp.disabled = is_busy or is_ai_generating
@@ -844,6 +850,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         elif event.button.id == "btn-rewind": await self.action_rewind()
         elif event.button.id == "btn-clear-chat": await self.action_wipe_all()
         elif event.button.id == "btn-emotions": self.analyze_emotions()
+        elif event.button.id == "btn-stats": self.analyze_stats()
         elif event.button.id == "btn-manage-actions":
             self.push_screen(ActionsManagerScreen(), self.actions_mgmt_callback)
         elif event.button.id == "btn-cards":
@@ -1200,6 +1207,182 @@ Analyze the emotional state of each character mentioned above."""
             traceback.print_exc()
             try:
                 self.notify(f"Failed to update emotion widget: {e}", severity="warning")
+            except:
+                pass
+
+    @work(exclusive=True, thread=True)
+    def analyze_stats(self):
+        """Analyze character stats from the last 3 conversations and print to chat window. Called from button press."""
+        if not self.llm:
+            self.call_from_thread(self.notify, "No model loaded. Please load a model first.", severity="warning")
+            return
+        
+        # Set flag to indicate stats analysis is starting
+        self.call_from_thread(setattr, self, "is_analyzing_stats", True)
+        self.call_from_thread(setattr, self, "status_text", "Analyzing stats...")
+        
+        try:
+            # Get messages from main thread
+            messages_snapshot = self.call_from_thread(lambda: list(self.messages))
+            
+            # Get the last 3 user/assistant exchanges (6 messages total)
+            # Filter out RAG context messages to avoid huge prompts
+            # First, filter out all vector context messages by iterating forward
+            filtered_messages = []
+            i = 0
+            while i < len(messages_snapshot):
+                msg = messages_snapshot[i]
+                content = msg.get('content', '')
+                
+                # Skip vector context user messages and the assistant message that follows
+                if msg['role'] == 'user' and content.startswith('[Past Context]:'):
+                    i += 1  # Skip this user message
+                    # Also skip the next assistant message if it exists (it's from vector context)
+                    if i < len(messages_snapshot) and messages_snapshot[i]['role'] == 'assistant':
+                        i += 1
+                    continue
+                
+                # Skip system messages with vector context
+                if msg['role'] == 'system' and content.startswith('Relevant past context:'):
+                    i += 1
+                    continue
+                
+                # Keep regular user/assistant messages
+                if msg['role'] in ['user', 'assistant']:
+                    filtered_messages.append(msg)
+                
+                i += 1
+            
+            # Now get the last 6 messages (3 exchanges) from filtered messages
+            recent_messages = filtered_messages[-6:] if len(filtered_messages) >= 6 else filtered_messages
+            
+            # Need at least one exchange to analyze
+            if len(recent_messages) < 2:
+                self.call_from_thread(self.notify, "Not enough conversation to analyze stats. Need at least one exchange.", severity="information")
+                return
+            
+            conversation_context = "\n".join([
+                f"{msg['role'].capitalize()}: {msg['content']}"
+                for msg in recent_messages
+            ])
+            
+            stats_prompt = f"""Recent conversation:
+{conversation_context}
+
+Analyze the character stats for each character mentioned above. For each character, provide numeric stats (0-100) in this format:
+
+[Character Name]:
+- Trust: [0-100]
+- Affection: [0-100]
+- Confidence: [0-100]
+- Stress: [0-100]
+- Interest: [0-100]
+- Arousal: [0-100]
+
+Base these stats on the character's words, actions, and reactions in the conversation. Provide stats for ALL characters mentioned."""
+            
+            # Use the same LLM to analyze stats
+            messages_for_analysis = [
+                {"role": "system", "content": "You are an expert at analyzing character attributes from dialogue. You MUST identify and analyze EVERY character mentioned in the conversation. Do not skip any characters. For each character, provide numeric stats (0-100) for: Trust, Affection, Confidence, Stress, Interest, and Arousal. Format as: [Character Name]:\n- Trust: [0-100]\n- Affection: [0-100]\n- Confidence: [0-100]\n- Stress: [0-100]\n- Interest: [0-100]\n- Arousal: [0-100]\n\nNever refer to characters as 'assistant', 'user', 'AI', or other generic terms. Do not add any notes or other information - only the stat summaries. Be thorough and complete - analyze ALL characters."},
+                {"role": "user", "content": stats_prompt}
+            ]
+            
+            # Get sampling parameters from main thread
+            temp = self.call_from_thread(lambda: self.temp)
+            topp = self.call_from_thread(lambda: self.topp)
+            topk = self.call_from_thread(lambda: self.topk)
+            repeat = self.call_from_thread(lambda: self.repeat)
+            minp = self.call_from_thread(lambda: self.minp)
+            
+            # Create initial widget for streaming
+            stats_widget = None
+            stats_content = ""
+            
+            # Run streaming inference for stats analysis
+            stream = self.llm.create_chat_completion(
+                messages=messages_for_analysis,
+                temperature=temp,
+                top_p=topp,
+                top_k=topk,
+                repeat_penalty=repeat,
+                min_p=minp,
+                stream=True
+            )
+            
+            import time
+            last_ui_update = 0
+            
+            for output in stream:
+                text_chunk = output["choices"][0].get("delta", {}).get("content", "")
+                if not text_chunk:
+                    continue
+                
+                stats_content += text_chunk
+                
+                now = time.time()
+                
+                # Batch UI updates: update every 50ms
+                if stats_widget is None:
+                    try:
+                        stats_widget = self.call_from_thread(self._create_stats_widget, stats_content)
+                        last_ui_update = now
+                    except Exception:
+                        break
+                elif now - last_ui_update > 0.05:
+                    try:
+                        self.call_from_thread(self._update_stats_widget, stats_widget, stats_content)
+                        last_ui_update = now
+                    except Exception:
+                        break
+            
+            # Final update to ensure everything is flushed
+            if stats_widget and stats_content:
+                self.call_from_thread(self._update_stats_widget, stats_widget, stats_content)
+        except Exception as e:
+            # Log error for debugging but don't crash
+            import traceback
+            try:
+                self.call_from_thread(self.notify, f"Stats analysis failed: {str(e)}", severity="warning")
+            except:
+                pass
+            traceback.print_exc()
+        finally:
+            # Always clear the flag when analysis completes (success or failure)
+            self.call_from_thread(setattr, self, "is_analyzing_stats", False)
+            self.call_from_thread(setattr, self, "status_text", "Ready")
+            # Re-enable and focus the chat input after analysis completes
+            self.call_from_thread(self.focus_chat_input)
+    
+    def _create_stats_widget(self, content: str):
+        """Create initial stats analysis widget for streaming."""
+        try:
+            chat_scroll = self.query_one("#chat-scroll")
+            msg_widget = MessageWidget("system", f"**Character Stats:**\n\n{content}", user_name=self.user_name, is_info=True)
+            chat_scroll.mount(msg_widget)
+            chat_scroll.scroll_end(animate=False)
+            return msg_widget
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            try:
+                self.notify(f"Failed to create stats widget: {e}", severity="warning")
+            except:
+                pass
+            return None
+    
+    def _update_stats_widget(self, widget, content: str):
+        """Update stats analysis widget with new content during streaming."""
+        try:
+            if widget:
+                widget.content = f"**Character Stats:**\n\n{content}"
+                widget.refresh()
+                chat_scroll = self.query_one("#chat-scroll")
+                chat_scroll.scroll_end(animate=False)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            try:
+                self.notify(f"Failed to update stats widget: {e}", severity="warning")
             except:
                 pass
 

@@ -1,5 +1,20 @@
 # Release Notes
 
+## v0.2.4: Character Stats Analysis
+### 📊 New Feature: Character Stats Analysis
+- **Stats Button**: Added a new "Stats" button next to the "Emotions" button for analyzing character attributes from recent conversations.
+- **Core Stats Tracking**: Analyzes six key character stats (0-100 scale) for each character mentioned:
+  - **Trust**: How much the character trusts others
+  - **Affection**: Emotional closeness/attachment
+  - **Confidence**: Self-assurance/assertiveness
+  - **Stress**: Pressure/anxiety level
+  - **Interest**: Engagement in the conversation
+  - **Arousal**: Sexual/romantic excitement level
+- **Streaming Responses**: Stats analysis streams results in real-time, just like emotion analysis, providing instant feedback as stats are generated.
+- **Last 3 Conversations**: Analyzes the last 3 user/assistant exchanges (6 messages total) to determine current character stat values.
+- **Vector Chat Compatibility**: Works seamlessly with Vector Chat (RAG), filtering out vector context messages to focus on actual conversation content.
+- **UI Improvements**: Renamed "Emotion Analysis" button to "Emotions" for a cleaner, more concise interface.
+
 ## v0.2.3: Streaming Emotion Analysis & Vector Chat Fixes
 ### ⚡ Emotion Analysis Improvements
 - **Streaming Responses**: Emotion analysis now streams responses in real-time, just like regular AI replies. Users no longer need to wait for the complete analysis - results appear incrementally as they're generated.
