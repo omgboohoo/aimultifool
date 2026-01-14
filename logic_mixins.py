@@ -702,7 +702,9 @@ class ActionsMixin:
             # 2. Put the user's message back into the input box for editing
             try:
                 if last_user_content and last_user_content != "continue":
-                    self.query_one("#chat-input").value = last_user_content
+                    # Strip newlines from action prompts when loading into input box
+                    cleaned_content = last_user_content.replace('\n', ' ').replace('\r', ' ')
+                    self.query_one("#chat-input").value = cleaned_content
             except Exception:
                 pass
 
