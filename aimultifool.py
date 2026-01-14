@@ -693,7 +693,9 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                     self.first_user_message = prompt
                     
                 self.notify(f"Action: {item_name}")
-                # Add message to conversation history but don't display it in chat window
+                # Display action title in chat window (sync_only=True so it doesn't add to messages)
+                await self.add_message("user", f"***{item_name}***", sync_only=True)
+                # Add prompt to conversation history for inference
                 self.messages.append({"role": "user", "content": prompt})
                 self.is_loading = True
                 self._inference_worker = self.run_inference(prompt)
