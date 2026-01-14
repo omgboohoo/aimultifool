@@ -1,4 +1,4 @@
-# System Reference Document: aiMultiFool v0.2.4
+# System Reference Document: aiMultiFool v0.2.5
 
 ## 1. Executive Summary
 aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox. It leverages **Textual** for a responsive, desktop-class TUI and **llama-cpp-python** for high-performance local inference. The architecture prioritizes separation of concerns via a Mixin pattern, enabling clean extensibility for theming, encryption, and complex character logic.
@@ -120,12 +120,12 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 ## 5. User Interface & Modals
 
 ### 5.1 Main Interface Components
-- **Chat Input**: Primary text input for user messages, disabled during model loading, generation, or emotion analysis.
+- **Chat Input**: Primary text input for user messages, disabled during model loading or generation.
 - **Chat Scroll Area**: Displays conversation history with role-based styling (user messages bold, assistant messages normal).
 - **Status Bar**: Shows current model name, generation status, TPS, token counts, and context usage.
 - **Top Menu Bar**: Provides access to all major features via buttons.
-- **Action Buttons**: Located below the chat input, includes Stop, Continue, Regenerate, Rewind, Restart, Clear, and Emotion Analysis buttons for controlling chat interactions.
-- **Right Sidebar**: Contains user settings (username, style) and action menu with search.
+- **Action Buttons**: Located below the chat input, includes Stop, Continue, Regenerate, Rewind, Restart, and Clear buttons for controlling chat interactions.
+- **Right Sidebar**: Contains user settings (username, style) and action menu with search. The action menu provides access to all roleplay tools including emotion analysis, character stats analysis, scene management, and narrative controls.
 
 ### 5.2 Modal Screens
 - **ModelScreen**: Model selection, context size, and GPU layer configuration.
@@ -261,14 +261,14 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **Style Application**: Styles modify the system prompt and apply immediately to active conversations.
 - **Style Persistence**: Selected style is saved to settings and persists across restarts.
 
-### 7.5 Emotion Analysis
-- **Manual Analysis**: Emotion analysis is triggered on-demand via the "Emotion Analysis" button in the main action bar, allowing users to control when to analyze character emotional states.
-- **Performance Optimization**: By removing automatic analysis after each AI reply, normal chat interactions complete faster without waiting for emotion processing overhead.
-- **Chat Window Integration**: Analysis results appear directly in the main chat window as informational messages, providing better visibility and context without requiring sidebar navigation.
-- **Character Recognition**: Extracts character names from recent conversation context, ensuring accurate identification of all characters mentioned.
-- **One-Sentence Summaries**: Provides concise one-sentence emotional summaries for each character identified in the conversation.
-- **Smart Prompting**: Uses enhanced prompts to ensure the AI uses actual character names instead of generic terms like "assistant" or "user".
-- **UI State Management**: During analysis, the chat input and action buttons are disabled, with status text showing "Analyzing emotions..." to provide user feedback.
+### 7.5 Action Menu System
+- **Unified Interface**: All roleplay tools, including emotion analysis and character stats analysis, are accessible through the action menu sidebar organized by category.
+- **Analysis Tools**: The "Analysis" category contains comprehensive analysis actions including emotion analysis, character stats analysis, relationship mapping, power dynamics, character motivations, and more.
+- **Flexible Organization**: Actions are organized by category (Analysis, Scene Tools, Spawn Woman, Spawn Man, etc.) with pinned categories ("Analysis" and "Scene Tools") at the top for quick access.
+- **Search Functionality**: Real-time search across action names and prompts with auto-expanding categories that match the search query.
+- **Custom Actions**: Users can create, edit, duplicate, and delete actions through the Action Manager, providing unlimited extensibility.
+- **System Prompts**: Actions can be marked as system prompts that modify the AI's behavior rather than user messages.
+- **Chat Window Integration**: Action results appear directly in the main chat window, providing full visibility and context.
 
 ---
 

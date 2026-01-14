@@ -1,4 +1,4 @@
-# aiMultiFool v0.2.4
+# aiMultiFool v0.2.5
 
 **The Premium Cross-Platform Terminal-Based Sandbox for Private AI Roleplay.** 
 Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favorite SillyTavern character cards with zero lag and full privacy.
@@ -31,10 +31,9 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
 ### 🛠️ Interface & Tools
 - **Minimalist TUI**: Pure Textual interface styled via external `.tcss` for fast, clean roleplay aesthetics.
 - **Theme Support**: Choose from 11 built-in themes including Textual Dark/Light, Catppuccin, Dracula, Gruvbox, Monokai, Nord, Solarized, Tokyo Night, and Flexoki. Themes apply consistently across the entire interface.
-- **Action Sidebar**: Right Sidebar containing roleplay tools and system prompts.
-- **Action Manager**: Full in-app manager with real-time search and category filtering.
-- **Emotion Analysis**: On-demand character emotion analysis via the "Emotions" button. Results stream in real-time directly in the chat window, providing insights into character emotional states when needed without slowing down normal conversations. Works seamlessly with Vector Chat (RAG).
-- **Character Stats Analysis**: Analyze character attributes (Trust, Affection, Confidence, Stress, Interest, Arousal) from recent conversations via the "Stats" button. Stats are calculated on a 0-100 scale based on the last 3 exchanges, streaming results in real-time. Works seamlessly with Vector Chat (RAG).
+- **Action Sidebar**: Right Sidebar containing roleplay tools and system prompts organized by category. Includes comprehensive analysis tools, scene management, character spawning, and narrative control actions.
+- **Action Manager**: Full in-app manager with real-time search and category filtering. Create, edit, duplicate, and delete custom actions to build your perfect roleplay toolkit.
+- **Flexible Action System**: All roleplay tools are accessible through the unified action menu, including emotion analysis, character stats analysis, scene tools, and narrative controls. No dedicated buttons needed - everything is organized and searchable in one place.
 - **Context Window Viewer**: Inspect the raw JSON context and system prompts being sent to the LLM. Accessible via the About screen.
 
 ---

@@ -123,15 +123,51 @@ Select ListItem {
 .action-list {
     height: auto;
     border: none;
-    background: $surface;
+    background: transparent;
 }
 
-.action-list {
+/* Prevent ListView from showing any selection background */
+.action-list:focus {
+    background: transparent;
+}
+
+.action-list:focus-within {
     background: transparent;
 }
 
 .action-list ListItem {
     padding-left: 4;
+}
+
+/* Completely disable selected highlight - override all possible states */
+.action-list ListItem.--highlight {
+    background: transparent !important;
+}
+
+.action-list ListItem.--highlight:focus {
+    background: transparent !important;
+}
+
+.action-list ListItem.--highlight:focus-within {
+    background: transparent !important;
+}
+
+.action-list:focus ListItem.--highlight {
+    background: transparent !important;
+}
+
+.action-list ListView:focus ListItem.--highlight {
+    background: transparent !important;
+}
+
+/* Keep hover highlight for mouseover feedback */
+.action-list ListItem:hover {
+    background: $boost;
+}
+
+/* Ensure hover doesn't show when item has highlight class */
+.action-list ListItem.--highlight:hover {
+    background: transparent !important;
 }
 
 MessageWidget {

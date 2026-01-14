@@ -1,5 +1,13 @@
 # Release Notes
 
+## v0.2.5: Unified Action Menu System
+### 🎯 Major UI Refinement: Flexible Action Menu
+- **Removed Dedicated Buttons**: Removed the dedicated "Emotions" and "Stats" buttons in favor of a unified, flexible action menu system.
+- **Action Menu Integration**: Emotion analysis and character stats analysis are now accessible through the action menu's "Analysis" category, alongside other analysis tools like relationship mapping, power dynamics, and character motivations.
+- **Improved Organization**: All roleplay tools are now organized by category in the action sidebar, making it easier to discover and use features without cluttering the main interface.
+- **Enhanced Flexibility**: Users can customize, duplicate, and create their own actions through the Action Manager, providing unlimited extensibility for roleplay workflows.
+- **Cleaner Interface**: The removal of dedicated buttons creates a cleaner, more streamlined main interface while maintaining full functionality through the comprehensive action menu.
+
 ## v0.2.4: Character Stats Analysis
 ### 📊 New Feature: Character Stats Analysis
 - **Stats Button**: Added a new "Stats" button next to the "Emotions" button for analyzing character attributes from recent conversations.

@@ -28,8 +28,11 @@ class UIMixin:
         return msg_widget
 
     def sync_update_assistant_widget(self, widget, content):
-        widget.content = content
-        widget.refresh()
+        # Only refresh if content actually changed to avoid unnecessary redraws
+        if widget.content != content:
+            widget.content = content
+            widget.refresh()
+        # Always ensure we're scrolled to the end (without forcing a refresh)
         self.query_one("#chat-scroll").scroll_end(animate=False)
     
     async def full_sync_chat_ui(self):
