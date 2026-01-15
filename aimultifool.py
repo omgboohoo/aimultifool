@@ -118,6 +118,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                         Button("Rewind", id="btn-rewind", variant="default"),
                         Button("Restart", id="btn-restart", variant="default"),
                         Button("Clear", id="btn-clear-chat", variant="default"),
+                        Button("Buy Coffee", id="btn-buy-coffee", variant="default"),
                         id="action-buttons"
                     ),
                     id="input-container"
@@ -860,6 +861,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         elif event.button.id == "btn-restart": await self.action_reset_chat()
         elif event.button.id == "btn-rewind": await self.action_rewind()
         elif event.button.id == "btn-clear-chat": await self.action_wipe_all()
+        elif event.button.id == "btn-buy-coffee": webbrowser.open("https://ko-fi.com/aimultifool")
         elif event.button.id == "btn-manage-actions":
             self.push_screen(ActionsManagerScreen(), self.actions_mgmt_callback)
         elif event.button.id == "btn-cards":
