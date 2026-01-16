@@ -103,6 +103,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             Button("Actions", id="btn-manage-actions", variant="default"),
             Button("Vector Chat", id="btn-vector-chat", variant="default"),
             Button("Theme", id="btn-theme", variant="default"),
+            Button("Sidebar", id="btn-toggle-sidebar", variant="default"),
             Button("About", id="btn-misc", variant="default"),
             id="top-menu-bar"
         )
@@ -316,7 +317,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                 continue
 
             # Disable top menu buttons when AI is generating
-            if btn.id in ["btn-file", "btn-misc", "btn-theme", "btn-cards", "btn-parameters", "btn-model-settings", "btn-manage-actions", "btn-vector-chat"]:
+            if btn.id in ["btn-file", "btn-misc", "btn-theme", "btn-cards", "btn-parameters", "btn-model-settings", "btn-manage-actions", "btn-vector-chat", "btn-toggle-sidebar"]:
                 btn.disabled = is_ai_generating
             elif btn.id in ["btn-continue", "btn-regenerate", "btn-rewind", "btn-restart", "btn-clear-chat"]:
                 # Disable if busy OR if no model is loaded OR if AI is generating
@@ -870,6 +871,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             self.push_screen(ParametersScreen())
         elif event.button.id == "btn-theme":
             self.push_screen(ThemeScreen())
+        elif event.button.id == "btn-toggle-sidebar":
+            self.action_toggle_sidebar()
         elif event.button.id == "btn-misc":
             self.push_screen(MiscScreen())
         elif event.button.id == "btn-file":
@@ -1054,6 +1057,14 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         # Normal chat reset
         await self.action_wipe_all()
         self.save_user_settings()
+
+    def action_toggle_sidebar(self):
+        """Toggle the right sidebar visibility."""
+        sidebar = self.query_one("#right-sidebar")
+        if sidebar.has_class("-visible"):
+            sidebar.remove_class("-visible")
+        else:
+            sidebar.add_class("-visible")
 
     async def model_screen_callback(self, result):
         if not result:
