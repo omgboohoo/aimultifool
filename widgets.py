@@ -376,12 +376,16 @@ class ContextWindowScreen(ModalScreen):
 class CharactersScreen(ModalScreen):
     """Integrated character list and metadata editor."""
     last_search_idx = -1
+    unsaved_card_path = None  # Track newly created cards that haven't been saved yet
+    original_metadata = None  # Track original metadata to detect changes
 
     def on_mount(self) -> None:
         title = self.query_one(".dialog-title")
         title.can_focus = True
         title.focus()
         self.last_search_idx = -1
+        self.unsaved_card_path = None
+        self.original_metadata = None
         self.app.update_ui_state()
         self.refresh_list()
         
@@ -462,9 +466,35 @@ class CharactersScreen(ModalScreen):
         
         if target_idx != -1:
             self.force_select_index(target_idx, select_path)
+        else:
+            # Clear metadata display when nothing is selected
+            try:
+                self.query_one("#metadata-text", TextArea).text = ""
+            except Exception:
+                pass
+            # Clear unsaved flag and original metadata when nothing is selected
+            self.unsaved_card_path = None
+            self.original_metadata = None
             
         self.app.update_ui_state()
         self.update_button_states()
+
+    def disable_all_buttons_except_play(self) -> None:
+        """Disable all buttons except play buttons (which are already disabled during AI editing)."""
+        try:
+            self.query_one("#btn-new-card", Button).disabled = True
+            self.query_one("#btn-duplicate-card", Button).disabled = True
+            self.query_one("#btn-rename-card", Button).disabled = True
+            self.query_one("#btn-delete-card", Button).disabled = True
+            self.query_one("#btn-save-metadata", Button).disabled = True
+            self.query_one("#btn-cancel-mgmt", Button).disabled = True
+        except Exception:
+            pass
+
+    def on_text_area_changed(self, event: TextArea.Changed) -> None:
+        """Handle metadata text area changes to enable/disable Save button."""
+        if event.text_area.id == "metadata-text":
+            self.update_button_states()
 
     def update_button_states(self) -> None:
         """Update the enabled/disabled state of the buttons based on selection."""
@@ -472,14 +502,43 @@ class CharactersScreen(ModalScreen):
             list_view = self.query_one("#list-characters", ListView)
             has_selection = list_view.highlighted_child is not None
             
-            # Play also requires LLM
-            can_play = has_selection and self.app.llm
+            # Get current selected card path
+            current_card_path = None
+            if has_selection:
+                selected_item = list_view.highlighted_child
+                current_card_path = getattr(selected_item, "name", None)
+            
+            # Check if metadata has been edited
+            metadata_changed = False
+            if has_selection:
+                try:
+                    current_text = self.query_one("#metadata-text", TextArea).text
+                    # Compare with original metadata (ignore None/empty cases)
+                    if self.original_metadata is not None and current_text != self.original_metadata:
+                        metadata_changed = True
+                except Exception:
+                    pass
+            
+            # Check if this is a newly created card that hasn't been edited
+            is_unsaved = current_card_path == self.unsaved_card_path if current_card_path else False
+            is_new_unedited = is_unsaved and not metadata_changed
+            
+            # Play buttons require LLM, selection, and card must be saved (not a new unsaved card)
+            # Also disable if it's a new card that hasn't been edited
+            can_play = has_selection and self.app.llm and not is_unsaved and not is_new_unedited
             self.query_one("#btn-play-card-user", Button).disabled = not can_play
             self.query_one("#btn-play-card-ai", Button).disabled = not can_play
-            self.query_one("#btn-duplicate-card", Button).disabled = not has_selection
-            self.query_one("#btn-rename-card", Button).disabled = not has_selection
+            # Duplicate button disabled if there are unsaved changes OR if it's a new unedited card
+            self.query_one("#btn-duplicate-card", Button).disabled = not has_selection or metadata_changed or is_new_unedited
+            # Rename button disabled if there are unsaved changes OR if it's a new unedited card
+            self.query_one("#btn-rename-card", Button).disabled = not has_selection or metadata_changed or is_new_unedited
             self.query_one("#btn-delete-card", Button).disabled = not has_selection
-            self.query_one("#btn-save-metadata", Button).disabled = not has_selection
+            # Save button only enabled if there's a selection AND metadata has been changed
+            self.query_one("#btn-save-metadata", Button).disabled = not (has_selection and metadata_changed)
+            # Close button is always enabled
+            self.query_one("#btn-cancel-mgmt", Button).disabled = False
+            # New button is always enabled
+            self.query_one("#btn-new-card", Button).disabled = False
         except Exception:
             pass
 
@@ -499,12 +558,14 @@ class CharactersScreen(ModalScreen):
         from character_manager import extract_chara_metadata
         chara_json = extract_chara_metadata(card_path)
         
+        loaded_text = None
         if chara_json:
             try:
                 # Check for standard JSON first
                 parsed = json.loads(chara_json)
                 pretty_json = json.dumps(parsed, indent=4)
                 self.query_one("#metadata-text", TextArea).text = pretty_json
+                loaded_text = pretty_json
             except Exception:
                 # Might be encrypted
                 if password_attempt:
@@ -515,8 +576,10 @@ class CharactersScreen(ModalScreen):
                                 parsed = json.loads(decrypted)
                                 pretty_json = json.dumps(parsed, indent=4)
                                 self.query_one("#metadata-text", TextArea).text = pretty_json
+                                loaded_text = pretty_json
                             except:
                                 self.query_one("#metadata-text", TextArea).text = decrypted
+                                loaded_text = decrypted
                         else:
                              self.app.notify("Incorrect Password!", severity="error")
                              # Don't clear text to avoid flickers, just maybe show error toast
@@ -524,13 +587,27 @@ class CharactersScreen(ModalScreen):
                         self.app.notify("Decryption Failed!", severity="error")
                 else:
                     self.query_one("#metadata-text", TextArea).text = "Encrypted Data (Click card in list to Unlock)"
+                    loaded_text = "Encrypted Data (Click card in list to Unlock)"
         else:
             self.query_one("#metadata-text", TextArea).text = "No metadata found."
+            loaded_text = "No metadata found."
+        
+        # Store original metadata for change detection
+        self.original_metadata = loaded_text
+        self.update_button_states()
 
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         if event.list_view.id == "list-characters":
             if event.item:
-                self.load_metadata(getattr(event.item, "name", ""))
+                card_path = getattr(event.item, "name", "")
+                self.load_metadata(card_path)
+                # Clear unsaved flag if user selects a different card
+                if self.unsaved_card_path and self.unsaved_card_path != card_path:
+                    self.unsaved_card_path = None
+                # original_metadata is reset in load_metadata
+            else:
+                # No selection - clear original metadata
+                self.original_metadata = None
             self.update_button_states()
             
     async def on_list_view_selected(self, event: ListView.Selected) -> None:
@@ -617,6 +694,7 @@ class CharactersScreen(ModalScreen):
             user_text = event.input.value.strip()
             if user_text:
                 current_meta = self.query_one("#metadata-text", TextArea).text
+                # Disable all buttons when AI starts editing (handled in ask_ai_to_edit)
                 self.ask_ai_to_edit(user_text, current_meta)
                 event.input.value = ""
 
@@ -701,6 +779,11 @@ class CharactersScreen(ModalScreen):
         if not self.app.llm:
             self.app.notify("Model not loaded! Load a model first.", severity="error")
             return
+
+        # Disable all buttons while AI is editing
+        self.disable_all_buttons_except_play()
+        self.query_one("#btn-play-card-user", Button).disabled = True
+        self.query_one("#btn-play-card-ai", Button).disabled = True
 
         history = self.query_one("#ai-meta-history", ScrollableContainer)
         history.mount(Static(f"User: {user_request}", classes="ai-message user"))
@@ -912,6 +995,17 @@ class CharactersScreen(ModalScreen):
 
             if clean_json:
                 self.query_one("#metadata-text", TextArea).text = clean_json
+                # Mark card as unsaved when AI edits it and mark metadata as changed
+                try:
+                    list_view = self.query_one("#list-characters", ListView)
+                    if list_view.highlighted_child:
+                        card_path = getattr(list_view.highlighted_child, "name", None)
+                        if card_path:
+                            self.unsaved_card_path = card_path
+                            # Don't update original_metadata here - keep it so Save button stays enabled
+                            self.update_button_states()
+                except Exception:
+                    pass
                 status_msg.update("AI: JSON Updated.")
             else:
                 if json_error_msg:
@@ -929,6 +1023,9 @@ class CharactersScreen(ModalScreen):
                 
         except Exception as e:
             status_msg.update(f"AI error: {str(e)}")
+        finally:
+            # Re-enable buttons when AI editing finishes (play buttons will be handled by update_button_states)
+            self.update_button_states()
         
         history.scroll_end()
 
@@ -967,6 +1064,8 @@ class CharactersScreen(ModalScreen):
                 new_path = self.app.create_new_character_card(filename=filename)
                 if new_path:
                     self.app.notify(f"Created new card: {os.path.basename(new_path)}")
+                    # Mark as unsaved until user saves it
+                    self.unsaved_card_path = str(new_path)
                     self.refresh_list(select_path=str(new_path))
                     
                     # Initiate AI Guidance
@@ -986,7 +1085,7 @@ class CharactersScreen(ModalScreen):
                 new_path = self.app.duplicate_character_card(card_path)
                 if new_path:
                     self.app.notify(f"Duplicated: {os.path.basename(new_path)}")
-                    self.refresh_list(select_path=str(new_path))
+                    self.refresh_list()
             else:
                 self.app.notify("Select a card first!", severity="warning")
             self.query_one(".dialog-title").focus()
@@ -1055,6 +1154,8 @@ class CharactersScreen(ModalScreen):
                 
                 if old_content != new_content:
                     text_area.text = new_content
+                    # Trigger button state update to enable Save button
+                    self.update_button_states()
                     self.app.notify(f"Replaced occurrences of '{search_text}' (case-insensitive)")
                     self.query_one(".dialog-title").focus()
                 else:
@@ -1088,12 +1189,16 @@ class CharactersScreen(ModalScreen):
                         if success:
                             filename = Path(card_path).name
                             self.app.notify(f"Successfully updated {filename}")
+                            # Card is now saved, clear unsaved flag
+                            if self.unsaved_card_path == card_path:
+                                self.unsaved_card_path = None
                             # Reload to refresh view state (e.g. show encrypted/decrypted)
                             # If we just encrypted it, we should probably show it in decrypted state or reload?
                             # Actually if we just saved it and we have the PW, we can reload with it?
                             # For simplicity, just reload regular. If encrypted, it will lock.
                             self.load_metadata(card_path, password_attempt=password)
-                            self.refresh_list(select_path=card_path)
+                            # Deselect card after saving
+                            self.refresh_list()
                         else:
                             self.app.notify("Failed to write metadata PNG! (File might be locked or invalid)", severity="error")
                      except Exception as e:

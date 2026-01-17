@@ -1,4 +1,4 @@
-# System Reference Document: aiMultiFool v0.2.5
+# System Reference Document: aiMultiFool v0.2.6
 
 ## 1. Executive Summary
 aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox. It leverages **Textual** for a responsive, desktop-class TUI and **llama-cpp-python** for high-performance local inference. The architecture prioritizes separation of concerns via a Mixin pattern, enabling clean extensibility for theming, encryption, and complex character logic.
@@ -240,8 +240,8 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **Continue**: Triggers AI to continue from where it left off.
 - **Regenerate**: Removes the last assistant message and re-runs inference with the same user prompt.
 - **Rewind**: Undoes the last user/assistant exchange, restoring previous state.
-- **Reset Chat**: Restarts conversation from the beginning while preserving character and style settings.
-- **Wipe All**: Clears all chat history completely.
+- **Restart**: Restarts conversation from the beginning while preserving character and style settings.
+- **New**: Clears context window and starts new chat.
 
 ### 7.2 Model Management
 - **Model Loading**: Automatic GPU layer detection with fallback strategies.

@@ -1,5 +1,5 @@
 # Security & Privacy Audit
-**Application**: aiMultiFool v0.2.5
+**Application**: aiMultiFool v0.2.6
 **Status**: ✅ Fully Private / Offline-Ready
 
 ## 1. Executive Summary

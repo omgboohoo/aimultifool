@@ -1,5 +1,18 @@
 # Release Notes
 
+## v0.2.6: Card Management Enhancements & UI Improvements
+### 🎴 Enhanced Card Management Workflow
+- **Improved Duplication Behavior**: When duplicating a card, all cards are now deselected and metadata display is cleared, providing a cleaner workflow.
+- **Save Changes Button Logic**: The "Save Changes" button is now only enabled when metadata has been manually edited or AI has finished editing, preventing unnecessary save operations.
+- **Unsaved Changes Protection**: Rename and Duplicate buttons are now disabled when there are unsaved changes, ensuring data integrity.
+- **New Card Protection**: For newly created cards, Rename, Play, and Duplicate buttons are disabled until the card has been edited, preventing operations on empty template cards.
+- **AI Editing State Management**: All buttons (except play buttons) are disabled while AI is editing metadata, preventing conflicts during the editing process.
+- **Play Button Safety**: Play buttons remain disabled for newly created cards until they are saved, ensuring only complete cards can be used for roleplay.
+- **Auto-Deselection After Save**: After saving a card, it is automatically deselected to provide clear visual feedback that the operation completed successfully.
+
+### 🎨 UI Refinements
+- **Button Label Update**: The "Clear" button on the main UI has been renamed to "New" for better clarity and consistency.
+
 ## v0.2.5: Unified Action Menu System
 ### 🎯 Major UI Refinement: Flexible Action Menu
 - **Removed Dedicated Buttons**: Removed the dedicated "Emotions" and "Stats" buttons in favor of a unified, flexible action menu system.

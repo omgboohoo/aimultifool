@@ -1,4 +1,4 @@
-# aiMultiFool v0.2.5
+# aiMultiFool v0.2.6
 
 **The Premium Cross-Platform Terminal-Based Sandbox for Private AI Roleplay.** 
 Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favorite SillyTavern character cards with zero lag and full privacy.
