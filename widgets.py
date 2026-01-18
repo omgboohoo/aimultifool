@@ -2342,21 +2342,8 @@ class ChatManagerScreen(ModalScreen):
             file_path = chats_dir / save_name
             
             try:
-                # Save messages along with model settings
-                chat_data = {
-                    "messages": self.app.messages,
-                    "model_settings": {
-                        "selected_model": self.app.selected_model,
-                        "context_size": self.app.context_size,
-                        "gpu_layers": self.app.gpu_layers,
-                        "temp": self.app.temp,
-                        "topp": self.app.topp,
-                        "topk": self.app.topk,
-                        "repeat": self.app.repeat,
-                        "minp": self.app.minp
-                    }
-                }
-                chat_data_json = json.dumps(chat_data, indent=2)
+                # Save messages only (model settings are not saved with chats)
+                chat_data_json = json.dumps(self.app.messages, indent=2)
                 if password:
                     encrypted_data = encrypt_data(chat_data_json, password)
                     with open(file_path, "w", encoding="utf-8") as f:
@@ -2384,20 +2371,17 @@ class ChatManagerScreen(ModalScreen):
                         try:
                             # Try loading as plain JSON first
                             data = json.loads(content)
-                            # Handle both old format (just messages list) and new format (dict with messages and model_settings)
+                            # Handle both old format (just messages list) and legacy format (dict with messages and model_settings)
                             if isinstance(data, list):
-                                # Old format: just messages
+                                # Current format: just messages list
                                 messages = data
-                                model_settings = None
                             elif isinstance(data, dict) and "messages" in data:
-                                # New format: dict with messages and model_settings
+                                # Legacy format: dict with messages and model_settings (ignore model_settings)
                                 messages = data["messages"]
-                                model_settings = data.get("model_settings")
                             else:
                                 # Fallback: treat as messages
                                 messages = data
-                                model_settings = None
-                            self.dismiss({"action": "load", "messages": messages, "model_settings": model_settings})
+                            self.dismiss({"action": "load", "messages": messages})
                         except json.JSONDecodeError:
                             # If not JSON, it's likely encrypted. Prompt for password.
                             self.app.push_screen(PasswordPromptScreen(file_path), self.password_prompt_callback)
@@ -2425,20 +2409,17 @@ class ChatManagerScreen(ModalScreen):
 
     def password_prompt_callback(self, result):
         if result:
-            # result can be either messages (old format) or dict with messages and model_settings (new format)
+            # result can be either messages (current format) or dict with messages and model_settings (legacy format)
             if isinstance(result, list):
-                # Old format: just messages
+                # Current format: just messages list
                 messages = result
-                model_settings = None
             elif isinstance(result, dict) and "messages" in result:
-                # Already in new format
+                # Legacy format: dict with messages and model_settings (ignore model_settings)
                 messages = result["messages"]
-                model_settings = result.get("model_settings")
             else:
-                # Fallback
+                # Fallback: treat as messages
                 messages = result
-                model_settings = None
-            self.dismiss({"action": "load", "messages": messages, "model_settings": model_settings})
+            self.dismiss({"action": "load", "messages": messages})
 
 class VectorChatScreen(ModalScreen):
     """The modal for managing vector chats (RAG)."""

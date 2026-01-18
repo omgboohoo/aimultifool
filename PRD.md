@@ -244,28 +244,7 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **`gpu_layers`**: Only applicable in local mode - number of GPU layers to offload
 
 ### 6.2 Saved Chat Format
-**New Format** (v0.1.20+):
-```json
-{
-    "messages": [
-        {"role": "system", "content": "..."},
-        {"role": "user", "content": "..."},
-        {"role": "assistant", "content": "..."}
-    ],
-    "model_settings": {
-        "selected_model": "/path/to/model.gguf",
-        "context_size": 8192,
-        "gpu_layers": 33,
-        "temp": 0.8,
-        "topp": 0.9,
-        "topk": 40,
-        "repeat": 1.0,
-        "minp": 0.0
-    }
-}
-```
-
-**Legacy Format** (backward compatible):
+**Current Format**:
 ```json
 [
     {"role": "system", "content": "..."},
@@ -273,6 +252,17 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
     {"role": "assistant", "content": "..."}
 ]
 ```
+
+**Note**: Saved chats contain only message history. Model settings are not saved with chats - users can load any chat with whatever model they have configured. This allows flexibility to use different models with the same conversation history.
+
+**Legacy Format** (backward compatible):
+```json
+{
+    "messages": [...],
+    "model_settings": {...}
+}
+```
+Legacy format chats with `model_settings` are still supported for loading, but the model settings are ignored - only the messages are restored.
 
 ### 6.3 Application State
 - **Reactive Properties**: Textual's `reactive` logic creates a unidirectional data flow. Changing `self.is_loading` automatically toggles button states (Stop/Continue) across the entire UI tree without manual DOM queries.
