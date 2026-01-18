@@ -1,4 +1,4 @@
-# System Reference Document: aiMultiFool v0.4.0
+# System Reference Document: aiMultiFool v0.4.1
 
 ## 1. Executive Summary
 aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox. It leverages **Textual** for a responsive, desktop-class TUI and supports dual inference modes: **llama-cpp-python** for high-performance local GPU inference and **Ollama API** for flexible model management. The architecture prioritizes separation of concerns via a Mixin pattern, enabling clean extensibility for theming, encryption, and complex character logic.
@@ -57,7 +57,7 @@ classDiagram
     - **Inference**: Supports dual inference backends (local llama-cpp-python and Ollama API). Uses unified interface that works with both backends. To prevent GIL-related UI freezes, local model loading is handled via manual `threading.Thread` with a result `Queue`, while inference is orchestrated by Textual's `@work(thread=True)` decorator. Ollama mode uses HTTP API calls that don't require model loading.
     - **State**: Manages the message history list, pruning logic, and token counting. Tracks inference mode (local/ollama) and handles mode-specific state management.
     - **Vector Chat**: On Windows, embeddings run in a separate subprocess (`SubprocessEmbedder`) to maintain UI responsiveness. On Linux, direct integration is used. Vector Chat works with both local and Ollama inference modes.
-    - **RLM Chat**: Manages RLM context stores for recursive language model support. Handles initialization, saving, and closing of RLM context stores. Supports optional AES-256-GCM encryption with password validation. Stores complete conversation history externally in JSON files for extended roleplay sessions.
+    - **RLM Chat**: Manages RLM context stores for recursive language model support. Implements LLM-generated search queries with multi-strategy retrieval (keyword matching, semantic similarity, temporal relevance). Handles initialization, saving, and closing of RLM context stores. Supports optional AES-256-GCM encryption with password validation. Stores complete conversation history externally in JSON files for extended roleplay sessions.
 
 - **`ui_mixin.py` (`UIMixin`)**: Centralizes DOM manipulation. Handles the mounting of `MessageWidget`s and synchronizing the specific visual state with the backend `messages` list.
 
@@ -152,6 +152,11 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 
 ### 4.8 RLM Chat (Recursive Language Models)
 - **Complete History Storage**: RLM Chat stores full conversation history externally in JSON files, ensuring nothing is ever lost even in extended roleplay sessions.
+- **LLM-Generated Search Queries**: The language model generates optimized search queries based on user input, implementing MIT's recursive querying approach. The model analyzes the user's question and creates targeted search queries to find relevant conversation history.
+- **Multi-Strategy Search**: Uses prewritten Python functions to execute searches combining:
+  - **Keyword Matching**: Extracts keywords from queries, filters stop words, and scores messages by match count with recency bonuses
+  - **Semantic Similarity**: When embedding models are available, uses cosine similarity to find semantically relevant messages
+  - **Temporal Relevance**: Prioritizes recent messages while sampling from middle and old sections for comprehensive coverage
 - **Recursive Querying**: Uses recursive LLM-based querying to find relevant chunks from the complete conversation history.
 - **External Context Management**: Treats conversation history as an external environment (MIT approach), allowing programmatic access to entire conversation history.
 - **Storage Location**: RLM context stores are saved to `rlmcontexts/{chat_name}/` directory with `context.json` containing the full message history.
@@ -159,6 +164,7 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **Context Store Management**: Users can create, duplicate, rename, delete, and inspect RLM context stores. The system handles lifecycle management to ensure proper saving and loading.
 - **Password Protection**: Encrypted RLM chats require password validation before loading, ensuring secure access to conversation history.
 - **Seamless Integration**: Toggle RLM Chat on/off mid-conversation to enhance characters with complete historical context beyond the standard context window.
+- **Result Deduplication**: Search results are deduplicated while preserving order to avoid redundant context in prompts.
 
 ---
 

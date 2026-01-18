@@ -1551,9 +1551,9 @@ class RLMMixin:
     
     def query_rlm_context(self, user_query: str, max_chunks: int = 5, chunk_size: int = 10):
         """
-        Query RLM context store recursively to find relevant messages.
-        This implements the MIT RLM approach: instead of loading all context,
-        we recursively query for relevant parts.
+        Query RLM context store recursively using LLM-generated search queries.
+        Uses prewritten Python functions to safely execute search strategies.
+        Implements MIT RLM approach: model queries its own context recursively.
         """
         if not self.rlm_context_store or len(self.rlm_context_store) == 0:
             return []
@@ -1561,34 +1561,145 @@ class RLMMixin:
         if not self.llm:
             return []
         
-        # Simple implementation: use the LLM to identify relevant message ranges
-        # In a full RLM implementation, the model would write code to search,
-        # but for now we'll use semantic similarity via the model itself
-        
         try:
-            # Get embedding for the query (if available)
-            if hasattr(self, "get_embedding"):
-                query_emb = self.get_embedding(user_query, task="query")
-                if query_emb:
-                    # Simple relevance: return recent messages + some from history
-                    # In full RLM, this would be more sophisticated
-                    recent_messages = self.rlm_context_store[-20:] if len(self.rlm_context_store) > 20 else self.rlm_context_store
-                    
-                    # Also try to find semantically similar older messages
-                    # For now, return recent context + some from middle
-                    result = []
-                    if len(self.rlm_context_store) > 20:
-                        # Include some from middle section
-                        mid_start = len(self.rlm_context_store) // 2
-                        mid_section = self.rlm_context_store[mid_start:mid_start + 10]
-                        result.extend(mid_section)
-                    result.extend(recent_messages)
-                    
-                    return result[:max_chunks * chunk_size]
+            # Step 1: Have LLM generate search query/strategy (not code, just a query)
+            search_prompt = f"""Given this user query: "{user_query}"
+
+I need to search through conversation history ({len(self.rlm_context_store)} messages) to find relevant context.
+
+Generate a search query that would help find relevant messages. Consider:
+- Key topics or themes
+- Important keywords or phrases
+- What type of information is needed
+
+Return ONLY a concise search query (1-2 sentences), no explanations."""
+
+            strategy_messages = [
+                {"role": "system", "content": "You are a search query generator. Return only the search query text."},
+                {"role": "user", "content": search_prompt}
+            ]
             
-            # Fallback: return recent messages
-            return self.rlm_context_store[-30:] if len(self.rlm_context_store) > 30 else self.rlm_context_store
+            strategy_response = self.llm.create_chat_completion(
+                messages=strategy_messages,
+                temperature=0.3,
+                max_tokens=100
+            )
+            
+            search_query = strategy_response["choices"][0]["message"]["content"].strip()
+            
+            # Step 2: Use prewritten Python functions to search
+            results = self._search_rlm_store(search_query, user_query, max_chunks * chunk_size)
+            
+            return results
             
         except Exception as e:
             # Fallback on error
             return self.rlm_context_store[-20:] if len(self.rlm_context_store) > 20 else self.rlm_context_store
+    
+    def _search_rlm_store(self, search_query: str, original_query: str, max_results: int = 50):
+        """
+        Prewritten Python function to search RLM context store.
+        Uses multiple search strategies: keyword matching, semantic similarity, and temporal relevance.
+        """
+        if not self.rlm_context_store:
+            return []
+        
+        results = []
+        search_query_lower = search_query.lower()
+        original_query_lower = original_query.lower()
+        
+        # Extract keywords from both queries
+        all_keywords = set(search_query_lower.split() + original_query_lower.split())
+        # Filter out common stop words
+        stop_words = {"the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "is", "was", "are", "were"}
+        keywords = [kw for kw in all_keywords if kw not in stop_words and len(kw) > 2]
+        
+        # Strategy 1: Keyword matching with scoring
+        keyword_matches = []
+        for i, msg in enumerate(self.rlm_context_store):
+            content = msg.get("content", "").lower()
+            role = msg.get("role", "")
+            
+            # Count keyword matches
+            match_count = sum(1 for kw in keywords if kw in content)
+            if match_count > 0:
+                # Score: keyword matches + recency bonus
+                score = match_count * 10
+                # Recent messages get bonus
+                recency_bonus = max(0, (len(self.rlm_context_store) - i) / len(self.rlm_context_store) * 5)
+                score += recency_bonus
+                
+                keyword_matches.append((score, i, msg))
+        
+        # Sort by score
+        keyword_matches.sort(reverse=True, key=lambda x: x[0])
+        results.extend([msg for _, _, msg in keyword_matches[:max_results // 2]])
+        
+        # Strategy 2: Semantic similarity (if embeddings available)
+        if hasattr(self, "get_embedding"):
+            try:
+                query_emb = self.get_embedding(search_query, task="query")
+                if query_emb:
+                    semantic_matches = []
+                    
+                    # Sample messages for semantic search (don't search all to save time)
+                    sample_size = min(100, len(self.rlm_context_store))
+                    # Sample from recent, middle, and old sections
+                    indices_to_check = set()
+                    if len(self.rlm_context_store) > 0:
+                        # Recent
+                        indices_to_check.update(range(max(0, len(self.rlm_context_store) - 30), len(self.rlm_context_store)))
+                        # Middle
+                        mid_start = len(self.rlm_context_store) // 2
+                        indices_to_check.update(range(mid_start, min(mid_start + 20, len(self.rlm_context_store))))
+                        # Old (if large enough)
+                        if len(self.rlm_context_store) > 50:
+                            indices_to_check.update(range(0, min(20, len(self.rlm_context_store))))
+                    
+                    for i in indices_to_check:
+                        if i < len(self.rlm_context_store):
+                            msg = self.rlm_context_store[i]
+                            content = msg.get("content", "")
+                            if not content or len(content) < 10:
+                                continue
+                            
+                            try:
+                                msg_emb = self.get_embedding(content[:500], task="document")  # Limit length
+                                if msg_emb:
+                                    # Cosine similarity (manual calculation without numpy)
+                                    dot_product = sum(a * b for a, b in zip(query_emb, msg_emb))
+                                    norm_a = sum(a * a for a in query_emb) ** 0.5
+                                    norm_b = sum(b * b for b in msg_emb) ** 0.5
+                                    similarity = dot_product / (norm_a * norm_b + 1e-8)
+                                    
+                                    # Add recency bonus
+                                    recency = (len(self.rlm_context_store) - i) / len(self.rlm_context_store)
+                                    final_score = similarity * 0.7 + recency * 0.3
+                                    
+                                    semantic_matches.append((final_score, i, msg))
+                            except Exception:
+                                continue
+                    
+                    # Sort by similarity score
+                    semantic_matches.sort(reverse=True, key=lambda x: x[0])
+                    results.extend([msg for _, _, msg in semantic_matches[:max_results // 2]])
+            except Exception:
+                pass
+        
+        # Strategy 3: Always include some recent messages (temporal relevance)
+        recent_count = min(10, len(self.rlm_context_store))
+        recent_messages = self.rlm_context_store[-recent_count:]
+        results.extend(recent_messages)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_results = []
+        for msg in results:
+            # Create a unique identifier for the message
+            msg_id = (msg.get("role", ""), msg.get("content", "")[:100])  # Use role + content prefix
+            if msg_id not in seen:
+                seen.add(msg_id)
+                unique_results.append(msg)
+        
+        # Limit to max_results
+        return unique_results[:max_results]

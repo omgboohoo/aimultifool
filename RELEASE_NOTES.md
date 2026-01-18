@@ -1,5 +1,24 @@
 # Release Notes
 
+## v0.4.1: Improved RLM Implementation with Intelligent Search
+### 🧠 Enhanced RLM Chat: MIT-Inspired Recursive Querying
+- **LLM-Generated Search Queries**: RLM Chat now uses the language model itself to generate optimized search queries based on user input, implementing the recursive querying approach from MIT's RLM research.
+- **Multi-Strategy Search**: Implemented sophisticated search combining keyword matching, semantic similarity (when embeddings available), and temporal relevance scoring.
+- **Intelligent Context Retrieval**: The model analyzes user queries and generates targeted search queries to find the most relevant conversation history, then executes searches using prewritten Python functions for safety and reliability.
+- **Improved Relevance Scoring**: Messages are scored using keyword match counts, recency bonuses, and semantic similarity (when available) to prioritize the most relevant context.
+- **Better Performance**: Optimized search strategies sample from recent, middle, and old sections of conversation history to balance relevance and efficiency.
+
+### 🔧 Technical Improvements
+- **Recursive Query Generation**: `query_rlm_context()` now uses LLM to generate search queries before executing searches, aligning with MIT RLM approach.
+- **Prewritten Search Functions**: Added `_search_rlm_store()` method with multiple search strategies executed safely via prewritten Python code.
+- **Semantic Integration**: When embedding models are available, RLM Chat uses semantic similarity alongside keyword matching for better context retrieval.
+- **Manual Cosine Similarity**: Implemented cosine similarity calculation without numpy dependency for semantic search scoring.
+- **Deduplication**: Results are deduplicated while preserving order to avoid redundant context in prompts.
+
+### 📚 Documentation Updates
+- **RLM Implementation Details**: Updated documentation to reflect the improved recursive querying implementation.
+- **Search Strategy Documentation**: Added details about multi-strategy search approach in RLM Chat.
+
 ## v0.4.0: RLM Chat & Enhanced Context Management
 ### 🧠 New Feature: RLM Chat (Recursive Language Models)
 - **RLM Chat Support**: Added support for Recursive Language Models, enabling management of very long conversations by storing complete conversation history externally and querying it recursively.

@@ -48,7 +48,7 @@ from widgets import MessageWidget, CharactersScreen, ParametersScreen, MiscScree
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin, RLMMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.4.0"
+    TITLE = "aiMultiFool v0.4.1"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -200,7 +200,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin, RL
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.4.0", id="status-version")
+            yield Static("aiMultiFool v0.4.1", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings

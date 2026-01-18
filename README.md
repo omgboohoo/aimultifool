@@ -1,4 +1,4 @@
-# aiMultiFool v0.4.0
+# aiMultiFool v0.4.1
 
 **The Premium Cross-Platform Terminal-Based Sandbox for Private AI Roleplay.** 
 Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favorite SillyTavern character cards with zero lag and full privacy.
@@ -16,7 +16,7 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
 - **Narrative Styles**: Choose from **45 custom presets** covering a wide range of tones.
 - **On-Demand Encryption**: Secure individual character cards with **AES-256-GCM** encryption.
 - **Vector Chat (RAG)**: Enhance roleplay with long-term memory via local vector databases. Supports optional **AES-256-GCM** encryption for database payloads. Duplicate, rename, and manage multiple knowledge bases with ease.
-- **RLM Chat**: Recursive Language Model support for managing very long conversations. Stores complete conversation history externally and queries it recursively. Supports optional **AES-256-GCM** encryption. Perfect for maintaining full context in extended roleplay sessions.
+- **RLM Chat**: Recursive Language Model support for managing very long conversations. Uses LLM-generated search queries with multi-strategy retrieval (keyword matching, semantic similarity, temporal relevance) to find relevant context. Stores complete conversation history externally and queries it recursively. Supports optional **AES-256-GCM** encryption. Perfect for maintaining full context in extended roleplay sessions.
     > *RLM Chat is based on research by MIT CSAIL: Alex L. Zhang, Tim Kraska, and Omar Khattab (arXiv:2512.24601)*
 
 ### ⚡ AI & Performance

@@ -4,8 +4,8 @@
 
 aiMultiFool supports two different approaches to managing long conversation context:
 
-- **Vector Chat (RAG)**: Uses semantic similarity search via embeddings
-- **RLM Chat**: Uses recursive querying of full conversation history
+- **Vector Chat (RAG)**: Uses semantic similarity search via embeddings stored in a vector database
+- **RLM Chat**: Uses LLM-generated search queries with multi-strategy retrieval (keyword, semantic, temporal) to query full conversation history recursively
 
 Both can be used together or separately, depending on your needs.
 
@@ -51,6 +51,11 @@ Both can be used together or separately, depending on your needs.
 ### How It Works
 
 - **Full History Storage**: Stores complete conversation history externally (never deletes)
+- **LLM-Generated Search Queries**: The language model itself generates optimized search queries based on user input, implementing MIT's recursive querying approach
+- **Multi-Strategy Search**: Uses prewritten Python functions to execute searches combining:
+  - Keyword matching with relevance scoring
+  - Semantic similarity (when embedding models are available)
+  - Temporal relevance (prioritizing recent messages)
 - **Recursive Querying**: Queries the full history recursively to find relevant chunks
 - **External Context**: Treats context as an external environment (MIT approach)
 - **Programmatic Access**: Can access entire conversation history programmatically
@@ -58,18 +63,21 @@ Both can be used together or separately, depending on your needs.
 ### Strengths ✅
 
 - **Complete History**: Nothing is ever lost - full conversation preserved
-- **Temporal Awareness**: Can prioritize recent vs old context
+- **Intelligent Search**: LLM generates optimized search queries tailored to each user question
+- **Multi-Strategy Retrieval**: Combines keyword matching, semantic similarity, and temporal relevance for best results
+- **Temporal Awareness**: Can prioritize recent vs old context with recency scoring
 - **Exact Matches**: Can find specific mentions, names, events, dates
-- **No Embedding Model Needed**: Works with just the main LLM
+- **Semantic Support**: When embedding models are available, uses semantic similarity alongside keyword matching
+- **No Embedding Model Required**: Works with just the main LLM (embeddings optional for enhanced results)
 - **Scalable**: Can handle very long conversations without degradation
 - **Chronological Context**: Maintains conversation flow and timeline
+- **Safe Execution**: Uses prewritten Python functions for reliable, secure search execution
 
 ### Weaknesses ❌
 
-- **Less Semantic**: Relies more on keyword/topic matching rather than meaning
-- **More Complex**: Recursive querying adds computational overhead
+- **More Complex**: Recursive querying adds computational overhead (LLM call for query generation)
 - **Storage Intensive**: Stores everything, not just summaries
-- **Slower for Large Histories**: Needs to search through full text
+- **Moderate Speed**: Search through full text is slower than vector search, but optimized with sampling strategies
 
 ### Best For 🎯
 
@@ -86,11 +94,11 @@ Both can be used together or separately, depending on your needs.
 | Feature | Vector Chat (RAG) | RLM Chat |
 |---------|-------------------|----------|
 | **Storage Method** | Embeddings in vector DB | Full text in JSON files |
-| **Retrieval Method** | Semantic similarity search | Recursive text querying |
-| **Model Required** | Embedding model + LLM | LLM only |
+| **Retrieval Method** | Semantic similarity search | LLM-generated queries + multi-strategy search |
+| **Model Required** | Embedding model + LLM | LLM only (embeddings optional for enhancement) |
 | **Memory Efficiency** | High (compressed vectors) | Lower (full text) |
-| **Search Speed** | Very fast | Moderate |
-| **Semantic Understanding** | Excellent | Good |
+| **Search Speed** | Very fast (~50-100ms) | Moderate (~500-1000ms, includes LLM query generation) |
+| **Semantic Understanding** | Excellent | Good to Excellent (when embeddings available) |
 | **Exact Match Finding** | Good | Excellent |
 | **Temporal Awareness** | Limited | Excellent |
 | **Cross-Conversation** | Yes | No (per-conversation) |
@@ -113,7 +121,8 @@ Both can be used together or separately, depending on your needs.
 - ✅ You have very long single conversations
 - ✅ You need exact references (who said what, when)
 - ✅ You want complete history preservation
-- ✅ You don't want to load an embedding model
+- ✅ You want intelligent, context-aware search (LLM generates optimized queries)
+- ✅ You don't want to load an embedding model (or want optional semantic enhancement)
 - ✅ You need temporal/chronological awareness
 - ✅ You want to experiment with cutting-edge MIT research
 
@@ -154,7 +163,10 @@ Both can be used together or separately, depending on your needs.
 - **Context File**: `context.json` (stores all messages)
 - **Chat Files**: `chats/*.json` (saved chat snapshots)
 - **Encryption**: Optional AES-256-GCM encryption
-- **Query Method**: Recursive LLM-based querying
+- **Query Method**: LLM-generated search queries with multi-strategy execution
+  - LLM generates optimized search queries based on user input
+  - Prewritten Python functions execute searches using keyword matching, semantic similarity, and temporal relevance
+  - Results are scored, deduplicated, and ranked by relevance
 
 ---
 
@@ -167,8 +179,8 @@ Both can be used together or separately, depending on your needs.
 - **Scalability**: Handles 10,000+ entries efficiently
 
 ### RLM Chat
-- **Initial Setup**: No additional models needed
-- **Query Speed**: ~200-500ms per query (depends on history size)
+- **Initial Setup**: No additional models needed (embeddings optional for enhanced semantic search)
+- **Query Speed**: ~500-1000ms per query (includes LLM query generation + search execution, depends on history size and model speed)
 - **Storage**: ~10-50KB per conversation exchange
 - **Scalability**: Best for single long conversations (100-1000+ exchanges)
 
@@ -182,10 +194,10 @@ Both can be used together or separately, depending on your needs.
 - Multi-vector search (combining multiple embedding models)
 
 ### Potential RLM Chat Improvements
-- True recursive code generation (model writes search queries)
+- Recursive sub-calls (model queries itself on smaller chunks for deeper analysis)
 - Hierarchical chunking and summarization
-- Integration with vector search for hybrid approach
-- Smarter relevance scoring
+- REPL-style code execution (model writes executable Python code for advanced searches)
+- Answer aggregation from multiple recursive calls
 
 ---
 
