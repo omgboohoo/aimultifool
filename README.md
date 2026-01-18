@@ -123,7 +123,7 @@ After installation, you can use **aiMultiFool** in two modes: **Local Inference*
    ollama pull nomic-embed-text-v2-moe
    
    # OPTIONAL: Default LLM (you can use any Ollama LLM model you prefer)
-   ollama pull mtaylor91/l3-stheno-maid-blackroot:8b
+   ollama pull fluffy/l3-8b-stheno-v3.2:q4_K_M
    
    # OPTIONAL: High-quality alternative LLM
    ollama pull nchapman/mn-12b-mag-mell-r1
