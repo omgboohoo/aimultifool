@@ -1,14 +1,48 @@
 import json
 from pathlib import Path
+from typing import List, Union
 
-def get_models():
-    """Get list of model files from models directory"""
-    models_dir = Path(__file__).parent / "models"
-    if not models_dir.exists():
-        models_dir.mkdir(parents=True, exist_ok=True)
+def get_models(inference_mode: str = "local") -> List[Union[Path, str]]:
+    """
+    Get list of models based on inference mode.
     
-    model_files = [m for m in models_dir.glob("*.gguf") if "nomic" not in m.name.lower() and "embed" not in m.name.lower()]
-    return sorted(model_files)
+    Args:
+        inference_mode: "local" for local GGUF files, "ollama" for Ollama models
+    
+    Returns:
+        List of model paths (Path objects for local, strings for Ollama)
+    """
+    if inference_mode == "ollama":
+        try:
+            from ollama_client import get_ollama_models
+            # Try to get ollama_url from app if available, otherwise use default
+            base_url = "http://localhost:11434"
+            try:
+                import sys
+                # Try to get from app instance if available
+                if hasattr(sys.modules.get('__main__', None), 'app'):
+                    app = sys.modules['__main__'].app
+                    if hasattr(app, 'ollama_url'):
+                        url = app.ollama_url
+                        if url and '://' not in url:
+                            base_url = f"http://{url}"
+                        elif url:
+                            base_url = url
+            except Exception:
+                pass
+            models = get_ollama_models(base_url)
+            return models
+        except Exception:
+            # If Ollama is not available, return empty list
+            return []
+    else:
+        # Local mode - get GGUF files
+        models_dir = Path(__file__).parent / "models"
+        if not models_dir.exists():
+            models_dir.mkdir(parents=True, exist_ok=True)
+        
+        model_files = [m for m in models_dir.glob("*.gguf") if "nomic" not in m.name.lower() and "embed" not in m.name.lower()]
+        return sorted(model_files)
 
 def get_model_cache_path():
     """Get path to model configuration cache file"""
@@ -53,9 +87,14 @@ def count_tokens_in_messages(llm, messages):
         else:
             text = f"Assistant: {content}"
         
-        # Use direct llama_cpp tokenize method for all platforms
-        tokens = llm.tokenize(text.encode("utf-8"), add_bos=False, special=False)
-        total_tokens += len(tokens)
+        # Check if it's an Ollama client (has tokenize method that returns list)
+        if hasattr(llm, 'tokenize'):
+            tokens = llm.tokenize(text.encode("utf-8"), add_bos=False, special=False)
+            total_tokens += len(tokens)
+        else:
+            # Fallback for llama_cpp
+            tokens = llm.tokenize(text.encode("utf-8"), add_bos=False, special=False)
+            total_tokens += len(tokens)
     
     total_tokens += (len(messages) - 1) * 2
     return total_tokens

@@ -1,5 +1,18 @@
 # Release Notes
 
+## v0.3.0: Ollama Inference Support & Enhanced Quick Start
+### 🚀 New Feature: Ollama Inference Mode
+- **Ollama Integration**: Added support for using Ollama-managed models alongside local GGUF models, providing flexibility in model management and deployment.
+- **Seamless Switching**: Toggle between Local and Ollama inference modes directly from the Model settings screen.
+- **Ollama Model Detection**: Automatic detection of available Ollama models and connection status.
+- **Unified Interface**: Ollama models work seamlessly with all existing features including Vector Chat, character cards, and action menus.
+
+### 📚 Documentation Improvements
+- **Quick Start Guide**: Added comprehensive Quick Start section to README with step-by-step instructions for both Local and Ollama inference modes.
+- **Model Download Instructions**: Clear instructions for downloading required models in both modes:
+  - Local mode: Use the built-in "Download Models" button
+  - Ollama mode: Terminal commands for downloading required models
+
 ## v0.2.6: Card Management Enhancements & UI Improvements
 ### 🎴 Enhanced Card Management Workflow
 - **Improved Duplication Behavior**: When duplicating a card, all cards are now deselected and metadata display is cleared, providing a cleaner workflow.

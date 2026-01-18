@@ -1,4 +1,4 @@
-# aiMultiFool v0.2.6
+# aiMultiFool v0.3.0
 
 **The Premium Cross-Platform Terminal-Based Sandbox for Private AI Roleplay.** 
 Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favorite SillyTavern character cards with zero lag and full privacy.
@@ -12,12 +12,15 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
 ### 🎭 Character & Content
 - **Character Card Support**: Load SillyTavern PNG cards directly from the top menu.
 - **AI-Assisted Editing**: Built-in **Metadata Editor** with **real-time streaming AI assistance** for generating and modifying character data without leaving the app.
-    > *Tip: Use a small model like **Llama-3.2-3B-Instruct-uncensored-Q4_K_M** for responsive AI editing.*
+    > *Tip: Use a small model for responsive AI editing.*
 - **Narrative Styles**: Choose from **45 custom presets** covering a wide range of tones.
 - **On-Demand Encryption**: Secure individual character cards with **AES-256-GCM** encryption.
 - **Vector Chat (RAG)**: Enhance roleplay with long-term memory via local vector databases. Supports optional **AES-256-GCM** encryption for database payloads. Duplicate, rename, and manage multiple knowledge bases with ease.
 
 ### ⚡ AI & Performance
+- **Dual Inference Modes**: Support for both **Local GPU Inference** (via `llama.cpp`) and **Ollama API Inference** (via Ollama service). Seamlessly switch between modes without restarting the application.
+- **Local GPU Inference**: Direct `llama.cpp` integration for maximum privacy and control. Full GPU acceleration support with automatic layer optimization and caching.
+- **Ollama API Inference**: Use Ollama-managed models for flexible model management and access to models not available in GGUF format.
 - **Real-time Metrics**: Live TPS, Token counts, and Context % usage.
 - **Smart Pruning**: Automatically manages context window by trimming middle-history while preserving the System Prompt, first 3 exchanges (for early roleplay context), and the last message. Deletes messages one by one from the middle until reaching 60% context usage. Triggers at 85% context usage. Chat window automatically syncs to match the pruned context exactly.
 - **GPU/CPU Auto-Detection**: Optimized layer loading with configuration caching for faster subsequent loads.
@@ -38,7 +41,7 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
 
 ---
 
-## 🚀 Installation & Quick Start
+## 🚀 Installation
 
 > [!NOTE]
 > In testing, we have found **Linux** to be the premium **aiMultiFool** experience, while **Windows** tends to be more efficient with GPU VRAM management (offering more layer offloading availability).
@@ -86,6 +89,53 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
 > **GPU Acceleration**: On first launch, `run.bat` will automatically download a **Windows Multi-Arch Wheel** (~235MB) to enable CUDA support across GTX 10-series through RTX 40-series GPUs.
 > 
 
+
+---
+
+## 🚀 Quick Start
+
+After installation, you can use **aiMultiFool** in two modes: **Local Inference** or **Ollama Inference**.
+
+### Local Inference Mode
+
+**Local Inference** runs models directly on your machine using `llama.cpp`, providing maximum privacy and control.
+
+1. **Launch the Application**: Run `./run.sh` (Linux) or `run.bat` (Windows)
+2. **Download Default Models**: Click the **"Download Models"** button to automatically download:
+   - **L3-8B-Stheno-v3.2-Q4_K_M** (Default LLM)
+   - **nomic-embed-text-v2-moe.Q4_K_M** (Required for Vector Chat/RAG)
+3. **Load Model**: Once downloaded, select the model from the dropdown and click **"Load Model"**
+4. **Start Chatting**: Load a character card or start chatting directly!
+
+> [!TIP]
+> The **"Download Models"** button will automatically download both the LLM and embedding model required for full functionality. Models are saved to the `models/` directory.
+
+### Ollama Inference Mode
+
+**Ollama Inference** uses models managed by the Ollama service, which can be easier to set up and manage.
+
+1. **Install Ollama**: Download and install Ollama from [ollama.ai](https://ollama.ai)
+2. **Download Required Models**: Open your terminal (Linux) or Command Prompt (Windows) and run:
+   ```bash
+   # REQUIRED: Embedding model for Vector Chat (RAG) functionality
+   ollama pull nomic-embed-text-v2-moe
+   
+   # OPTIONAL: Default LLM (you can use any Ollama LLM model you prefer)
+   ollama pull mtaylor91/l3-stheno-maid-blackroot:8b
+   
+   # OPTIONAL: High-quality alternative LLM
+   ollama pull nchapman/mn-12b-mag-mell-r1
+   ```
+
+4. **Launch aiMultiFool**: Run `./run.sh` (Linux) or `run.bat` (Windows)
+5. **Switch to Ollama Mode**: Click **"Ollama Inference"** to switch modes
+6. **Select Model**: Choose your downloaded Ollama model from the dropdown
+7. **Load Model**: Click **"Load Model"** and start chatting!
+
+> [!TIP]
+> Ollama mode is great if you want to manage models separately or use models that aren't available in GGUF format. The app will automatically detect if Ollama is running and enable the mode.
+> 
+> **Privacy Note**: Privacy in Ollama mode depends on your Ollama configuration. Ensure Ollama is running locally and not configured to use cloud services or remote servers if you want to maintain full privacy.
 
 ---
 
@@ -140,6 +190,30 @@ If you've ever set **Temperature** to 2.0 and noticed the AI still sounds perfec
 ### 🌟 Optional Alternatives
 - **CPU/Low-Spec Option**: [Llama-3.2-3B-Instruct-uncensored-Q4_K_M](https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-uncensored-GGUF/resolve/main/Llama-3.2-3B-Instruct-uncensored-Q4_K_M.gguf?download=true) (Small 3B model, fast on systems without a GPU)
 - **High Quality Option**: [MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_M](https://huggingface.co/mradermacher/MN-12B-Mag-Mell-R1-Uncensored-i1-GGUF/resolve/main/MN-12B-Mag-Mell-R1-Uncensored.i1-Q4_K_M.gguf?download=true) (Larger 12B model, higher quality)
+
+---
+
+## 🛠️ Developer Tools
+
+The `devtools/` folder contains utility scripts for developers and advanced users:
+
+### `control_ollama.py`
+Interactive terminal utility for managing the Ollama service. Provides a menu-driven interface to:
+- Start, stop, and restart the Ollama service
+- Check Ollama service status and version
+- View available models
+- Works with both systemd-managed services and direct Ollama installations
+
+**Usage**: Run `python devtools/control_ollama.py` from the project root directory.
+
+### `inspect_vectors.py`
+Developer tool for inspecting vector database encryption status. Scans the `vectors/` directory and reports:
+- Which vector databases are marked for encryption (via `.encrypted` marker files)
+- Collection information and sample data from each database
+- Vector dimensions and payload content
+- Useful for debugging and verifying encryption status of vector databases
+
+**Usage**: Run `python devtools/inspect_vectors.py` from the project root directory.
 
 ---
 

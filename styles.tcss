@@ -538,8 +538,43 @@ ActionsManagerScreen {
 #model-dialog {
     width: 60;
     height: auto;
-    max-height: 90%;
+    max-height: 55%;
+    min-height: 0;
+    padding: 1 2;
 }
+
+#model-dialog.ollama-mode {
+    max-height: 45%;
+}
+
+#model-dialog .dialog-title {
+    margin-top: 0;
+    margin-bottom: 1;
+}
+
+#model-dialog .setting-group {
+    margin-top: 0;
+    margin-bottom: 1;
+}
+
+#model-dialog #ollama-url-container {
+    margin-bottom: 1;
+}
+
+#model-dialog #gpu-layers-container {
+    margin-bottom: 1;
+}
+
+#model-dialog .buttons {
+    margin-top: 0;
+    margin-bottom: 0;
+    height: auto;
+}
+
+#model-dialog #input-ollama-url {
+    height: 1;
+}
+
 
 #context-window-dialog {
     width: 80%;

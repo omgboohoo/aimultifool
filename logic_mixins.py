@@ -212,15 +212,85 @@ class InferenceMixin:
             # Always release the lock
             _inference_lock.release()
 
-    def load_model_task(self, model_path, context_size, requested_gpu_layers, needs_cleanup=False, old_llm=None):
+    def load_model_task(self, model_path, context_size, requested_gpu_layers, inference_mode="local", needs_cleanup=False, old_llm=None):
         # Use manual threading with proper GIL release to prevent UI freezes on Windows
         # llama_cpp.Llama() can hold GIL in native code, so we need to ensure UI updates happen
         
+        # Ensure model_path is a string (Windows path handling)
+        model_path_str = str(model_path) if model_path else None
+        if not model_path_str:
+            self.is_model_loading = False
+            return
+
+        # Handle Ollama models differently
+        if inference_mode == "ollama":
+            # Create a queue for thread communication
+            result_queue = Queue()
+            
+            # Define the blocking function to run in a manual thread
+            def _load_ollama_thread():
+                nonlocal old_llm
+                llm = None
+                
+                try:
+                    # Clean up old model if needed
+                    if old_llm is not None:
+                        try:
+                            if hasattr(old_llm, "close"):
+                                old_llm.close()
+                            old_llm = None
+                            gc.collect()
+                        except Exception:
+                            pass
+
+                    # Update status
+                    try:
+                        self.call_from_thread(setattr, self, "status_text", f"Connecting to Ollama...")
+                    except Exception:
+                        pass
+                    
+                    # Small delay to allow UI to update
+                    time.sleep(0.05)
+                    
+                    # Load Ollama client with configured URL
+                    from ollama_client import OllamaClient
+                    # Get ollama_url from app instance
+                    ollama_url = getattr(self, "ollama_url", "127.0.0.1:11434")
+                    if ollama_url and '://' not in ollama_url:
+                        base_url = f"http://{ollama_url}"
+                    elif ollama_url:
+                        base_url = ollama_url
+                    else:
+                        base_url = "http://127.0.0.1:11434"
+                    llm = OllamaClient(base_url=base_url)
+                    llm.load(model_path_str, n_ctx=int(context_size))
+                    
+                    # Put result in queue
+                    result_queue.put(("success", llm, 0))  # GPU layers not applicable for Ollama
+                except Exception as e:
+                    result_queue.put(("error", str(e), None))
+            
+            # Start the thread
+            thread = threading.Thread(target=_load_ollama_thread, daemon=True, name="OllamaLoadThread")
+            try:
+                thread.start()
+            except Exception as e:
+                self.is_model_loading = False
+                self.status_text = f"Thread start failed: {e}"
+                return
+            
+            # Set up a periodic check for the result
+            self._model_load_thread = thread
+            self._model_load_queue = result_queue
+            self.set_timer(0.1, self._check_model_load_result)
+            return
+        
+        # Local model loading (original logic)
         if requested_gpu_layers == 0:
             layers_to_try = [0]
         else:
             cache = load_model_cache()
-            cache_key = get_cache_key(model_path, context_size)
+            cache_key = get_cache_key(model_path_str, context_size)
             
             cached_layers = None
             if cache_key in cache:
@@ -247,12 +317,6 @@ class InferenceMixin:
                         layers_to_try.append(current)
                 if 0 not in layers_to_try:
                     layers_to_try.append(0)
-        
-        # Ensure model_path is a string (Windows path handling)
-        model_path_str = str(model_path) if model_path else None
-        if not model_path_str:
-            self.is_model_loading = False
-            return
 
         # Create a queue for thread communication
         result_queue = Queue()
@@ -301,6 +365,7 @@ class InferenceMixin:
                         
                         # Cache the successful result
                         cache = load_model_cache()
+                        cache_key = get_cache_key(model_path_str, context_size)
                         cache[cache_key] = {"gpu_layers": layers, "model_path": model_path_str, "context_size": int(context_size)}
                         save_model_cache(cache)
                         break
@@ -350,7 +415,12 @@ class InferenceMixin:
                         layer_display = "all" if actual_layers == -1 else str(actual_layers)
                         self.notify(f"Model loaded successfully with {layer_display} GPU layers!")
                         self.enable_character_list()
-                        model_name = Path(self.selected_model).stem
+                        # Get model name based on inference mode
+                        inference_mode = getattr(self, "inference_mode", "local")
+                        if inference_mode == "ollama":
+                            model_name = self.selected_model
+                        else:
+                            model_name = Path(self.selected_model).stem
                         self.status_text = f"{model_name} Ready"
                     else:
                         self.notify("Failed to load model!", severity="error")
@@ -839,6 +909,7 @@ class ActionsMixin:
             "context_size": self.context_size,
             "gpu_layers": self.gpu_layers,
             "selected_model": self.selected_model,
+            "inference_mode": getattr(self, "inference_mode", "local"),
             "temp": self.temp,
             "topp": self.topp,
             "topk": self.topk,

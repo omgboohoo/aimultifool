@@ -48,7 +48,7 @@ from widgets import MessageWidget, CharactersScreen, ParametersScreen, MiscScree
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.2.6"
+    TITLE = "aiMultiFool v0.3.0"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -76,6 +76,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     repeat = reactive(1.0)
     minp = reactive(0.0)
     selected_model = reactive("")
+    inference_mode = reactive("local")  # "local" or "ollama"
     current_character = reactive(None)
     first_user_message = reactive(None)
     status_text = reactive("Ready")
@@ -195,7 +196,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.2.6", id="status-version")
+            yield Static("aiMultiFool v0.3.0", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -210,6 +211,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         self.repeat = settings.get("repeat", 1.0)
         self.minp = settings.get("minp", 0.0)
         self.selected_model = settings.get("selected_model", "")
+        self.inference_mode = settings.get("inference_mode", "local")
+        self.ollama_url = settings.get("ollama_url", "127.0.0.1:11434")
         self.theme = settings.get("theme", "textual-dark")
         self.speech_styling = settings.get("speech_styling", "highlight")
         self.force_ai_speak_first = settings.get("force_ai_speak_first", True)
@@ -239,11 +242,14 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         # Re-apply Focus styling for inputs (sometimes gets lost in dynamic CSS loading?)
         # Actually it's handled by CSS, but good to ensure everything mounted.
         
-        models = get_models()
-        nomic_path = self.root_path / "models" / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
-        if not models or not nomic_path.exists():
-            self.notify("Setting up default models...", severity="information")
-            self.download_default_model()
+        # Don't auto-download models - user can use Download Default Models button
+        # inference_mode = getattr(self, "inference_mode", "local")
+        # models = get_models(inference_mode)
+        # nomic_path = self.root_path / "models" / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
+        # # Only check for nomic model in local mode
+        # if inference_mode == "local" and (not models or not nomic_path.exists()):
+        #     self.notify("Setting up default models...", severity="information")
+        #     self.download_default_model()
         
         new_content = get_style_prompt(self.style)
         self.messages = [{"role": "system", "content": new_content}]
@@ -312,8 +318,30 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
 
         for btn in all_buttons:
             if btn.id == "btn-load-model":
-                btn.disabled = is_busy
+                # Disable if busy or if no models available (in local mode)
+                btn_disabled = is_busy
+                if not is_busy:
+                    # Check if models exist in local mode
+                    inference_mode = getattr(self, "inference_mode", "local")
+                    if inference_mode == "local":
+                        try:
+                            from ai_engine import get_models
+                            models = get_models("local")
+                            if len(models) == 0:
+                                btn_disabled = True
+                        except Exception:
+                            # If check fails, disable to be safe
+                            btn_disabled = True
+                btn.disabled = btn_disabled
                 btn.loading = self.is_model_loading
+                continue
+
+            # Skip btn-toggle-mode - its disabled state is managed by ModelScreen based on Ollama status
+            if btn.id == "btn-toggle-mode":
+                continue
+            
+            # Skip btn-download-models - its disabled state is managed by ModelScreen based on whether models exist
+            if btn.id == "btn-download-models":
                 continue
 
             # Disable top menu buttons when AI is generating
@@ -375,18 +403,12 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
 
     def update_model_list(self):
         """Update model list on the active ModelScreen if it's open."""
-        models = get_models()
-        
         # Check if ModelScreen is the current screen
         if isinstance(self.screen, ModelScreen):
             try:
-                select_model = self.screen.query_one("#select-model", Select)
-                options = [(m.name, str(m)) for m in models]
-                select_model.set_options(options)
-                
-                # If nothing is selected or current selection is invalid, select the first one
-                if options and (select_model.value == Select.BLANK or not any(opt[1] == select_model.value for opt in options)):
-                    select_model.value = options[0][1]
+                inference_mode = getattr(self, "inference_mode", "local")
+                # Use the ModelScreen's _populate_models method which handles enabling/disabling controls
+                self.screen._populate_models(inference_mode)
             except Exception:
                 pass
 
@@ -441,6 +463,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             "repeat": self.repeat,
             "minp": self.minp,
             "selected_model": self.selected_model,
+            "inference_mode": getattr(self, "inference_mode", "local"),
+            "ollama_url": getattr(self, "ollama_url", "127.0.0.1:11434"),
             "theme": self.theme,
             "speech_styling": self.speech_styling
         }
@@ -824,16 +848,21 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                     await asyncio.sleep(0.1)
                     setattr(self, "_inference_starting", False)
 
-    def start_model_load(self, model_path, ctx, gpu):
+    def start_model_load(self, model_path, ctx, gpu, inference_mode=None):
         """Helper to safely start model loading from modals."""
         if not model_path:
             self.notify("Please select a model first!", severity="warning")
             return
 
+        # Get inference mode (default to current app state)
+        if inference_mode is None:
+            inference_mode = getattr(self, "inference_mode", "local")
+
         # Update app state and persist settings
         self.selected_model = str(model_path)
         self.context_size = int(ctx)
         self.gpu_layers = int(gpu)
+        self.inference_mode = inference_mode
         self.save_user_settings()
 
         # Set loading state and status BEFORE starting worker (Windows needs reactive updates on main thread)
@@ -850,7 +879,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         
         # Start manual threading (completely bypasses Textual's @work decorator for Windows compatibility)
         # Pass cleanup flag so thread can handle it
-        self.load_model_task(model_path, ctx, gpu, needs_cleanup=needs_cleanup, old_llm=old_llm if needs_cleanup else None)
+        self.load_model_task(model_path, ctx, gpu, inference_mode=inference_mode, needs_cleanup=needs_cleanup, old_llm=old_llm if needs_cleanup else None)
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-stop": await self.action_stop_generation()
@@ -960,7 +989,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                         self.notify("Reloading model with saved settings...", severity="information")
                         self.is_model_loading = True
                         await asyncio.sleep(0.1)
-                        self.start_model_load(self.selected_model, self.context_size, self.gpu_layers)
+                        inference_mode = getattr(self, "inference_mode", "local")
+                        self.start_model_load(self.selected_model, self.context_size, self.gpu_layers, inference_mode=inference_mode)
                         
                         # Wait for model loading to complete before allowing input
                         max_wait = 300  # 30 seconds max wait
@@ -1073,7 +1103,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         if result.get("action") == "load":
             self.is_model_loading = True
             await asyncio.sleep(0.1)
-            self.start_model_load(result["model_path"], result["ctx"], result["gpu"])
+            inference_mode = result.get("inference_mode", getattr(self, "inference_mode", "local"))
+            self.start_model_load(result["model_path"], result["ctx"], result["gpu"], inference_mode=inference_mode)
 
     async def add_message(self, role: str, content: str, sync_only: bool = False):
         """Helper to add a message to state and UI."""

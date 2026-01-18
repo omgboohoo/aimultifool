@@ -264,12 +264,21 @@ class ModelScreen(ModalScreen):
             Container(
                 Label("GPU Layers"),
                 Select([("All (-1)", -1), ("CPU Only (0)", 0)] + [(str(x), x) for x in range(8, 129, 8)], id="select-gpu-layers", value=-1),
-                classes="setting-group"
+                classes="setting-group",
+                id="gpu-layers-container"
+            ),
+            Container(
+                Label("Ollama Server"),
+                Input(placeholder="127.0.0.1:11434", id="input-ollama-url"),
+                classes="setting-group",
+                id="ollama-url-container"
             ),
             Horizontal(
+                Button("Local Inference", variant="default", id="btn-toggle-mode"),
+                Button("Download Models", variant="default", id="btn-download-models"),
                 Button("Load Model", variant="default", id="btn-load-model"),
-                Button("Close", variant="default", id="btn-close-model"),
-                classes="buttons"
+                classes="buttons",
+                id="model-buttons-container"
             ),
             id="model-dialog",
             classes="modal-dialog"
@@ -282,56 +291,424 @@ class ModelScreen(ModalScreen):
         # Populate fields from app state
         app = self.app
 
+        # Get inference mode from app (default to "local")
+        inference_mode = getattr(app, "inference_mode", "local")
+        
+        # In local mode, check if models exist and disable Load Model button if none found
+        if inference_mode == "local":
+            try:
+                from ai_engine import get_models
+                models = get_models("local")
+                load_btn = self.query_one("#btn-load-model", Button)
+                load_btn.disabled = len(models) == 0
+            except Exception:
+                # If check fails, disable button to be safe (user can enable after models are found)
+                load_btn = self.query_one("#btn-load-model", Button)
+                load_btn.disabled = True
+        
+        # Update toggle button label to show what it will switch to
+        toggle_btn = self.query_one("#btn-toggle-mode", Button)
+        if inference_mode == "ollama":
+            toggle_btn.label = "Local Inference"
+        else:
+            toggle_btn.label = "Ollama Inference"
+        
+        # Show/hide Download Models button (only in local mode)
+        download_btn = self.query_one("#btn-download-models", Button)
+        if inference_mode == "ollama":
+            download_btn.display = False
+        else:
+            download_btn.display = True
+            # Check if default models already exist
+            try:
+                from pathlib import Path
+                models_dir = Path(__file__).parent / "models"
+                llm_path = models_dir / "L3-8B-Stheno-v3.2-Q4_K_M.gguf"
+                embed_path = models_dir / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
+                if llm_path.exists() and embed_path.exists():
+                    download_btn.disabled = True
+                else:
+                    download_btn.disabled = False
+            except Exception:
+                # If check fails, leave button enabled (fallback)
+                download_btn.disabled = False
+        
+        # Show/hide GPU Layers and Ollama URL based on inference mode
+        gpu_container = self.query_one("#gpu-layers-container", Container)
+        ollama_url_container = self.query_one("#ollama-url-container", Container)
+        model_dialog = self.query_one("#model-dialog", Vertical)
+        if inference_mode == "ollama":
+            gpu_container.display = False
+            ollama_url_container.display = True
+            model_dialog.add_class("ollama-mode")
+        else:
+            gpu_container.display = True
+            ollama_url_container.display = False
+            model_dialog.remove_class("ollama-mode")
+
         # Validate and set Context Size
         try:
             self.query_one("#select-context").value = app.context_size
         except Exception:
             self.query_one("#select-context").value = 4096
 
-        # Validate and set GPU Layers
-        try:
-            self.query_one("#select-gpu-layers").value = app.gpu_layers
-        except Exception:
-            self.query_one("#select-gpu-layers").value = -1
-        
-        # Populate models
-        from ai_engine import get_models
-        models = get_models()
-        select_model = self.query_one("#select-model", Select)
-        options = [(m.name, str(m)) for m in models]
-        select_model.set_options(options)
-        
-        if app.selected_model:
+        # Validate and set GPU Layers (only for local mode)
+        if inference_mode != "ollama":
             try:
-                # check if selected model is in options
-                if any(opt[1] == app.selected_model for opt in options):
-                    select_model.value = app.selected_model
-                elif options:
-                    select_model.value = options[0][1]
+                self.query_one("#select-gpu-layers").value = app.gpu_layers
             except Exception:
-                pass
-        elif options:
-            select_model.value = options[0][1]
+                self.query_one("#select-gpu-layers").value = -1
+        
+        # Validate and set Ollama URL (only for ollama mode)
+        if inference_mode == "ollama":
+            try:
+                ollama_url = getattr(app, "ollama_url", "127.0.0.1:11434")
+                self.query_one("#input-ollama-url").value = ollama_url
+            except Exception:
+                self.query_one("#input-ollama-url").value = "127.0.0.1:11434"
+        
+        # Populate models based on inference mode
+        self._populate_models(inference_mode)
+        
+        # Explicitly set Load Model button state after population
+        # This ensures the button is enabled if models were found
+        try:
+            from ai_engine import get_models
+            models = get_models(inference_mode)
+            has_models = len(models) > 0
+            load_btn = self.query_one("#btn-load-model", Button)
+            load_btn.disabled = not has_models
+        except Exception:
+            # If we can't check, leave button as-is (should be enabled by default)
+            pass
         
         self.app.update_ui_state()
+        
+        # Check download button state after update_ui_state (to avoid reset)
+        if inference_mode != "ollama":
+            download_btn = self.query_one("#btn-download-models", Button)
+            try:
+                from pathlib import Path
+                models_dir = Path(__file__).parent / "models"
+                llm_path = models_dir / "L3-8B-Stheno-v3.2-Q4_K_M.gguf"
+                embed_path = models_dir / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
+                if llm_path.exists() and embed_path.exists():
+                    download_btn.disabled = True
+                else:
+                    download_btn.disabled = False
+            except Exception:
+                download_btn.disabled = False
+        
+        # Disable Ollama button if Ollama is not running (after update_ui_state to avoid reset)
+        toggle_btn = self.query_one("#btn-toggle-mode", Button)
+        if inference_mode != "ollama":
+            # Button shows "Ollama Inference" - check if Ollama is running
+            try:
+                from devtools.control_ollama import check_ollama_running
+                ollama_url = getattr(app, "ollama_url", "127.0.0.1:11434")
+                base_url = f"http://{ollama_url}" if '://' not in ollama_url else ollama_url
+                ollama_running = check_ollama_running(base_url)
+                toggle_btn.disabled = not ollama_running
+            except Exception:
+                # If we can't check, leave button enabled (fallback behavior)
+                toggle_btn.disabled = False
+        else:
+            # Button shows "Local Inference" - always enabled
+            toggle_btn.disabled = False
+    
+    def _populate_models(self, inference_mode: str):
+        """Populate model list based on inference mode."""
+        from ai_engine import get_models
+        from ollama_client import get_ollama_models
+        app = self.app
+        
+        try:
+            if inference_mode == "ollama":
+                # Use ollama_url from app settings
+                ollama_url = getattr(app, "ollama_url", "127.0.0.1:11434")
+                base_url = f"http://{ollama_url}" if '://' not in ollama_url else ollama_url
+                models = get_ollama_models(base_url)
+            else:
+                models = get_models(inference_mode)
+            select_model = self.query_one("#select-model", Select)
+            select_context = self.query_one("#select-context", Select)
+            select_gpu_layers = self.query_one("#select-gpu-layers", Select)
+            
+            # Check if we have any models
+            has_models = len(models) > 0
+            
+            if has_models:
+                if inference_mode == "ollama":
+                    # Ollama models are strings
+                    options = [(m, m) for m in models]
+                else:
+                    # Local models are Path objects
+                    options = [(m.name, str(m)) for m in models]
+                
+                select_model.set_options(options)
+                
+                # Try to restore selected model
+                if app.selected_model:
+                    try:
+                        if any(opt[1] == app.selected_model for opt in options):
+                            select_model.value = app.selected_model
+                        elif options:
+                            select_model.value = options[0][1]
+                    except Exception:
+                        if options:
+                            select_model.value = options[0][1]
+                elif options:
+                    select_model.value = options[0][1]
+                
+                # Enable controls when models are available
+                select_model.disabled = False
+                select_context.disabled = False
+                if inference_mode != "ollama":
+                    select_gpu_layers.disabled = False
+                
+                # Enable Load Model button when models are available
+                try:
+                    load_btn = self.query_one("#btn-load-model", Button)
+                    load_btn.disabled = False
+                except Exception:
+                    pass
+            else:
+                # No models available - disable controls
+                select_model.set_options([])
+                select_model.disabled = True
+                select_context.disabled = True
+                select_gpu_layers.disabled = True
+                
+                # Disable Load Model button when no models available
+                try:
+                    load_btn = self.query_one("#btn-load-model", Button)
+                    load_btn.disabled = True
+                except Exception:
+                    pass
+                
+                # Show helpful message
+                if inference_mode == "ollama":
+                    app.notify("No Ollama models found. Make sure Ollama is running and models are installed.", severity="warning")
+                else:
+                    app.notify("No local models found. Click 'Download Default Models' to get started.", severity="information")
+        except Exception as e:
+            app.notify(f"Error loading models: {e}", severity="error")
+            select_model = self.query_one("#select-model", Select)
+            select_context = self.query_one("#select-context", Select)
+            select_gpu_layers = self.query_one("#select-gpu-layers", Select)
+            select_model.set_options([])
+            select_model.disabled = True
+            select_context.disabled = True
+            select_gpu_layers.disabled = True
+            
+            # Disable Load Model button on error
+            try:
+                load_btn = self.query_one("#btn-load-model", Button)
+                load_btn.disabled = True
+            except Exception:
+                pass
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "btn-close-model":
-            self.dismiss()
+        if event.button.id == "btn-toggle-mode":
+            # Toggle between local and ollama mode
+            app = self.app
+            current_mode = getattr(app, "inference_mode", "local")
+            new_mode = "ollama" if current_mode == "local" else "local"
+            
+            # If switching to local mode, always try to unload Ollama models
+            if new_mode == "local":
+                # First, unload any model we have a reference to
+                if hasattr(app, "llm") and app.llm is not None:
+                    try:
+                        if hasattr(app.llm, "unload"):
+                            app.llm.unload()
+                        elif hasattr(app.llm, "close"):
+                            app.llm.close()
+                    except Exception:
+                        pass
+                    app.llm = None
+                    import gc
+                    gc.collect()
+                
+                # Proactively unload any Ollama models that might be loaded from previous runs
+                try:
+                    from devtools.control_ollama import check_ollama_running
+                    import requests
+                    ollama_url = getattr(app, "ollama_url", "127.0.0.1:11434")
+                    base_url = f"http://{ollama_url}" if '://' not in ollama_url else ollama_url
+                    if check_ollama_running(base_url):
+                        # Get list of available models
+                        response = requests.get(f"{base_url}/api/tags", timeout=2)
+                        if response.status_code == 200:
+                            data = response.json()
+                            models = data.get("models", [])
+                            # Try to unload each model (Ollama keeps models in memory)
+                            for model_info in models:
+                                model_name = model_info.get("name", "")
+                                if model_name and "embed" not in model_name.lower() and "nomic" not in model_name.lower():
+                                    try:
+                                        # Unload by calling generate with keep_alive=0
+                                        requests.post(
+                                            f"{base_url}/api/generate",
+                                            json={"model": model_name, "prompt": "", "keep_alive": "0"},
+                                            timeout=2
+                                        )
+                                    except Exception:
+                                        pass  # Best effort - ignore errors
+                except Exception:
+                    pass  # If Ollama isn't running or we can't connect, that's fine
+                
+                app.status_text = "Ready"
+                app.notify("Ollama models unloaded from GPU. GPU resources should be available.", severity="information")
+            
+            # Update app state
+            app.inference_mode = new_mode
+            
+            # Save Ollama URL if switching to Ollama mode
+            if new_mode == "ollama":
+                try:
+                    ollama_url = self.query_one("#input-ollama-url").value.strip()
+                    if ollama_url:
+                        app.ollama_url = ollama_url
+                except Exception:
+                    pass
+            
+            # Save the mode change to settings
+            if hasattr(app, "save_user_settings"):
+                app.save_user_settings()
+            
+            # Update button label to show what it will switch to
+            toggle_btn = self.query_one("#btn-toggle-mode", Button)
+            if new_mode == "ollama":
+                toggle_btn.label = "Local Inference"
+                toggle_btn.disabled = False  # Local Inference button is always enabled
+            else:
+                toggle_btn.label = "Ollama Inference"
+                # Disable Ollama button if Ollama is not running
+                try:
+                    from devtools.control_ollama import check_ollama_running
+                    ollama_url = getattr(app, "ollama_url", "127.0.0.1:11434")
+                    base_url = f"http://{ollama_url}" if '://' not in ollama_url else ollama_url
+                    ollama_running = check_ollama_running(base_url)
+                    toggle_btn.disabled = not ollama_running
+                except Exception:
+                    # If we can't check, leave button enabled (fallback behavior)
+                    toggle_btn.disabled = False
+            
+            # Show/hide Download Models button (only in local mode)
+            download_btn = self.query_one("#btn-download-models", Button)
+            if new_mode == "ollama":
+                download_btn.display = False
+            else:
+                download_btn.display = True
+                # Check if default models already exist
+                try:
+                    from pathlib import Path
+                    models_dir = Path(__file__).parent / "models"
+                    llm_path = models_dir / "L3-8B-Stheno-v3.2-Q4_K_M.gguf"
+                    embed_path = models_dir / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
+                    if llm_path.exists() and embed_path.exists():
+                        download_btn.disabled = True
+                    else:
+                        download_btn.disabled = False
+                except Exception:
+                    # If check fails, leave button enabled (fallback)
+                    download_btn.disabled = False
+            
+            # Show/hide GPU Layers and Ollama URL based on inference mode
+            gpu_container = self.query_one("#gpu-layers-container", Container)
+            ollama_url_container = self.query_one("#ollama-url-container", Container)
+            model_dialog = self.query_one("#model-dialog", Vertical)
+            if new_mode == "ollama":
+                gpu_container.display = False
+                ollama_url_container.display = True
+                model_dialog.add_class("ollama-mode")
+            else:
+                gpu_container.display = True
+                ollama_url_container.display = False
+                model_dialog.remove_class("ollama-mode")
+            
+            # Repopulate models
+            self._populate_models(new_mode)
+            
+            # Show notification
+            mode_name = "Ollama" if new_mode == "ollama" else "Local"
+            app.notify(f"Switched to {mode_name} mode", severity="information")
+        elif event.button.id == "btn-download-models":
+            # Trigger download of default models
+            app = self.app
+            if hasattr(app, "download_default_model"):
+                # Disable download button while downloading
+                download_btn = self.query_one("#btn-download-models", Button)
+                download_btn.disabled = True
+                download_btn.label = "Downloading..."
+                
+                # Start download (this is async, so we'll refresh when it completes)
+                app.download_default_model()
+                app.notify("Downloading default models...", severity="information")
+                
+                # Set up a timer to check for completion and refresh model list
+                def check_download_complete():
+                    if not app.is_downloading:
+                        # Download completed, refresh model list
+                        inference_mode = getattr(app, "inference_mode", "local")
+                        self._populate_models(inference_mode)
+                        download_btn.label = "Download Models"
+                        # Check if models exist and disable if they do
+                        from pathlib import Path
+                        models_dir = Path(__file__).parent / "models"
+                        llm_path = models_dir / "L3-8B-Stheno-v3.2-Q4_K_M.gguf"
+                        embed_path = models_dir / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
+                        if llm_path.exists() and embed_path.exists():
+                            download_btn.disabled = True
+                        else:
+                            download_btn.disabled = False
+                        download_btn.label = "Download Default Models"
+                    else:
+                        # Still downloading, check again in 0.5 seconds
+                        self.set_timer(0.5, check_download_complete)
+                
+                self.set_timer(0.5, check_download_complete)
+            else:
+                app.notify("Download functionality not available", severity="error")
         elif event.button.id == "btn-load-model":
             try:
                 model_path = self.query_one("#select-model").value
                 ctx = int(self.query_one("#select-context").value)
-                gpu = int(self.query_one("#select-gpu-layers").value)
+                
+                # Get current inference mode
+                inference_mode = getattr(self.app, "inference_mode", "local")
+                
+                # Save Ollama URL if in Ollama mode
+                if inference_mode == "ollama":
+                    try:
+                        ollama_url = self.query_one("#input-ollama-url").value.strip()
+                        if ollama_url:
+                            self.app.ollama_url = ollama_url
+                            if hasattr(self.app, "save_user_settings"):
+                                self.app.save_user_settings()
+                    except Exception:
+                        pass
+                
+                # GPU layers only apply to local mode
+                if inference_mode == "ollama":
+                    gpu = 0  # Not used for Ollama, but keep for compatibility
+                else:
+                    gpu = int(self.query_one("#select-gpu-layers").value)
                 
                 self.dismiss({
                     "action": "load",
                     "model_path": model_path,
                     "ctx": ctx,
-                    "gpu": gpu
+                    "gpu": gpu,
+                    "inference_mode": inference_mode
                 })
             except Exception as e:
                 self.app.notify(f"Error gathering settings: {e}", severity="error")
+        
+        # Focus title after button press (except for buttons that dismiss)
+        if event.button.id not in ["btn-load-model"]:
+            self.query_one(".dialog-title").focus()
         # btn-load-model is handled by the main app via bubbling or we delegate it here?
         # Standard pattern in this app is bubbling for main actions, but we need to ensure the app can read values.
         # Since on_select_changed updates app state, bubbling is fine IF app reads from app state, not widgets.
