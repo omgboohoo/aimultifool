@@ -38,6 +38,10 @@ def encrypt_data(data: str, password: str) -> str:
 
 def decrypt_data(encrypted_data: str, password: str) -> str:
     """Decrypts AES-256-GCM encrypted string data."""
+    if not password:
+        raise ValueError("Password parameter is required for decryption.")
+    if not isinstance(password, str):
+        raise ValueError("Password must be a string.")
     try:
         combined = base64.b64decode(encrypted_data)
         salt = combined[:16]

@@ -36,19 +36,19 @@ from textual import work
 import llama_cpp
 
 # Modular Logic Mixins
-from logic_mixins import InferenceMixin, ActionsMixin, VectorMixin
+from logic_mixins import InferenceMixin, ActionsMixin, VectorMixin, RLMMixin
 from ui_mixin import UIMixin
 
 # Module Functions
 from utils import _get_action_menu_data, load_settings, save_settings, DOWNLOAD_AVAILABLE, get_style_prompt, save_action_menu_data, encrypt_data
 from character_manager import extract_chara_metadata, process_character_metadata, create_initial_messages, write_chara_metadata
 from ai_engine import get_models
-from widgets import MessageWidget, CharactersScreen, ParametersScreen, MiscScreen, ThemeScreen, ActionsManagerScreen, ModelScreen, ChatManagerScreen, VectorChatScreen
+from widgets import MessageWidget, CharactersScreen, ParametersScreen, MiscScreen, ThemeScreen, ActionsManagerScreen, ModelScreen, ChatManagerScreen, VectorChatScreen, RLMChatScreen
 
-class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
+class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin, RLMMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.3.0"
+    TITLE = "aiMultiFool v0.4.0"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -86,6 +86,9 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     is_char_edit_mode = reactive(False)
     vector_chat_name = reactive(None)
     enable_vector_chat = reactive(False)
+    rlm_chat_name = reactive(None)
+    enable_rlm_chat = reactive(False)
+    rlm_password = reactive(None)
     force_ai_speak_first = reactive(True)
     _inference_worker = None
     _last_action_list = None
@@ -103,6 +106,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             Button("Cards", id="btn-cards", variant="default"),
             Button("Actions", id="btn-manage-actions", variant="default"),
             Button("Vector Chat", id="btn-vector-chat", variant="default"),
+            Button("RLM Chat", id="btn-rlm-chat", variant="default"),
             Button("Theme", id="btn-theme", variant="default"),
             Button("Sidebar", id="btn-toggle-sidebar", variant="default"),
             Button("About", id="btn-misc", variant="default"),
@@ -196,7 +200,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.3.0", id="status-version")
+            yield Static("aiMultiFool v0.4.0", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -301,6 +305,17 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         except Exception:
             pass
 
+    def watch_enable_rlm_chat(self, enable_rlm_chat: bool) -> None:
+        """Called when enable_rlm_chat changes."""
+        try:
+            btn = self.query_one("#btn-rlm-chat", Button)
+            if enable_rlm_chat:
+                btn.add_class("vector-active")  # Reuse same styling
+            else:
+                btn.remove_class("vector-active")
+        except Exception:
+            pass
+
     async def on_focus(self, event) -> None:
         if hasattr(self, 'show_footer'):
             self.show_footer = True
@@ -345,7 +360,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                 continue
 
             # Disable top menu buttons when AI is generating
-            if btn.id in ["btn-file", "btn-misc", "btn-theme", "btn-cards", "btn-parameters", "btn-model-settings", "btn-manage-actions", "btn-vector-chat", "btn-toggle-sidebar"]:
+            if btn.id in ["btn-file", "btn-misc", "btn-theme", "btn-cards", "btn-parameters", "btn-model-settings", "btn-manage-actions", "btn-vector-chat", "btn-rlm-chat", "btn-toggle-sidebar"]:
                 btn.disabled = is_ai_generating
             elif btn.id in ["btn-continue", "btn-regenerate", "btn-rewind", "btn-restart", "btn-clear-chat"]:
                 # Disable if busy OR if no model is loaded OR if AI is generating
@@ -907,7 +922,15 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         elif event.button.id == "btn-file":
             self.push_screen(ChatManagerScreen(), self.chat_manager_callback)
         elif event.button.id == "btn-vector-chat":
-            self.push_screen(VectorChatScreen(), self.vector_chat_callback)
+            if getattr(self, "enable_rlm_chat", False):
+                self.notify("Cannot open Vector Chat while RLM Chat is active. Please disable RLM Chat first.", severity="warning")
+            else:
+                self.push_screen(VectorChatScreen(), self.vector_chat_callback)
+        elif event.button.id == "btn-rlm-chat":
+            if getattr(self, "enable_vector_chat", False):
+                self.notify("Cannot open RLM Chat while Vector Chat is active. Please disable Vector Chat first.", severity="warning")
+            else:
+                self.push_screen(RLMChatScreen(), self.rlm_chat_callback)
         elif event.button.id == "btn-clear-search":
             search_input = self.query_one("#input-action-search", Input)
             search_input.value = ""
@@ -1084,6 +1107,105 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         self.vector_password = None
         self.close_vector_db()
         self.notify("Vector Chat disabled.")
+        # Normal chat reset
+        await self.action_wipe_all()
+        self.save_user_settings()
+
+    async def rlm_chat_callback(self, result):
+        if not result:
+            return
+        
+        try:
+            action = result.get("action")
+            name = result.get("name")
+            password = result.get("password")
+            
+            if action == "load" or action == "create":
+                if not name:
+                    self.notify("Error: No chat name provided.", severity="error")
+                    return
+                
+                # Normalize password: empty strings should be None
+                if password and isinstance(password, str):
+                    password = password.strip()
+                    password = password if password else None
+                else:
+                    password = None
+                    
+                await self.action_stop_generation()
+                self.rlm_password = password
+                # Backup password to ensure it persists even if reactive system clears it
+                self._rlm_password_backup = password
+                
+                if action == "create":
+                    rlm_dir = self.root_path / "rlmcontexts" / name
+                    rlm_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    if password:
+                        # Create marker file if password provided for a new chat
+                        (rlm_dir / ".encrypted").touch()
+                        
+                        # Create password verification file
+                        try:
+                            from utils import encrypt_data
+                            verify_data = encrypt_data("verification_string", password)
+                            with open(rlm_dir / "verify.bin", "w") as f:
+                                f.write(verify_data)
+                        except Exception:
+                            pass
+                    else:
+                        # Remove .encrypted file if it exists (from previous failed attempt)
+                        # This ensures new unencrypted chats work correctly
+                        encrypted_file = rlm_dir / ".encrypted"
+                        if encrypted_file.exists():
+                            encrypted_file.unlink()
+                        verify_file = rlm_dir / "verify.bin"
+                        if verify_file.exists():
+                            verify_file.unlink()
+                
+                # Initialize RLM context store with error handling
+                try:
+                    self.initialize_rlm_context(name)
+                except Exception as e:
+                    self.notify(f"Failed to initialize RLM context store: {e}", severity="error")
+                    self.enable_rlm_chat = False
+                    self.rlm_chat_name = None
+                    self.rlm_password = None
+                    self._rlm_password_backup = None
+                    return
+                
+                # SUCCESS: Set active state only after successful initialization
+                self.rlm_chat_name = name
+                self.enable_rlm_chat = True
+                # Ensure backup password is set (in case reactive cleared it)
+                if password:
+                    self._rlm_password_backup = password
+                
+                self.query_one("#chat-scroll").query("*").remove()
+                self.messages = [{"role": "system", "content": "RLM Chat enabled. Full conversation history will be stored externally and queried recursively."}]
+                enc_suffix = " (Encrypted)" if password else ""
+                self.notify(f"RLM Chat '{name}'{enc_suffix} loaded.")
+            elif action == "disable":
+                await self.action_disable_rlm_chat()
+            
+            self.save_user_settings()
+        except Exception as e:
+            import traceback
+            self.notify(f"RLM chat error: {e}", severity="error")
+            traceback.print_exc()
+
+    async def action_disable_rlm_chat(self):
+        # Save context BEFORE clearing password and name
+        # This ensures encryption works if the chat was encrypted
+        self.close_rlm_context()
+        
+        # Now clear the state
+        self.enable_rlm_chat = False
+        self.rlm_chat_name = None
+        self.rlm_password = None
+        self._rlm_password_backup = None
+        
+        self.notify("RLM Chat disabled.")
         # Normal chat reset
         await self.action_wipe_all()
         self.save_user_settings()

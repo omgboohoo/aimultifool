@@ -765,6 +765,51 @@ VectorInspectScreen {
     align: center middle;
 }
 
+RLMInspectScreen {
+    align: center middle;
+}
+
+RLMChatScreen {
+    align: center middle;
+}
+
+#rlm-chat-dialog {
+    width: 80;
+    height: auto;
+    min-height: 35;
+    max-height: 95%;
+    background: $surface;
+    border: thick $primary;
+    padding: 1 2;
+}
+
+#rlm-input-container {
+    height: auto;
+    width: 100%;
+    margin-top: 1;
+    margin-bottom: 1;
+    align: left middle;
+}
+
+#rlm-input-container Input {
+    width: 1fr;
+    height: 3;
+    margin: 0;
+}
+
+#rlm-input-container Button {
+    width: 12;
+    height: 3;
+    margin: 0 0 0 1;
+}
+
+#list-rlm-chats {
+    height: 12;
+    background: $boost;
+    border: solid $primary;
+    margin: 1 0;
+}
+
 #vector-chat-dialog {
     width: 80;
     height: auto;
@@ -820,6 +865,20 @@ VectorInspectScreen {
     width: 90%;
     height: 90%;
     max-height: 95%;
+}
+
+#rlm-inspect-dialog {
+    width: 90%;
+    height: 90%;
+    max-height: 95%;
+}
+
+#rlm-content {
+    height: 1fr;
+    width: 100%;
+    margin: 1 0;
+    border: solid $primary;
+    background: $surface;
 }
 
 /* Active vector chat button styling */

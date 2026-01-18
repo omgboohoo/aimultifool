@@ -109,6 +109,7 @@ build/
 backup.sh
 backups/
 chats/
+rlmcontexts/
 
 # Cards - Ignore all except specific base set
 cards/*

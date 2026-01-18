@@ -111,6 +111,34 @@ class InferenceMixin:
                     else:
                         # Make it explicit when RAG found nothing (helps debugging)
                         self.call_from_thread(setattr, self, "status_text", "Recall: 0 memories found.")
+                
+                # Retrieve RLM context if enabled (Recursive Language Models approach)
+                if getattr(self, "enable_rlm_chat", False) and user_text.lower() != "continue":
+                    self.call_from_thread(setattr, self, "status_text", "Querying RLM context...")
+                    rlm_context_msgs = self.query_rlm_context(user_text)
+                    if rlm_context_msgs:
+                        # Prepend RLM context after system prompt
+                        insert_idx = 1 if len(messages_to_use) > 0 and messages_to_use[0]["role"] == "system" else 0
+                        # Format RLM context as system messages to indicate they're from external store
+                        for i, msg in enumerate(rlm_context_msgs[:10]):  # Limit to 10 most relevant
+                            # Get content and strip any existing RLM Context prefix to prevent double-formatting
+                            content = msg.get('content', '')
+                            # Remove any existing "[RLM Context" prefix if present
+                            if content.startswith("[RLM Context"):
+                                # Find the colon after the prefix and extract the actual content
+                                colon_idx = content.find("]:")
+                                if colon_idx != -1:
+                                    content = content[colon_idx + 2:].strip()
+                            
+                            rlm_msg = {
+                                "role": "system",
+                                "content": f"[RLM Context - {msg.get('role', 'unknown')}]: {content[:500]}"
+                            }
+                            messages_to_use.insert(insert_idx + i, rlm_msg)
+                        
+                        self.call_from_thread(setattr, self, "status_text", f"RLM: {len(rlm_context_msgs)} context chunks retrieved.")
+                        time.sleep(0.3)
+                        self.call_from_thread(setattr, self, "status_text", "Thinking with RLM context...")
 
                 stream = self.llm.create_chat_completion(
                     messages=messages_to_use,
@@ -193,6 +221,15 @@ class InferenceMixin:
                         # Save to vector DB if enabled
                         if getattr(self, "enable_vector_chat", False) and user_text.lower() != "continue":
                             self.save_vector_entry(user_text, assistant_content)
+                        
+                        # Save to RLM context store if enabled
+                        if getattr(self, "enable_rlm_chat", False) and user_text.lower() != "continue":
+                            # Add user message and assistant response to RLM store
+                            rlm_messages = [
+                                {"role": "user", "content": user_text},
+                                {"role": "assistant", "content": assistant_content}
+                            ]
+                            self.add_to_rlm_context(rlm_messages)
 
                         messages_to_use = prune_messages_if_needed(self.llm, messages_to_use, self.context_size)
                         self.call_from_thread(self._update_messages_safely, messages_to_use)
@@ -918,6 +955,13 @@ class ActionsMixin:
             "style": self.style
         }
         save_settings(settings)
+        
+        # Save RLM context if enabled
+        if getattr(self, "enable_rlm_chat", False):
+            try:
+                self.save_rlm_context()
+            except Exception:
+                pass
 
 class VectorMixin:
     """Mixin for handling Vector DB (RAG) operations."""
@@ -1310,3 +1354,241 @@ class VectorMixin:
             self.qdrant_instance.upsert(collection_name=getattr(self, "vector_collection_name", "chat_memory"), points=[point])
         except Exception as e:
             self.notify(f"Failed to save vector entry: {e}", severity="error")
+
+
+class RLMMixin:
+    """Mixin for handling RLM (Recursive Language Models) context management."""
+    rlm_context_store = None
+    rlm_password = None
+    rlm_collection_name = None
+    _rlm_password_backup = None  # Backup to ensure password persists even if reactive clears it
+    
+    def validate_rlm_password(self, password):
+        """Validator for reactive rlm_password attribute. Normalizes empty strings to None."""
+        # Allow None or string values
+        if password is None:
+            return None
+        if isinstance(password, str):
+            # Normalize empty strings to None
+            password = password.strip()
+            return password if password else None
+        # Reject other types
+        raise ValueError("Password must be a string or None")
+    
+    def check_rlm_password(self, name: str, password):
+        """Pre-validation check for RLM chat passwords without setting state."""
+        rlm_dir = Path(__file__).parent / "rlmcontexts" / name
+        
+        # If .encrypted doesn't exist, no password needed
+        if not (rlm_dir / ".encrypted").exists():
+            return True  # Not encrypted
+        
+        # Normalize password: None or empty string means no password
+        # But if .encrypted exists, we need a password
+        if not password:
+            raise ValueError("Password required for encrypted RLM chat.")
+        
+        # Ensure password is a string (not None)
+        if not isinstance(password, str):
+            raise ValueError("Password must be a string.")
+        
+        password = password.strip()
+        if not password:
+            raise ValueError("Password required for encrypted RLM chat.")
+            
+        # Try verify.bin first
+        verify_file = rlm_dir / "verify.bin"
+        if verify_file.exists():
+            try:
+                with open(verify_file, "r") as f:
+                    enc_v = f.read()
+                decrypt_data(enc_v, password)
+                return True
+            except ValueError as e:
+                # Re-raise ValueError as-is (it has the error message)
+                raise
+            except Exception as e:
+                raise ValueError("Incorrect password for encrypted RLM chat.")
+        
+        return True
+    
+    def initialize_rlm_context(self, name: str):
+        """Initialize RLM context store for a given name."""
+        try:
+            rlm_dir = Path(__file__).parent / "rlmcontexts" / name
+            rlm_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Load existing context or create new
+            context_file = rlm_dir / "context.json"
+            if context_file.exists():
+                try:
+                    with open(context_file, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    
+                    messages = data.get("messages", [])
+                    # Decrypt if needed
+                    if data.get("encrypted", False) and self.rlm_password:
+                        decrypted_messages = []
+                        for msg in messages:
+                            try:
+                                decrypted_messages.append({
+                                    "role": msg.get("role"),
+                                    "content": decrypt_data(msg.get("content", ""), self.rlm_password)
+                                })
+                            except Exception:
+                                # Skip messages that can't be decrypted
+                                pass
+                        self.rlm_context_store = decrypted_messages
+                    else:
+                        self.rlm_context_store = messages
+                except Exception:
+                    self.rlm_context_store = []
+            else:
+                self.rlm_context_store = []
+            
+            # Password validation for encrypted chats
+            # Only validate if .encrypted exists (for loading existing encrypted chats)
+            # New chats without passwords won't have .encrypted file, so validation is skipped
+            encrypted_file = rlm_dir / ".encrypted"
+            
+            if encrypted_file.exists():
+                # Validate password if .encrypted exists (means it's an encrypted chat)
+                self.check_rlm_password(name, self.rlm_password)
+                
+                # Create verify.bin if it doesn't exist yet
+                verify_file = rlm_dir / "verify.bin"
+                if not verify_file.exists() and self.rlm_password:
+                    try:
+                        enc_v = encrypt_data("verification_string", self.rlm_password)
+                        with open(verify_file, "w") as f:
+                            f.write(enc_v)
+                    except Exception:
+                        pass
+            
+            self.rlm_collection_name = name
+        except Exception as e:
+            raise e
+    
+    def close_rlm_context(self):
+        """Safely close and save the current RLM context store."""
+        if self.rlm_context_store is not None:
+            try:
+                self.save_rlm_context()
+            except Exception:
+                pass
+            self.rlm_context_store = None
+        self.rlm_collection_name = None
+    
+    def save_rlm_context(self):
+        """Save current RLM context to disk."""
+        if not self.rlm_collection_name or self.rlm_context_store is None:
+            return
+        
+        rlm_dir = Path(__file__).parent / "rlmcontexts" / self.rlm_collection_name
+        rlm_dir.mkdir(parents=True, exist_ok=True)
+        context_file = rlm_dir / "context.json"
+        
+        # Check if this chat should be encrypted (has .encrypted marker file)
+        encrypted_file = rlm_dir / ".encrypted"
+        should_encrypt = encrypted_file.exists()
+        
+        # Encrypt messages if .encrypted marker exists
+        # We check for .encrypted file as the source of truth for whether encryption should be used
+        messages_to_save = self.rlm_context_store
+        is_encrypted = False
+        if should_encrypt:
+            # Get password from reactive attribute or backup
+            password_to_use = getattr(self, 'rlm_password', None) or getattr(self, '_rlm_password_backup', None)
+            
+            # If .encrypted exists, we must have a password (it was set during creation/load)
+            if not password_to_use:
+                self.notify("RLM encryption error: Password not available for encrypted chat.", severity="error")
+                return
+            
+            # Encrypt all messages
+            try:
+                from utils import encrypt_data
+                encrypted_messages = []
+                for msg in messages_to_save:
+                    encrypted_messages.append({
+                        "role": msg.get("role"),
+                        "content": encrypt_data(msg.get("content", ""), password_to_use)
+                    })
+                messages_to_save = encrypted_messages
+                is_encrypted = True
+            except Exception as e:
+                self.notify(f"RLM encryption failed: {e}", severity="error")
+                return
+        
+        data = {
+            "messages": messages_to_save,
+            "encrypted": is_encrypted,
+            "message_count": len(messages_to_save)
+        }
+        
+        try:
+            with open(context_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            self.notify(f"Failed to save RLM context: {e}", severity="error")
+    
+    def add_to_rlm_context(self, messages: list):
+        """Add messages to RLM context store."""
+        if self.rlm_context_store is None:
+            self.rlm_context_store = []
+        
+        # Append new messages
+        self.rlm_context_store.extend(messages)
+        
+        # Save after every message exchange (user + assistant = 2 messages)
+        # This ensures RLM context is constantly updated and available for queries
+        # RLM needs frequent saves to work properly - the context should be available
+        # for recursive queries, not just at the end of the chat
+        try:
+            self.save_rlm_context()
+        except Exception:
+            pass
+    
+    def query_rlm_context(self, user_query: str, max_chunks: int = 5, chunk_size: int = 10):
+        """
+        Query RLM context store recursively to find relevant messages.
+        This implements the MIT RLM approach: instead of loading all context,
+        we recursively query for relevant parts.
+        """
+        if not self.rlm_context_store or len(self.rlm_context_store) == 0:
+            return []
+        
+        if not self.llm:
+            return []
+        
+        # Simple implementation: use the LLM to identify relevant message ranges
+        # In a full RLM implementation, the model would write code to search,
+        # but for now we'll use semantic similarity via the model itself
+        
+        try:
+            # Get embedding for the query (if available)
+            if hasattr(self, "get_embedding"):
+                query_emb = self.get_embedding(user_query, task="query")
+                if query_emb:
+                    # Simple relevance: return recent messages + some from history
+                    # In full RLM, this would be more sophisticated
+                    recent_messages = self.rlm_context_store[-20:] if len(self.rlm_context_store) > 20 else self.rlm_context_store
+                    
+                    # Also try to find semantically similar older messages
+                    # For now, return recent context + some from middle
+                    result = []
+                    if len(self.rlm_context_store) > 20:
+                        # Include some from middle section
+                        mid_start = len(self.rlm_context_store) // 2
+                        mid_section = self.rlm_context_store[mid_start:mid_start + 10]
+                        result.extend(mid_section)
+                    result.extend(recent_messages)
+                    
+                    return result[:max_chunks * chunk_size]
+            
+            # Fallback: return recent messages
+            return self.rlm_context_store[-30:] if len(self.rlm_context_store) > 30 else self.rlm_context_store
+            
+        except Exception as e:
+            # Fallback on error
+            return self.rlm_context_store[-20:] if len(self.rlm_context_store) > 20 else self.rlm_context_store

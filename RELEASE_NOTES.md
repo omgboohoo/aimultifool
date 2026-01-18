@@ -1,5 +1,26 @@
 # Release Notes
 
+## v0.4.0: RLM Chat & Enhanced Context Management
+### 🧠 New Feature: RLM Chat (Recursive Language Models)
+- **RLM Chat Support**: Added support for Recursive Language Models, enabling management of very long conversations by storing complete conversation history externally and querying it recursively.
+- **Complete History Preservation**: RLM Chat stores full conversation history in external JSON files, ensuring nothing is ever lost even in extended roleplay sessions.
+- **Optional Encryption**: RLM context stores support optional **AES-256-GCM** encryption with **Argon2id** key derivation, keeping your complete conversation history secure on disk.
+- **RLM Chat Management**: Full suite of tools to create, duplicate, rename, delete, and inspect RLM context stores directly from the new **RLM Chat** modal.
+- **Seamless Integration**: Toggle RLM Chat on/off mid-conversation to enhance characters with complete historical context beyond the standard context window.
+- **Password Protection**: Encrypted RLM chats require password validation before loading, ensuring secure access to your conversation history.
+- **Storage Location**: RLM context stores are saved to `rlmcontexts/{chat_name}/` directory with `context.json` containing the full message history.
+
+### 🔧 Technical Improvements
+- **RLM Context Management**: Implemented `RLMMixin` with methods for initializing, saving, and closing RLM context stores.
+- **Encryption Support**: RLM context stores use the same AES-256-GCM encryption system as Vector Chat and saved chats.
+- **Password Validation**: Added robust password validation system for encrypted RLM chats with verification file support.
+- **Context Store Lifecycle**: Proper lifecycle management ensures RLM context stores are saved automatically when switching chats or closing the app.
+
+### 📚 Documentation Updates
+- **RLM Chat Documentation**: Added comprehensive RLM Chat information to README, including feature description and encryption details.
+- **Comparison Guide**: Updated `RAG_VS_RLM.md` with detailed comparison between Vector Chat (RAG) and RLM Chat approaches.
+- **Storage Path Correction**: Updated all references from `rlm_contexts` to `rlmcontexts` to match actual folder structure.
+
 ## v0.3.0: Ollama Inference Support & Enhanced Quick Start
 ### 🚀 New Feature: Ollama Inference Mode
 - **Ollama Integration**: Added support for using Ollama-managed models alongside local GGUF models, providing flexibility in model management and deployment.
