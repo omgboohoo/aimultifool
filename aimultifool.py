@@ -922,15 +922,9 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin, RL
         elif event.button.id == "btn-file":
             self.push_screen(ChatManagerScreen(), self.chat_manager_callback)
         elif event.button.id == "btn-vector-chat":
-            if getattr(self, "enable_rlm_chat", False):
-                self.notify("Cannot open Vector Chat while RLM Chat is active. Please disable RLM Chat first.", severity="warning")
-            else:
-                self.push_screen(VectorChatScreen(), self.vector_chat_callback)
+            self.push_screen(VectorChatScreen(), self.vector_chat_callback)
         elif event.button.id == "btn-rlm-chat":
-            if getattr(self, "enable_vector_chat", False):
-                self.notify("Cannot open RLM Chat while Vector Chat is active. Please disable Vector Chat first.", severity="warning")
-            else:
-                self.push_screen(RLMChatScreen(), self.rlm_chat_callback)
+            self.push_screen(RLMChatScreen(), self.rlm_chat_callback)
         elif event.button.id == "btn-clear-search":
             search_input = self.query_one("#input-action-search", Input)
             search_input.value = ""

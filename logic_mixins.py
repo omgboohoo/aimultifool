@@ -140,6 +140,10 @@ class InferenceMixin:
                         time.sleep(0.3)
                         self.call_from_thread(setattr, self, "status_text", "Thinking with RLM context...")
 
+                # Important: context insertion (Vector/RLM) can push us over the context window.
+                # Prune again *after* inserting retrieval snippets so the final prompt is safe.
+                messages_to_use = prune_messages_if_needed(self.llm, messages_to_use, self.context_size)
+
                 stream = self.llm.create_chat_completion(
                     messages=messages_to_use,
                     max_tokens=self.context_size - 100,
@@ -1594,10 +1598,13 @@ Return ONLY a concise search query (1-2 sentences), no explanations."""
             
             search_query = strategy_response["choices"][0]["message"]["content"].strip()
             
-            # Step 2: Use prewritten Python functions to search
-            results = self._search_rlm_store(search_query, user_query, max_chunks * chunk_size)
-            
-            return results
+            # Step 2: Use prewritten Python functions to search and return chunked context
+            return self._search_rlm_store_chunked(
+                search_query=search_query,
+                original_query=user_query,
+                max_chunks=max_chunks,
+                chunk_size=chunk_size,
+            )
             
         except Exception as e:
             # Fallback on error
@@ -1710,3 +1717,148 @@ Return ONLY a concise search query (1-2 sentences), no explanations."""
         
         # Limit to max_results
         return unique_results[:max_results]
+
+    def _search_rlm_store_scored(self, search_query: str, original_query: str, max_results: int = 50):
+        """
+        Like _search_rlm_store(), but returns scored hits: List[(score, index, msg)].
+        This enables chunking around high-signal indices.
+        """
+        if not self.rlm_context_store:
+            return []
+
+        scored = []
+        search_query_lower = (search_query or "").lower()
+        original_query_lower = (original_query or "").lower()
+
+        # Extract keywords from both queries
+        all_keywords = set(search_query_lower.split() + original_query_lower.split())
+        stop_words = {"the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "is", "was", "are", "were"}
+        keywords = [kw for kw in all_keywords if kw not in stop_words and len(kw) > 2]
+
+        # Strategy 1: Keyword matching with scoring
+        for i, msg in enumerate(self.rlm_context_store):
+            content = (msg.get("content", "") or "").lower()
+            match_count = sum(1 for kw in keywords if kw in content)
+            if match_count <= 0:
+                continue
+
+            score = match_count * 10
+            recency_bonus = max(0, (len(self.rlm_context_store) - i) / max(1, len(self.rlm_context_store)) * 5)
+            score += recency_bonus
+            scored.append((score, i, msg))
+
+        # Strategy 2: Semantic similarity (if embeddings available)
+        if hasattr(self, "get_embedding"):
+            try:
+                query_emb = self.get_embedding(search_query or original_query or "", task="query")
+                if query_emb:
+                    indices_to_check = set()
+                    store_len = len(self.rlm_context_store)
+                    if store_len > 0:
+                        indices_to_check.update(range(max(0, store_len - 30), store_len))  # recent
+                        mid_start = store_len // 2
+                        indices_to_check.update(range(mid_start, min(mid_start + 20, store_len)))  # middle
+                        if store_len > 50:
+                            indices_to_check.update(range(0, min(20, store_len)))  # old
+
+                    for i in indices_to_check:
+                        msg = self.rlm_context_store[i]
+                        content = msg.get("content", "")
+                        if not content or len(content) < 10:
+                            continue
+                        try:
+                            msg_emb = self.get_embedding(content[:500], task="document")
+                            if not msg_emb:
+                                continue
+
+                            dot_product = sum(a * b for a, b in zip(query_emb, msg_emb))
+                            norm_a = sum(a * a for a in query_emb) ** 0.5
+                            norm_b = sum(b * b for b in msg_emb) ** 0.5
+                            similarity = dot_product / (norm_a * norm_b + 1e-8)
+
+                            recency = (store_len - i) / max(1, store_len)
+                            final_score = (similarity * 0.7 + recency * 0.3) * 10  # scale to keyword score range
+                            scored.append((final_score, i, msg))
+                        except Exception:
+                            continue
+            except Exception:
+                pass
+
+        # Strategy 3: Always include some recency hits (low weight)
+        store_len = len(self.rlm_context_store)
+        for i in range(max(0, store_len - min(10, store_len)), store_len):
+            msg = self.rlm_context_store[i]
+            scored.append((1.0, i, msg))
+
+        scored.sort(reverse=True, key=lambda x: x[0])
+
+        # Deduplicate by index, preserve highest score per index
+        seen_idx = set()
+        deduped = []
+        for score, i, msg in scored:
+            if i in seen_idx:
+                continue
+            seen_idx.add(i)
+            deduped.append((score, i, msg))
+            if len(deduped) >= max_results:
+                break
+
+        return deduped
+
+    def _search_rlm_store_chunked(self, search_query: str, original_query: str, max_chunks: int = 5, chunk_size: int = 10):
+        """
+        Return context as message *chunks* around high-scoring hits.
+
+        This is a closer match to the RLM paper's "operate on snippets/chunks of context" behavior,
+        without implementing a full REPL + recursive sub-LLM calling environment.
+        """
+        if not self.rlm_context_store:
+            return []
+
+        max_chunks = max(1, int(max_chunks or 1))
+        chunk_size = max(2, int(chunk_size or 2))
+
+        scored_hits = self._search_rlm_store_scored(search_query, original_query, max_results=max_chunks * 4)
+        if not scored_hits:
+            return []
+
+        store_len = len(self.rlm_context_store)
+        half = chunk_size // 2
+
+        # Build candidate windows (score, start, end)
+        windows = []
+        for score, i, _ in scored_hits:
+            start = max(0, i - half)
+            end = min(store_len, start + chunk_size)
+            start = max(0, end - chunk_size)  # keep size stable when near end
+            windows.append((score, start, end))
+
+        # Sort windows by score and keep top-N non-identical windows
+        windows.sort(reverse=True, key=lambda x: x[0])
+        chosen = []
+        seen_ranges = set()
+        for score, start, end in windows:
+            key = (start, end)
+            if key in seen_ranges:
+                continue
+            seen_ranges.add(key)
+            chosen.append((score, start, end))
+            if len(chosen) >= max_chunks:
+                break
+
+        # Flatten chosen windows into messages, preserving chronological order within each chunk,
+        # and then de-dupe by (role, content prefix) similar to _search_rlm_store().
+        results = []
+        for _, start, end in chosen:
+            results.extend(self.rlm_context_store[start:end])
+
+        seen = set()
+        unique_results = []
+        for msg in results:
+            msg_id = (msg.get("role", ""), (msg.get("content", "") or "")[:100])
+            if msg_id in seen:
+                continue
+            seen.add(msg_id)
+            unique_results.append(msg)
+
+        return unique_results
