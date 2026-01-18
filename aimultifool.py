@@ -1126,7 +1126,45 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin, RL
                     self._rlm_password_backup = password
                 
                 self.query_one("#chat-scroll").query("*").remove()
-                self.messages = [{"role": "system", "content": "RLM Chat enabled. Full conversation history will be stored externally and queried recursively."}]
+                
+                # Load existing RLM context if available, otherwise start fresh
+                if self.rlm_context_store and len(self.rlm_context_store) > 0:
+                    # RLM stores full history externally - load first 3 exchanges + last 7 messages
+                    # This matches the pruning strategy (preserves first 3 exchanges) and provides recent continuity
+                    # The full history will be queried on-demand during inference
+                    
+                    # Get first 3 exchanges (6 messages: 3 user + 3 assistant)
+                    first_3_exchanges = self.rlm_context_store[:6] if len(self.rlm_context_store) >= 6 else self.rlm_context_store
+                    
+                    # Get last 7 messages
+                    last_7_messages = self.rlm_context_store[-7:] if len(self.rlm_context_store) >= 7 else self.rlm_context_store
+                    
+                    # Combine: first 3 exchanges + last 7 messages, removing duplicates while preserving order
+                    combined_messages = []
+                    seen_indices = set()
+                    
+                    # Add first 3 exchanges
+                    for i, msg in enumerate(first_3_exchanges):
+                        combined_messages.append(msg)
+                        seen_indices.add(i)
+                    
+                    # Add last 7 messages (skip if already included in first 3 exchanges)
+                    store_len = len(self.rlm_context_store)
+                    for i in range(max(0, store_len - 7), store_len):
+                        if i not in seen_indices:
+                            combined_messages.append(self.rlm_context_store[i])
+                    
+                    self.messages = combined_messages
+                    
+                    # Add informational system message at the start if not already present
+                    if not any(msg.get("role") == "system" and "RLM Chat enabled" in msg.get("content", "") for msg in self.messages):
+                        self.messages.insert(0, {"role": "system", "content": "RLM Chat enabled. Full conversation history will be stored externally and queried recursively."})
+                    
+                    await self.full_sync_chat_ui()
+                else:
+                    # New RLM chat - start with just the informational message
+                    self.messages = [{"role": "system", "content": "RLM Chat enabled. Full conversation history will be stored externally and queried recursively."}]
+                
                 enc_suffix = " (Encrypted)" if password else ""
                 self.notify(f"RLM Chat '{name}'{enc_suffix} loaded.")
             elif action == "disable":

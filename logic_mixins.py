@@ -231,6 +231,13 @@ class InferenceMixin:
                             ]
                             self.add_to_rlm_context(rlm_messages)
 
+                        # Remove RLM context messages before updating self.messages
+                        # RLM context should only exist during inference, not persist in self.messages
+                        messages_to_use = [msg for msg in messages_to_use 
+                                          if not (msg.get("role") == "system" and 
+                                                 isinstance(msg.get("content", ""), str) and
+                                                 msg.get("content", "").startswith("[RLM Context"))]
+
                         messages_to_use = prune_messages_if_needed(self.llm, messages_to_use, self.context_size)
                         self.call_from_thread(self._update_messages_safely, messages_to_use)
                         
