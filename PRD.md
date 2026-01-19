@@ -1,4 +1,4 @@
-# System Reference Document: aiMultiFool v0.4.1
+# System Reference Document: aiMultiFool v0.4.2
 
 ## 1. Executive Summary
 aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox. It leverages **Textual** for a responsive, desktop-class TUI and supports dual inference modes: **llama-cpp-python** for high-performance local GPU inference and **Ollama API** for flexible model management. The architecture prioritizes separation of concerns via a Mixin pattern, enabling clean extensibility for theming, encryption, and complex character logic.
@@ -53,16 +53,15 @@ classDiagram
 #### Application Entry & Core Logic
 - **`aimultifool.py`**: The entry point. Initializes the `App`, loads settings, and composes the primary layout. Sets Windows event loop policy for threading compatibility.
 
-- **`logic_mixins.py` (`InferenceMixin`, `ActionsMixin`, `VectorMixin`, `RLMMixin`)**:
+- **`logic_mixins.py` (`InferenceMixin`, `ActionsMixin`, `VectorMixin`)**:
     - **Inference**: Supports dual inference backends (local llama-cpp-python and Ollama API). Uses unified interface that works with both backends. To prevent GIL-related UI freezes, local model loading is handled via manual `threading.Thread` with a result `Queue`, while inference is orchestrated by Textual's `@work(thread=True)` decorator. Ollama mode uses HTTP API calls that don't require model loading.
     - **State**: Manages the message history list, pruning logic, and token counting. Tracks inference mode (local/ollama) and handles mode-specific state management.
     - **Vector Chat**: On Windows, embeddings run in a separate subprocess (`SubprocessEmbedder`) to maintain UI responsiveness. On Linux, direct integration is used. Vector Chat works with both local and Ollama inference modes.
-    - **RLM Chat**: Manages RLM context stores for recursive language model support. Implements LLM-generated search queries with multi-strategy retrieval (keyword matching, semantic similarity, temporal relevance). Handles initialization, saving, and closing of RLM context stores. Supports optional AES-256-GCM encryption with password validation. Stores complete conversation history externally in JSON files for extended roleplay sessions.
 
 - **`ui_mixin.py` (`UIMixin`)**: Centralizes DOM manipulation. Handles the mounting of `MessageWidget`s and synchronizing the specific visual state with the backend `messages` list.
 
 #### User Interface Components
-- **`widgets.py`**: Contains all Textual UI widgets and modal screens including `ModelScreen`, `ParametersScreen`, `CharactersScreen`, `ActionsManagerScreen`, `ChatManagerScreen`, `RLMChatScreen`, `ThemeScreen`, `MiscScreen`, `ContextWindowScreen`, and various custom widgets like `ScaledSlider` for parameter controls. This is the largest module, containing all user-facing UI components.
+- **`widgets.py`**: Contains all Textual UI widgets and modal screens including `ModelScreen`, `ParametersScreen`, `CharactersScreen`, `ActionsManagerScreen`, `ChatManagerScreen`, `VectorChatScreen`, `ThemeScreen`, `MiscScreen`, `ContextWindowScreen`, and various custom widgets like `ScaledSlider` for parameter controls. This is the largest module, containing all user-facing UI components.
 
 - **`styles.tcss`**: The primary stylesheet. Supports dynamic runtime modification (see **3.3 Theming**) via generic CSS variable overrides or string replacement.
 
@@ -150,22 +149,6 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **Vector Inspection**: Users can inspect stored vectors in active databases via the "Inspect" button, viewing decrypted content when password is provided.
 - **Similarity Search**: Performs real-time similarity searches against active databases to retrieve relevant context for the current conversation.
 
-### 4.8 RLM Chat (Recursive Language Models)
-- **Complete History Storage**: RLM Chat stores full conversation history externally in JSON files, ensuring nothing is ever lost even in extended roleplay sessions.
-- **LLM-Generated Search Queries**: The language model generates optimized search queries based on user input, implementing MIT's recursive querying approach. The model analyzes the user's question and creates targeted search queries to find relevant conversation history.
-- **Multi-Strategy Search**: Uses prewritten Python functions to execute searches combining:
-  - **Keyword Matching**: Extracts keywords from queries, filters stop words, and scores messages by match count with recency bonuses
-  - **Semantic Similarity**: When embedding models are available, uses cosine similarity to find semantically relevant messages
-  - **Temporal Relevance**: Prioritizes recent messages while sampling from middle and old sections for comprehensive coverage
-- **Recursive Querying**: Uses recursive LLM-based querying to find relevant chunks from the complete conversation history.
-- **External Context Management**: Treats conversation history as an external environment (MIT approach), allowing programmatic access to entire conversation history.
-- **Storage Location**: RLM context stores are saved to `rlmcontexts/{chat_name}/` directory with `context.json` containing the full message history.
-- **Optional Encryption**: RLM context stores support optional **AES-256-GCM** encryption with **Argon2id** key derivation. When enabled, complete conversation histories are mathematically scrambled on disk and decrypted in-memory during access.
-- **Context Store Management**: Users can create, duplicate, rename, delete, and inspect RLM context stores. The system handles lifecycle management to ensure proper saving and loading.
-- **Password Protection**: Encrypted RLM chats require password validation before loading, ensuring secure access to conversation history.
-- **Seamless Integration**: Toggle RLM Chat on/off mid-conversation to enhance characters with complete historical context beyond the standard context window.
-- **Result Deduplication**: Search results are deduplicated while preserving order to avoid redundant context in prompts.
-
 ---
 
 ## 5. User Interface & Modals
@@ -184,7 +167,6 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **CharactersScreen**: Character card browser with search, load, and unified metadata editor with AI-assisted editing.
 - **ActionsManagerScreen**: Unified action menu management with search, filtering, and category organization.
 - **ChatManagerScreen**: Save and load conversation histories with optional encryption.
-- **RLMChatScreen**: Manage RLM context stores with create, duplicate, rename, delete, and inspect functionality. Supports optional encryption for secure conversation history storage.
 - **ThemeScreen**: Theme selection and speech styling options.
 - **MiscScreen**: About screen with links to website, Discord, and support. Also provides access to the Context Window Viewer.
 - **ContextWindowScreen**: Inspect the raw JSON context and system prompts being sent to the LLM. Accessible via the About (Misc) screen.

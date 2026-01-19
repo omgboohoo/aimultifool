@@ -1,5 +1,5 @@
 # Security & Privacy Audit
-**Application**: aiMultiFool v0.4.1
+**Application**: aiMultiFool v0.4.2
 **Status**: ✅ Fully Private / Offline-Ready
 
 ## 1. Executive Summary
@@ -48,10 +48,9 @@ aiMultiFool is designed with a "Privacy First" architecture. All Large Language 
 - **Conversation Persistence**: High-grade authenticated encryption for saved chats in the `chats/` directory.
 - **Character Card Encryption**: Metadata within individual character cards can now be optionally encrypted.
 - **Vector Database Encryption**: Payloads within vector databases can be encrypted via **AES-256-GCM**. Similarity search remains functional while keeping the stored content cryptographically secure.
-- **RLM Chat Encryption**: RLM context stores support optional **AES-256-GCM** encryption. Complete conversation histories stored in `rlmcontexts/` can be encrypted, keeping your extended roleplay sessions secure on disk.
 - **Encryption Algorithm**: **AES-256-GCM** (Galois/Counter Mode) via the `cryptography` library.
 - **KDF (Key Derivation Function)**: Uses **Argon2id** (64MB memory cost, 3 iterations) to derive keys from user passphrases. This is a memory-hard function resistant to GPU-based brute-force attacks.
-- **Privacy**: Without the correct passphrase, chat histories, character metadata, vector database payloads, and RLM context stores are cryptographically inaccessible. Decryption occurs purely in system RAM.
+- **Privacy**: Without the correct passphrase, chat histories, character metadata, and vector database payloads are cryptographically inaccessible. Decryption occurs purely in system RAM.
 
 ---
 

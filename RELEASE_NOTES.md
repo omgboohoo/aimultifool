@@ -1,5 +1,19 @@
 # Release Notes
 
+## v0.4.2: RLM Chat Removal & Code Cleanup
+### 🧹 Code Cleanup: Removed RLM Chat Feature
+- **RLM Chat Removal**: Removed RLM Chat feature from the application. Vector Chat (RAG) provides similar functionality with better performance and simpler implementation.
+- **Code Simplification**: Removed `RLMMixin` class and all RLM-related code from `logic_mixins.py`, reducing codebase complexity.
+- **UI Cleanup**: Removed RLM Chat button from the top menu bar and all related UI components (`RLMChatScreen`, `RLMInspectScreen`).
+- **Documentation Updates**: Updated PRD.md, README.md, and SECURITY_AUDIT.md to reflect the removal of RLM Chat functionality.
+- **CSS Cleanup**: Removed all RLM-related CSS styles from `styles.tcss`.
+
+### 📝 Technical Changes
+- **Mixin Removal**: Removed `RLMMixin` from `AiMultiFoolApp` class inheritance.
+- **Import Cleanup**: Removed `RLMMixin` and `RLMChatScreen` imports from `aimultifool.py` and `widgets.py`.
+- **State Management**: Removed RLM-related reactive properties (`rlm_chat_name`, `enable_rlm_chat`, `rlm_password`) from the app.
+- **Inference Pipeline**: Removed RLM context retrieval and saving code from the inference pipeline.
+
 ## v0.4.1: Improved RLM Implementation with Intelligent Search
 ### 🧠 Enhanced RLM Chat: MIT-Inspired Recursive Querying
 - **LLM-Generated Search Queries**: RLM Chat now uses the language model itself to generate optimized search queries based on user input, implementing the recursive querying approach from MIT's RLM research.
