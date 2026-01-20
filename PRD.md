@@ -130,9 +130,8 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 
 ### 4.5 Chat Management
 - **Save/Load Chats**: Users can save conversation histories to JSON files with optional encryption.
-- **Model Settings Persistence**: Saved chats include complete model configuration (model path, context size, GPU layers, and all sampling parameters) alongside conversation history.
-- **Automatic Model Restoration**: When loading a saved chat, the app automatically restores the model settings used during that conversation and reloads the model if needed.
-- **Backward Compatibility**: Old chat files (messages only) continue to work seamlessly.
+- **Message-Only Format**: Saved chats contain only message history (system, user, and assistant messages). Model settings are not saved with chats, allowing users to load any chat with whatever model they have configured. This provides flexibility to use different models with the same conversation history.
+- **Backward Compatibility**: Legacy chat files that include `model_settings` are still supported for loading, but the model settings are ignored - only the messages are restored.
 
 ### 4.6 User Actions & System Prompts
 - **Action Menu System**: Right sidebar containing roleplay tools and system prompts.
