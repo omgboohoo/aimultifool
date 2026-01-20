@@ -604,7 +604,7 @@ ActionsManagerScreen {
 }
 
 #model-dialog.ollama-mode {
-    max-height: 45%;
+    max-height: 55%;
 }
 
 #model-dialog .dialog-title {
@@ -627,7 +627,7 @@ ActionsManagerScreen {
 
 #model-dialog .buttons {
     margin-top: 0;
-    margin-bottom: 0;
+    margin-bottom: 1;
     height: auto;
 }
 
