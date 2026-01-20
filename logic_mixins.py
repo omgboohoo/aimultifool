@@ -290,9 +290,14 @@ class InferenceMixin:
             return
         
         # Local model loading (original logic)
-        if requested_gpu_layers == 0:
+        # Check if CPU mode is enabled
+        cpu_mode = getattr(self, "cpu_mode", False)
+        
+        if requested_gpu_layers == 0 or cpu_mode:
+            # CPU mode: only try 0 layers, skip cache
             layers_to_try = [0]
         else:
+            # GPU mode: use cache if available
             cache = load_model_cache()
             cache_key = get_cache_key(model_path_str, context_size)
             
@@ -367,11 +372,13 @@ class InferenceMixin:
                         )
                         actual_layers = int(layers)
                         
-                        # Cache the successful result
-                        cache = load_model_cache()
-                        cache_key = get_cache_key(model_path_str, context_size)
-                        cache[cache_key] = {"gpu_layers": layers, "model_path": model_path_str, "context_size": int(context_size)}
-                        save_model_cache(cache)
+                        # Cache the successful result (only if not in CPU mode)
+                        cpu_mode = getattr(self, "cpu_mode", False)
+                        if not cpu_mode:
+                            cache = load_model_cache()
+                            cache_key = get_cache_key(model_path_str, context_size)
+                            cache[cache_key] = {"gpu_layers": layers, "model_path": model_path_str, "context_size": int(context_size)}
+                            save_model_cache(cache)
                         break
                     except Exception as e:
                         last_err = e

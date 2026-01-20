@@ -6,6 +6,7 @@ aiMultiFool - Textual TUI chat app with llama-cpp-python
 import os
 import sys
 import faulthandler
+import argparse
 
 # Windows safety: enable fault handler to debug hangs
 if sys.platform == "win32":
@@ -45,10 +46,16 @@ from character_manager import extract_chara_metadata, process_character_metadata
 from ai_engine import get_models
 from widgets import MessageWidget, CharactersScreen, ParametersScreen, MiscScreen, ThemeScreen, ActionsManagerScreen, ModelScreen, ChatManagerScreen, VectorChatScreen
 
+def parse_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(description="aiMultiFool - Textual TUI chat app")
+    parser.add_argument("--cpu", action="store_true", help="Run in CPU-only mode (disables GPU layers and model cache)")
+    return parser.parse_args()
+
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.4.3"
+    TITLE = "aiMultiFool v0.4.4"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -87,6 +94,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     vector_chat_name = reactive(None)
     enable_vector_chat = reactive(False)
     force_ai_speak_first = reactive(True)
+    cpu_mode = reactive(False)
     _inference_worker = None
     _last_action_list = None
 
@@ -196,7 +204,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.4.3", id="status-version")
+            yield Static("aiMultiFool v0.4.4", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -204,6 +212,9 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         self.user_name = settings.get("user_name", "User")
         self.context_size = settings.get("context_size", 8192)
         self.gpu_layers = settings.get("gpu_layers", -1)
+        # If not in CPU mode and gpu_layers is 0, default to -1 (all GPU layers)
+        if not self.cpu_mode and self.gpu_layers == 0:
+            self.gpu_layers = -1
         self.style = settings.get("style", "descriptive")
         self.temp = settings.get("temp", 0.8)
         self.topp = settings.get("topp", 0.9)
@@ -861,6 +872,11 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         if inference_mode is None:
             inference_mode = getattr(self, "inference_mode", "local")
 
+        # Force GPU layers to 0 if CPU mode is enabled
+        cpu_mode = getattr(self, "cpu_mode", False)
+        if cpu_mode:
+            gpu = 0
+
         # Update app state and persist settings
         self.selected_model = str(model_path)
         self.context_size = int(ctx)
@@ -1256,8 +1272,10 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                 self.notify("Could not find action in data!", severity="error")
 
 if __name__ == "__main__":
+    args = parse_args()
     try:
         app = AiMultiFoolApp()
+        app.cpu_mode = args.cpu  # Set CPU mode from command line
         app.run()
     except Exception as e:
         # Catch-all for Windows weirdness or silent crashes

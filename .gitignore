@@ -24,6 +24,8 @@ MANIFEST
 
 # Virtual Environment
 venv/
+venv_cpu/
+venv_gpu/
 env/
 ENV/
 env.bak/

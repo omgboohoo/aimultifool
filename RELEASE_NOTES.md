@@ -1,5 +1,23 @@
 # Release Notes
 
+## v0.4.4: GPU/CPU Mode Separation & Simplified Installation
+### 🎮 GPU/CPU Mode Separation
+- **Separate Run Scripts**: Added dedicated `run_gpu.sh`/`run_gpu.bat` and `run_cpu.sh`/`run_cpu.bat` scripts for GPU and CPU modes respectively.
+- **Independent Virtual Environments**: Each mode uses its own virtual environment (`venv_gpu` or `venv_cpu`) to prevent dependency conflicts.
+- **CPU Mode Simplification**: CPU mode no longer requires CUDA toolkit installation, making it perfect for systems without NVIDIA GPUs.
+- **CPU Mode Flag**: Added `--cpu` command-line flag to disable GPU layers control and model cache in CPU mode.
+
+### 🔧 Technical Improvements
+- **CPU Mode Detection**: App automatically detects CPU mode and hides GPU layers control in Model Settings modal.
+- **Model Cache Disabled**: Model cache is completely disabled in CPU mode (no reading or writing).
+- **GPU Layers Default**: GPU mode now defaults to -1 (all GPU layers) instead of 0 (CPU only).
+- **Settings Management**: GPU layers automatically reset to -1 when switching from CPU mode to GPU mode.
+
+### 📚 Documentation Updates
+- **Updated Installation Guides**: Both README.md and HOWTO_INSTALL.md now include separate sections for GPU and CPU installation.
+- **Clear Requirements**: Requirements are now clearly separated into GPU Mode and CPU Mode sections.
+- **Installation Simplification**: CPU mode installation instructions omit CUDA toolkit requirements.
+
 ## v0.4.3: Action Management Enhancements & Export/Import & Games Category
 ### 🎯 Action Menu Management Improvements
 - **Batch Editing**: Action menu edits are now batched - changes are only saved when clicking "Apply". The "Cancel" button discards all edits and restores the original state.

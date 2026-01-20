@@ -533,13 +533,23 @@ class ModelScreen(ModalScreen):
         ollama_url_container = self.query_one("#ollama-url-container", Container)
         model_dialog = self.query_one("#model-dialog", Vertical)
         connect_btn = self.query_one("#btn-connect", Button)
+        
+        # Check if CPU mode is enabled
+        cpu_mode = getattr(app, "cpu_mode", False)
+        
         if inference_mode == "ollama":
             gpu_container.display = False
             ollama_url_container.display = True
             model_dialog.add_class("ollama-mode")
             connect_btn.display = True
         else:
-            gpu_container.display = True
+            # Hide GPU layers container if CPU mode is enabled
+            if cpu_mode:
+                gpu_container.display = False
+                # Force GPU layers to 0 in CPU mode
+                app.gpu_layers = 0
+            else:
+                gpu_container.display = True
             ollama_url_container.display = False
             model_dialog.remove_class("ollama-mode")
             connect_btn.display = False
@@ -550,10 +560,14 @@ class ModelScreen(ModalScreen):
         except Exception:
             self.query_one("#select-context").value = 4096
 
-        # Validate and set GPU Layers (only for local mode)
-        if inference_mode != "ollama":
+        # Validate and set GPU Layers (only for local mode and not CPU mode)
+        if inference_mode != "ollama" and not cpu_mode:
+            # Ensure GPU layers defaults to -1 (all GPU layers) if it's 0
+            gpu_layers_value = app.gpu_layers if app.gpu_layers != 0 else -1
+            if app.gpu_layers == 0:
+                app.gpu_layers = -1  # Update app state to match
             try:
-                self.query_one("#select-gpu-layers").value = app.gpu_layers
+                self.query_one("#select-gpu-layers").value = gpu_layers_value
             except Exception:
                 self.query_one("#select-gpu-layers").value = -1
         

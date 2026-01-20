@@ -5,7 +5,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV_DIR="$SCRIPT_DIR/venv"
+VENV_DIR="$SCRIPT_DIR/venv_gpu"
 # Universal Multi-Arch Wheel Configuration
 WHEEL_NAME="llama_cpp_python-0.3.16-cp312-cp312-linux_x86_64.whl"
 WHEEL_URL="https://aimultifool.com/llama_cpp_python-0.3.16-cp312-cp312-linux_x86_64.whl" # Change this to your actual hosting URL
@@ -13,7 +13,7 @@ WHEEL_DIR="$SCRIPT_DIR/llama.cpp"
 WHEEL_PATH="$WHEEL_DIR/$WHEEL_NAME"
 
 echo "----------------------------------------------------------------"
-echo "  aiMultiFool Suite - Setup & Launch Script v0.1.9"
+echo "  aiMultiFool Suite - GPU Setup & Launch Script v0.1.9"
 echo "----------------------------------------------------------------"
 
 # 1. Ensure the llama.cpp directory exists
@@ -74,7 +74,7 @@ if [ -d "$VENV_DIR" ]; then
 fi
 
 # Create virtual environment
-echo "[STEP 1/4] Creating fresh virtual environment (venv)..."
+echo "[STEP 1/4] Creating fresh virtual environment (venv_gpu)..."
 python3 -m venv "$VENV_DIR"
 
 # Activate virtual environment

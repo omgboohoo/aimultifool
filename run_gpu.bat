@@ -5,7 +5,7 @@ setlocal enabledelayedexpansion
 
 set "SCRIPT_DIR=%~dp0"
 set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
-set "VENV_DIR=%SCRIPT_DIR%\venv"
+set "VENV_DIR=%SCRIPT_DIR%\venv_gpu"
 
 :: Universal Multi-Arch Wheel Configuration
 set "WHEEL_NAME=llama_cpp_python-0.3.16-cp312-cp312-win_amd64.whl"
@@ -14,7 +14,7 @@ set "WHEEL_DIR=%SCRIPT_DIR%\llama.cpp"
 set "WHEEL_PATH=%WHEEL_DIR%\%WHEEL_NAME%"
 
 echo ----------------------------------------------------------------
-echo   aiMultiFool Suite - Setup ^& Launch Script v0.1.9 (Windows)
+echo   aiMultiFool Suite - GPU Setup ^& Launch Script v0.1.9 (Windows)
 echo ----------------------------------------------------------------
 
 :: Ensure CUDA is in PATH (in case terminal wasn't restarted after CUDA install)
@@ -91,7 +91,7 @@ if exist "%VENV_DIR%" (
 )
 
 :: Create virtual environment
-echo [STEP 1/4] Creating fresh virtual environment ^(venv^)...
+echo [STEP 1/4] Creating fresh virtual environment ^(venv_gpu^)...
 py -m venv "%VENV_DIR%"
 
 :: Activate virtual environment
