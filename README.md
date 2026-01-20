@@ -1,4 +1,4 @@
-# aiMultiFool v0.4.2
+# aiMultiFool v0.4.3
 
 **The Premium Cross-Platform Terminal-Based Sandbox for Private AI Roleplay.** 
 Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favorite SillyTavern character cards with zero lag and full privacy.
@@ -35,7 +35,7 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
 - **Minimalist TUI**: Pure Textual interface styled via external `.tcss` for fast, clean roleplay aesthetics.
 - **Theme Support**: Choose from 11 built-in themes including Textual Dark/Light, Catppuccin, Dracula, Gruvbox, Monokai, Nord, Solarized, Tokyo Night, and Flexoki. Themes apply consistently across the entire interface.
 - **Action Sidebar**: Right Sidebar containing roleplay tools and system prompts organized by category. Includes comprehensive analysis tools, scene management, character spawning, and narrative control actions.
-- **Action Manager**: Full in-app manager with real-time search and category filtering. Create, edit, duplicate, and delete custom actions to build your perfect roleplay toolkit.
+- **Action Manager**: Full in-app manager with real-time search and category filtering. Create, edit, duplicate, delete, export, and import custom actions to build your perfect roleplay toolkit. Export all actions or specific categories for backup and sharing.
 - **Flexible Action System**: All roleplay tools are accessible through the unified action menu, including emotion analysis, character stats analysis, scene tools, and narrative controls. No dedicated buttons needed - everything is organized and searchable in one place.
 - **Context Window Viewer**: Inspect the raw JSON context and system prompts being sent to the LLM. Accessible via the About screen.
 

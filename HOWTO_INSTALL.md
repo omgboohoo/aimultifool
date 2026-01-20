@@ -1,4 +1,4 @@
-# How to Install aiMultiFool v0.4.2
+# How to Install aiMultiFool v0.4.3
 
 Follow these instructions to get **aiMultiFool** up and running on your system.
 

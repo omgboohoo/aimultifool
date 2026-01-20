@@ -48,7 +48,7 @@ from widgets import MessageWidget, CharactersScreen, ParametersScreen, MiscScree
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.4.2"
+    TITLE = "aiMultiFool v0.4.3"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -196,7 +196,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.4.2", id="status-version")
+            yield Static("aiMultiFool v0.4.3", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -212,7 +212,9 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         self.minp = settings.get("minp", 0.0)
         self.selected_model = settings.get("selected_model", "")
         self.inference_mode = settings.get("inference_mode", "local")
-        self.ollama_url = settings.get("ollama_url", "127.0.0.1:11434")
+        ollama_url_setting = settings.get("ollama_url", "127.0.0.1:11434")
+        # Ensure we always have a valid default if setting is empty or None
+        self.ollama_url = ollama_url_setting if ollama_url_setting and ollama_url_setting.strip() else "127.0.0.1:11434"
         self.theme = settings.get("theme", "textual-dark")
         self.speech_styling = settings.get("speech_styling", "highlight")
         self.force_ai_speak_first = settings.get("force_ai_speak_first", True)

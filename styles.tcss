@@ -314,6 +314,14 @@ FileNamePrompt {
     align: center middle;
 }
 
+CategoryNamePrompt {
+    align: center middle;
+}
+
+SaveChatPrompt {
+    align: center middle;
+}
+
 .modal-dialog {
     layout: vertical;
     width: 60;
@@ -365,11 +373,29 @@ GenericPasswordModal {
     align: center middle;
 }
 
+ConfirmationModal {
+    align: center middle;
+}
+
+FilePickerModal {
+    align: center middle;
+}
+
 ActionsManagerScreen {
     align: center middle;
 }
 
 #password-prompt-dialog {
+    width: 50;
+    height: auto;
+}
+
+#category-prompt-dialog {
+    width: 50;
+    height: auto;
+}
+
+#save-chat-prompt-dialog {
     width: 50;
     height: auto;
 }
@@ -388,6 +414,10 @@ ActionsManagerScreen {
 #theme-dialog {
     width: 50;
     height: auto;
+}
+
+#theme-dialog .sidebar-setting-group:first-of-type {
+    margin-bottom: 1;
 }
 
 .about-buttons-list {
@@ -462,10 +492,40 @@ ActionsManagerScreen {
     border-right: solid $primary;
 }
 
+.pane-left-vector {
+    width: 2fr;
+    background: $boost;
+    padding: 1;
+    border-right: solid $primary;
+    height: 1fr;
+}
+
 .pane-right {
     width: 2fr;
     background: $boost;
     padding: 1;
+    height: 1fr;
+}
+
+.pane-right .action-prompt-textarea {
+    height: 1fr;
+    min-height: 10;
+}
+
+.pane-buttons {
+    width: 22;
+    background: $boost;
+    padding: 1;
+    height: 1fr;
+}
+
+#buttons-scroll {
+    height: 1fr;
+}
+
+.pane-buttons Button {
+    width: 100%;
+    margin-bottom: 0;
 }
 
 .pane-ai {
@@ -589,14 +649,29 @@ ActionsManagerScreen {
 }
 
 #chat-manager-dialog {
-    width: 85;
-    height: 60%;
-    max-height: 90%;
+    width: 65;
+    height: auto;
+    overflow: hidden;
+}
+
+#chat-manager-dialog #management-split {
+    height: 25;
 }
 
 #list-saved-chats {
     height: 1fr;
     background: transparent;
+}
+
+#list-files {
+    height: 20;
+    background: transparent;
+}
+
+#file-picker-dialog {
+    width: 60;
+    height: auto;
+    max-height: 80%;
 }
 
 .dialog-title {
@@ -646,17 +721,6 @@ ActionsManagerScreen {
     margin-bottom: 0;
 }
 
-#characters-buttons-grid {
-    layout: grid;
-    grid-size: 4 2;
-    grid-gutter: 0 1;
-    height: 8;
-    margin-top: 0;
-}
-
-#characters-buttons-grid Button {
-    width: 100%;
-}
 
 .buttons {
     width: 100%;
@@ -767,10 +831,9 @@ VectorInspectScreen {
 
 
 #vector-chat-dialog {
-    width: 80;
-    height: auto;
-    min-height: 35;
-    max-height: 95%;
+    width: 40%;
+    height: 80%;
+    max-height: 90%;
     background: $surface;
     border: thick $primary;
     padding: 1 2;
@@ -779,7 +842,7 @@ VectorInspectScreen {
 #vector-input-container {
     height: auto;
     width: 100%;
-    margin-top: 1;
+    margin-top: 0;
     margin-bottom: 1;
     align: left middle;
 }
@@ -797,7 +860,8 @@ VectorInspectScreen {
 }
 
 #list-vector-chats {
-    height: 12;
+    height: 1fr;
+    min-height: 10;
     background: $boost;
     border: solid $primary;
     margin: 1 0;

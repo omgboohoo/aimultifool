@@ -7,6 +7,7 @@ import re
 import json
 import asyncio
 import webbrowser
+import copy
 from pathlib import Path
 from rich.text import Text
 from textual import work
@@ -124,6 +125,199 @@ class FileNamePrompt(ModalScreen):
             self.dismiss(val)
         else:
             self.dismiss(None)
+
+class CategoryNamePrompt(ModalScreen):
+    """Modal to ask for a new category name."""
+    def __init__(self, existing_categories: list[str] = None):
+        super().__init__()
+        self.existing_categories = existing_categories or []
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="category-prompt-dialog", classes="modal-dialog"):
+            yield Label("Enter Category Name", classes="dialog-title")
+            yield Input(placeholder="Category name", id="category-input")
+            with Horizontal(classes="buttons"):
+                yield Button("Cancel", id="btn-cancel-cat", variant="default")
+                yield Button("Confirm", id="btn-confirm-cat", variant="default")
+
+    def on_mount(self) -> None:
+        self.query_one("#category-input").focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self.action_confirm()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-confirm-cat":
+            self.action_confirm()
+        else:
+            self.dismiss(None)
+
+    def action_confirm(self) -> None:
+        category_name = self.query_one("#category-input", Input).value.strip()
+        if not category_name:
+            self.app.notify("Category name cannot be empty!", severity="warning")
+            self.query_one("#category-input").focus()
+            return
+        
+        # Check for duplicates
+        if category_name in self.existing_categories:
+            self.app.notify(f"Category '{category_name}' already exists!", severity="warning")
+            self.query_one("#category-input").focus()
+            return
+        
+        self.dismiss(category_name)
+
+class SaveChatPrompt(ModalScreen):
+    """Modal to ask for filename and password when saving a chat."""
+    def compose(self) -> ComposeResult:
+        with Vertical(id="save-chat-prompt-dialog", classes="modal-dialog"):
+            yield Label("Save Current Chat", classes="dialog-title")
+            yield Label("Filename (optional)", classes="label")
+            yield Input(placeholder="Filename (optional)...", id="filename-input")
+            yield Label("Password / Passphrase (optional)", classes="label")
+            yield Input(placeholder="Password / Passphrase (optional)...", id="password-input", password=False)
+            with Horizontal(classes="buttons"):
+                yield Button("Cancel", id="btn-cancel-save", variant="default")
+                yield Button("Save", id="btn-confirm-save", variant="default")
+    
+    def on_mount(self) -> None:
+        self.query_one("#filename-input").focus()
+    
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "filename-input":
+            self.query_one("#password-input").focus()
+        elif event.input.id == "password-input":
+            self.action_save()
+    
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-confirm-save":
+            self.action_save()
+        else:
+            self.dismiss(None)
+    
+    def action_save(self) -> None:
+        filename = self.query_one("#filename-input", Input).value.strip()
+        password = self.query_one("#password-input", Input).value
+        self.dismiss({"filename": filename, "password": password})
+
+class ConfirmationModal(ModalScreen):
+    """Generic confirmation modal for yes/no questions."""
+    def __init__(self, title: str = "Confirm", message: str = "Are you sure?", **kwargs):
+        super().__init__(**kwargs)
+        self.dialog_title = title
+        self.message = message
+
+    def compose(self) -> ComposeResult:
+        yield Vertical(
+            Label(self.dialog_title, classes="dialog-title"),
+            Label(self.message, classes="dialog-subtitle"),
+            Horizontal(
+                Button("Cancel", variant="default", id="btn-cancel-confirm"),
+                Button("Confirm", variant="default", id="btn-confirm-confirm"),
+                classes="buttons"
+            ),
+            id="confirmation-dialog",
+            classes="modal-dialog"
+        )
+
+    def on_mount(self) -> None:
+        title = self.query_one(".dialog-title")
+        title.can_focus = True
+        title.focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-confirm-confirm":
+            self.dismiss(True)
+        else:
+            self.dismiss(False)
+
+class FilePickerModal(ModalScreen):
+    """Modal for selecting a file from a directory."""
+    def __init__(self, directory: Path, file_extension: str = ".json", **kwargs):
+        super().__init__(**kwargs)
+        self.directory = directory
+        self.file_extension = file_extension
+
+    def compose(self) -> ComposeResult:
+        # Show relative path or just folder name
+        try:
+            rel_path = self.directory.relative_to(Path(__file__).parent)
+            display_path = f"export/{rel_path.name}" if rel_path != Path(".") else "export"
+        except:
+            display_path = str(self.directory.name) if self.directory.name else "export"
+        
+        yield Vertical(
+            Label("Select File to Import", classes="dialog-title"),
+            Label(f"Files in: {display_path}", classes="dialog-subtitle"),
+            ListView(id="list-files"),
+            Horizontal(
+                Button("Cancel", variant="default", id="btn-cancel-file"),
+                Button("Select", variant="default", id="btn-select-file", disabled=True),
+                classes="buttons"
+            ),
+            id="file-picker-dialog",
+            classes="modal-dialog"
+        )
+
+    def on_mount(self) -> None:
+        title = self.query_one(".dialog-title")
+        title.can_focus = True
+        title.focus()
+        self.refresh_file_list()
+
+    def refresh_file_list(self) -> None:
+        """Populate the file list with JSON files from the export directory."""
+        lv = self.query_one("#list-files", ListView)
+        lv.clear()
+        
+        if not self.directory.exists():
+            lv.append(ListItem(Label("Export folder does not exist.")))
+            return
+        
+        # Get all JSON files
+        json_files = sorted(self.directory.glob(f"*{self.file_extension}"))
+        
+        if not json_files:
+            lv.append(ListItem(Label("No JSON files found in export folder.")))
+            return
+        
+        for file_path in json_files:
+            lv.append(ListItem(Label(file_path.name), name=str(file_path)))
+
+    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
+        """Enable/disable Select button based on selection."""
+        try:
+            has_selection = event.item is not None
+            self.query_one("#btn-select-file", Button).disabled = not has_selection
+        except Exception:
+            pass
+    
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        """Handle double-click or Enter key selection."""
+        try:
+            if event.item:
+                file_path = getattr(event.item, "name", None)
+                if file_path:
+                    self.dismiss(file_path)
+        except Exception:
+            pass
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-cancel-file":
+            self.dismiss(None)
+        elif event.button.id == "btn-select-file":
+            try:
+                lv = self.query_one("#list-files", ListView)
+                if lv.highlighted_child:
+                    file_path = getattr(lv.highlighted_child, "name", None)
+                    if file_path:
+                        self.dismiss(file_path)
+                    else:
+                        self.dismiss(None)
+                else:
+                    self.dismiss(None)
+            except Exception:
+                self.dismiss(None)
 
 def create_styled_text(text, speech_styling="highlight", highlight_color=None):
     """Create a rich renderable with styled quoted text
@@ -275,6 +469,7 @@ class ModelScreen(ModalScreen):
             ),
             Horizontal(
                 Button("Local Inference", variant="default", id="btn-toggle-mode"),
+                Button("Test", variant="default", id="btn-connect"),
                 Button("Download Models", variant="default", id="btn-download-models"),
                 Button("Load Model", variant="default", id="btn-load-model"),
                 classes="buttons",
@@ -337,14 +532,17 @@ class ModelScreen(ModalScreen):
         gpu_container = self.query_one("#gpu-layers-container", Container)
         ollama_url_container = self.query_one("#ollama-url-container", Container)
         model_dialog = self.query_one("#model-dialog", Vertical)
+        connect_btn = self.query_one("#btn-connect", Button)
         if inference_mode == "ollama":
             gpu_container.display = False
             ollama_url_container.display = True
             model_dialog.add_class("ollama-mode")
+            connect_btn.display = True
         else:
             gpu_container.display = True
             ollama_url_container.display = False
             model_dialog.remove_class("ollama-mode")
+            connect_btn.display = False
 
         # Validate and set Context Size
         try:
@@ -362,7 +560,10 @@ class ModelScreen(ModalScreen):
         # Validate and set Ollama URL (only for ollama mode)
         if inference_mode == "ollama":
             try:
-                ollama_url = getattr(app, "ollama_url", "127.0.0.1:11434")
+                ollama_url = getattr(app, "ollama_url", None)
+                if not ollama_url or ollama_url.strip() == "":
+                    ollama_url = "127.0.0.1:11434"
+                    app.ollama_url = ollama_url
                 self.query_one("#input-ollama-url").value = ollama_url
             except Exception:
                 self.query_one("#input-ollama-url").value = "127.0.0.1:11434"
@@ -597,14 +798,26 @@ class ModelScreen(ModalScreen):
             gpu_container = self.query_one("#gpu-layers-container", Container)
             ollama_url_container = self.query_one("#ollama-url-container", Container)
             model_dialog = self.query_one("#model-dialog", Vertical)
+            connect_btn = self.query_one("#btn-connect", Button)
             if new_mode == "ollama":
                 gpu_container.display = False
                 ollama_url_container.display = True
                 model_dialog.add_class("ollama-mode")
+                connect_btn.display = True
+                # Ensure Ollama URL input is populated with default if empty
+                try:
+                    ollama_url = getattr(app, "ollama_url", None)
+                    if not ollama_url or ollama_url.strip() == "":
+                        ollama_url = "127.0.0.1:11434"
+                        app.ollama_url = ollama_url
+                    self.query_one("#input-ollama-url").value = ollama_url
+                except Exception:
+                    self.query_one("#input-ollama-url").value = "127.0.0.1:11434"
             else:
                 gpu_container.display = True
                 ollama_url_container.display = False
                 model_dialog.remove_class("ollama-mode")
+                connect_btn.display = False
             
             # Repopulate models
             self._populate_models(new_mode)
@@ -649,6 +862,55 @@ class ModelScreen(ModalScreen):
                 self.set_timer(0.5, check_download_complete)
             else:
                 app.notify("Download functionality not available", severity="error")
+        elif event.button.id == "btn-connect":
+            # Test connection to Ollama server
+            app = self.app
+            try:
+                ollama_url = self.query_one("#input-ollama-url").value.strip()
+                if not ollama_url:
+                    ollama_url = getattr(app, "ollama_url", "127.0.0.1:11434")
+                
+                # Format URL properly
+                base_url = f"http://{ollama_url}" if '://' not in ollama_url else ollama_url
+                
+                # Test connection
+                from devtools.control_ollama import check_ollama_running
+                connect_btn = self.query_one("#btn-connect", Button)
+                connect_btn.disabled = True
+                connect_btn.label = "Testing..."
+                
+                is_connected = check_ollama_running(base_url)
+                
+                if is_connected:
+                    # Try to get model list to verify full functionality
+                    import requests
+                    try:
+                        response = requests.get(f"{base_url}/api/tags", timeout=2)
+                        if response.status_code == 200:
+                            data = response.json()
+                            models = data.get("models", [])
+                            model_count = len(models)
+                            app.notify(f"✓ Connected to Ollama! Found {model_count} model(s).", severity="success")
+                            # Save the URL if connection successful
+                            app.ollama_url = ollama_url
+                            if hasattr(app, "save_user_settings"):
+                                app.save_user_settings()
+                            # Refresh model list
+                            self._populate_models("ollama")
+                        else:
+                            app.notify(f"⚠ Connected but got unexpected response: {response.status_code}", severity="warning")
+                    except Exception as e:
+                        app.notify(f"⚠ Connected but error fetching models: {e}", severity="warning")
+                else:
+                    app.notify(f"✗ Failed to connect to Ollama at {base_url}", severity="error")
+                
+                connect_btn.label = "Test"
+                connect_btn.disabled = False
+            except Exception as e:
+                app.notify(f"Error testing connection: {e}", severity="error")
+                connect_btn = self.query_one("#btn-connect", Button)
+                connect_btn.label = "Test"
+                connect_btn.disabled = False
         elif event.button.id == "btn-load-model":
             try:
                 model_path = self.query_one("#select-model").value
@@ -744,6 +1006,12 @@ class CharactersScreen(ModalScreen):
         self.app.update_ui_state()
         self.refresh_list()
         
+        # Disable AI input field initially (no card selected)
+        try:
+            self.query_one("#ai-meta-input", Input).disabled = True
+        except Exception:
+            pass
+        
         # Welcome message
         history = self.query_one("#ai-meta-history", ScrollableContainer)
         history.mount(Static("Assistant: Hello! I can help you edit character metadata. Ask me to change names, descriptions, or traits.", classes="ai-message"))
@@ -774,18 +1042,21 @@ class CharactersScreen(ModalScreen):
                     Input(placeholder="Ask AI to edit...", id="ai-meta-input"),
                     classes="pane-ai"
                 ),
+                Vertical(
+                    ScrollableContainer(
+                        Button("Play - User First", variant="default", id="btn-play-card-user", disabled=True),
+                        Button("Play - AI First", variant="default", id="btn-play-card-ai", disabled=True),
+                        Button("New", variant="default", id="btn-new-card"),
+                        Button("Duplicate", variant="default", id="btn-duplicate-card", disabled=True),
+                        Button("Rename", variant="default", id="btn-rename-card", disabled=True),
+                        Button("Delete", variant="default", id="btn-delete-card", disabled=True),
+                        Button("Save Changes", variant="default", id="btn-save-metadata"),
+                        Button("Close", variant="default", id="btn-cancel-mgmt"),
+                        id="buttons-scroll"
+                    ),
+                    classes="pane-buttons"
+                ),
                 id="management-split"
-            ),
-            Grid(
-                Button("Play (User Speak First)", variant="default", id="btn-play-card-user", disabled=True),
-                Button("Play (AI Speak First)", variant="default", id="btn-play-card-ai", disabled=True),
-                Button("New", variant="default", id="btn-new-card"),
-                Button("Duplicate", variant="default", id="btn-duplicate-card", disabled=True),
-                Button("Rename", variant="default", id="btn-rename-card", disabled=True),
-                Button("Delete", variant="default", id="btn-delete-card", disabled=True),
-                Button("Save Changes", variant="default", id="btn-save-metadata"),
-                Button("Close", variant="default", id="btn-cancel-mgmt"),
-                id="characters-buttons-grid"
             ),
             id="characters-dialog",
             classes="modal-dialog"
@@ -856,6 +1127,12 @@ class CharactersScreen(ModalScreen):
         try:
             list_view = self.query_one("#list-characters", ListView)
             has_selection = list_view.highlighted_child is not None
+            
+            # Enable/disable AI input field based on selection
+            try:
+                self.query_one("#ai-meta-input", Input).disabled = not has_selection
+            except Exception:
+                pass
             
             # Get current selected card path
             current_card_path = None
@@ -1835,12 +2112,15 @@ class MiscScreen(ModalScreen):
 class ActionsManagerScreen(ModalScreen):
     """Integrated Action Management Screen."""
     current_data_idx: int = -1 # Explicitly type-hinted for clarity
+    original_data_backup: list = None # Backup of original data for cancel
 
     def on_mount(self) -> None:
         title = self.query_one(".dialog-title")
         title.can_focus = True
         title.focus()
         self.current_data_idx = -1 # Reset on mount
+        # Create a deep copy of the original data for cancel functionality
+        self.original_data_backup = copy.deepcopy(self.app.action_menu_data)
         self.refresh_action_list()
         self.update_button_states()
 
@@ -1880,24 +2160,31 @@ class ActionsManagerScreen(ModalScreen):
                 ),
                 Vertical(
                     Label("Edit Action", classes="label"),
-                    Label("Category", classes="label"),
-                    Input(id="input-action-category"),
                     Label("Item Name", classes="label"),
                     Input(id="input-action-name"),
                     Label("Prompt", classes="label"),
-                    TextArea(id="input-action-prompt"),
+                    TextArea(id="input-action-prompt", classes="action-prompt-textarea"),
                     Label("Action Type", classes="label"),
                     Select([("Regular Action / User", "false"), ("System Prompt", "true")], id="select-action-type", allow_blank=False, value="false"),
                     classes="pane-right"
                 ),
+                Vertical(
+                    ScrollableContainer(
+                        Button("New Action", variant="default", id="btn-add-action-mgmt"),
+                        Button("New Category", variant="default", id="btn-new-category-mgmt"),
+                        Button("Duplicate", variant="default", id="btn-duplicate-action-mgmt", disabled=True),
+                        Button("Delete", variant="default", id="btn-delete-action-mgmt", disabled=True),
+                        Button("Delete Category", variant="default", id="btn-delete-category-mgmt"),
+                        Button("Export All", variant="default", id="btn-export-all-mgmt"),
+                        Button("Export Folder", variant="default", id="btn-export-folder-mgmt"),
+                        Button("Import", variant="default", id="btn-import-mgmt"),
+                        Button("Cancel", variant="default", id="btn-cancel-action-mgmt"),
+                        Button("Apply Changes", variant="default", id="btn-apply-action-mgmt"),
+                        id="buttons-scroll"
+                    ),
+                    classes="pane-buttons"
+                ),
                 id="management-split"
-            ),
-            Horizontal(
-                Button("Add New", variant="default", id="btn-add-action-mgmt"),
-                Button("Duplicate", variant="default", id="btn-duplicate-action-mgmt", disabled=True),
-                Button("Delete", variant="default", id="btn-delete-action-mgmt", disabled=True),
-                Button("Close", variant="default", id="btn-close-action-mgmt"),
-                classes="buttons"
             ),
             id="actions-dialog",
             classes="modal-dialog"
@@ -1938,16 +2225,20 @@ class ActionsManagerScreen(ModalScreen):
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "select-mgmt-filter":
+            # Save current edit to working copy before changing filter
+            if self.current_data_idx >= 0:
+                self.save_current_edit()
+            
             self.refresh_action_list()
             # After refreshing, the previously selected item might not exist or be at a new index.
             # Clear the edit fields and reset current_data_idx.
             self.current_data_idx = -1
-            self.query_one("#input-action-category", Input).value = ""
             self.query_one("#input-action-name", Input).value = ""
             self.query_one("#input-action-prompt", TextArea).text = ""
             self.query_one("#select-action-type", Select).value = "false"
         elif event.select.id == "select-action-type":
-             if self.current_data_idx >= 0:
+            # Update working copy immediately (but not disk) when action type changes
+            if self.current_data_idx >= 0:
                 self.save_current_edit()
 
 
@@ -1972,21 +2263,23 @@ class ActionsManagerScreen(ModalScreen):
             sel.value = options[0][1]
 
     def on_input_changed(self, event: Input.Changed) -> None:
-        if event.input.id in ["input-action-category", "input-action-name"]:
-            if self.current_data_idx >= 0:
-                self.save_current_edit()
+        # Update working copy immediately (but not disk) when input changes
+        if event.input.id == "input-action-name" and self.current_data_idx >= 0:
+            self.save_current_edit()
 
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
-        if event.text_area.id == "input-action-prompt":
-            if self.current_data_idx >= 0:
-                self.save_current_edit()
+        # Update working copy immediately (but not disk) when textarea changes
+        if event.text_area.id == "input-action-prompt" and self.current_data_idx >= 0:
+            self.save_current_edit()
 
     def save_current_edit(self) -> None:
+        """Save current edit to the working copy (not to disk)."""
         idx = self.current_data_idx
         if idx < 0: return
         
         try:
-            category = self.query_one("#input-action-category", Input).value.strip()
+            # Category is preserved from existing data, not from input field
+            category = self.app.action_menu_data[idx].get('category', 'Other')
             item_name = self.query_one("#input-action-name", Input).value.strip()
             prompt = self.query_one("#input-action-prompt", TextArea).text
             is_system_val = self.query_one("#select-action-type", Select).value
@@ -1996,7 +2289,6 @@ class ActionsManagerScreen(ModalScreen):
             self.app.action_menu_data[idx]['name'] = item_name
             self.app.action_menu_data[idx]['prompt'] = prompt
             self.app.action_menu_data[idx]['isSystem'] = is_system
-            save_action_menu_data(self.app.action_menu_data)
             
             # Update list label without full refresh to avoid focus/scroll jumps
             lv = self.query_one("#list-actions-mgmt", ListView)
@@ -2006,9 +2298,22 @@ class ActionsManagerScreen(ModalScreen):
                     break
         except Exception:
             pass
+    
+    def apply_all_edits(self) -> None:
+        """Save current edit field to working copy, then save all changes to disk."""
+        # Save any pending edit from the current fields
+        if self.current_data_idx >= 0:
+            self.save_current_edit()
+        
+        # Save all changes to disk
+        save_action_menu_data(self.app.action_menu_data)
 
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         if event.list_view.id == "list-actions-mgmt":
+            # Save current edit to working copy before switching items
+            if self.current_data_idx >= 0:
+                self.save_current_edit()
+            
             self.update_button_states()
             if event.item:
                 idx_str = getattr(event.item, "name", "-1")
@@ -2017,26 +2322,22 @@ class ActionsManagerScreen(ModalScreen):
                     if self.current_data_idx >= 0 and self.current_data_idx < len(self.app.action_menu_data):
                         act = self.app.action_menu_data[self.current_data_idx]
                         
-                        self.query_one("#input-action-category", Input).value = act.get('category', 'Other')
                         self.query_one("#input-action-name", Input).value = act.get('name', '')
                         self.query_one("#input-action-prompt", TextArea).text = act.get('prompt', '')
                         self.query_one("#select-action-type", Select).value = "true" if act.get('isSystem', False) else "false"
                     else:
                         self.current_data_idx = -1
                         # Clear fields if index is out of bounds (shouldn't happen with valid name)
-                        self.query_one("#input-action-category", Input).value = ""
                         self.query_one("#input-action-name", Input).value = ""
                         self.query_one("#input-action-prompt", TextArea).text = ""
                         self.query_one("#select-action-type", Select).value = "false"
                 except ValueError: # if idx_str is not an int
                     self.current_data_idx = -1
-                    self.query_one("#input-action-category", Input).value = ""
                     self.query_one("#input-action-name", Input).value = ""
                     self.query_one("#input-action-prompt", TextArea).text = ""
                     self.query_one("#select-action-type", Select).value = "false"
             else:
                 self.current_data_idx = -1
-                self.query_one("#input-action-category", Input).value = ""
                 self.query_one("#input-action-name", Input).value = ""
                 self.query_one("#input-action-prompt", TextArea).text = ""
                 self.query_one("#select-action-type", Select).value = "false"
@@ -2053,7 +2354,6 @@ class ActionsManagerScreen(ModalScreen):
                 # Force sync fields
                 act = self.app.action_menu_data[data_idx]
                 # Update edit fields
-                self.query_one("#input-action-category", Input).value = act.get('category', 'Other')
                 self.query_one("#input-action-name", Input).value = act.get('name', '')
                 self.query_one("#input-action-prompt", TextArea).text = act.get('prompt', '')
                 self.query_one("#select-action-type", Select).value = "true" if act.get('isSystem', False) else "false"
@@ -2061,7 +2361,13 @@ class ActionsManagerScreen(ModalScreen):
         lv.focus()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "btn-close-action-mgmt":
+        if event.button.id == "btn-cancel-action-mgmt":
+            # Restore original data and close without saving
+            self.app.action_menu_data = copy.deepcopy(self.original_data_backup)
+            self.dismiss()
+        elif event.button.id == "btn-apply-action-mgmt":
+            # Save all edits and close
+            self.apply_all_edits()
             self.dismiss()
         elif event.button.id == "btn-add-action-mgmt":
             # Get current filter category
@@ -2083,10 +2389,10 @@ class ActionsManagerScreen(ModalScreen):
             # Sort after adding: Category then Name
             self.app.action_menu_data.sort(key=lambda x: (x.get("category", "Other").lower(), x.get("name", "").lower()))
             
-            save_action_menu_data(self.app.action_menu_data)
+            # Don't save here - will be saved when Apply is clicked
             self.update_filter_options()
             self.refresh_action_list()
-            self.app.notify(f"New action added to {cat}.")
+            self.app.notify(f"New action added to {cat}. Click Apply to save.")
             
             # Find the new index of the added item using identity 'is'
             new_idx = -1
@@ -2099,6 +2405,51 @@ class ActionsManagerScreen(ModalScreen):
                 # Use a small timer to allow the ListView to fully mount the new items
                 self.set_timer(0.1, lambda: self.select_item_by_data_index(new_idx))
 
+        elif event.button.id == "btn-new-category-mgmt":
+            # Collect existing categories for validation
+            existing_cats = [act.get('category', 'Other') for act in self.app.action_menu_data]
+            
+            def on_category_entered(category_name: str) -> None:
+                if category_name is None:  # User cancelled
+                    # Move focus away from the button to the dialog title
+                    self.query_one(".dialog-title").focus()
+                    return
+                
+                # Create a new action in the new category
+                name = "new action"
+                new_act = {"category": category_name, "name": name, "prompt": "Your instruction here...", "isSystem": False}
+                self.app.action_menu_data.append(new_act)
+                
+                # Sort after adding: Category then Name
+                self.app.action_menu_data.sort(key=lambda x: (x.get("category", "Other").lower(), x.get("name", "").lower()))
+                
+                # Don't save here - will be saved when Apply is clicked
+                
+                # Update filter dropdown and select the new category
+                self.update_filter_options()
+                sel = self.query_one("#select-mgmt-filter", Select)
+                sel.value = category_name
+                
+                # Refresh the list to show the new category
+                self.refresh_action_list()
+                self.app.notify(f"New category '{category_name}' created with action. Click Apply to save.")
+                
+                # Find the new index of the added item using identity 'is'
+                new_idx = -1
+                for i, act in enumerate(self.app.action_menu_data):
+                    if act is new_act:
+                        new_idx = i
+                        break
+                
+                if new_idx != -1:
+                    # Use a small timer to allow the ListView to fully mount the new items
+                    self.set_timer(0.1, lambda: self.select_item_by_data_index(new_idx))
+            
+            # Open the category name prompt modal
+            self.app.push_screen(
+                CategoryNamePrompt(existing_categories=existing_cats),
+                on_category_entered
+            )
         
         elif event.button.id == "btn-delete-action-mgmt":
             idx = self.current_data_idx
@@ -2106,17 +2457,16 @@ class ActionsManagerScreen(ModalScreen):
                 try:
                     del self.app.action_menu_data[idx]
                     self.app.action_menu_data.sort(key=lambda x: (x.get("category", "Other").lower(), x.get("name", "").lower()))
-                    save_action_menu_data(self.app.action_menu_data)
+                    # Don't save here - will be saved when Apply is clicked
                     self.update_filter_options()
                     self.refresh_action_list()
-                    self.app.notify("Action deleted.")
+                    self.app.notify("Action deleted. Click Apply to save.")
                     self.current_data_idx = -1
                     self.query_one(".dialog-title").focus()
                 except Exception as e:
                     self.app.notify(f"Delete error: {e}", severity="error")
                 # Reset inputs if list empty
                 if not self.app.action_menu_data:
-                    self.query_one("#input-action-category", Input).value = ""
                     self.query_one("#input-action-name", Input).value = ""
                     self.query_one("#input-action-prompt", TextArea).text = ""
 
@@ -2147,10 +2497,10 @@ class ActionsManagerScreen(ModalScreen):
                     # Sort after duplicating: Category then Name
                     self.app.action_menu_data.sort(key=lambda x: (x.get("category", "Other").lower(), x.get("name", "").lower()))
                     
-                    save_action_menu_data(self.app.action_menu_data)
+                    # Don't save here - will be saved when Apply is clicked
                     self.update_filter_options()
                     self.refresh_action_list()
-                    self.app.notify(f"Duplicated to: {new_name}")
+                    self.app.notify(f"Duplicated to: {new_name}. Click Apply to save.")
                     
                     # Find the new index using identity 'is'
                     new_idx = -1
@@ -2164,6 +2514,226 @@ class ActionsManagerScreen(ModalScreen):
                         self.set_timer(0.1, lambda: self.select_item_by_data_index(new_idx))
                 except Exception as e:
                     self.app.notify(f"Duplicate error: {e}", severity="error")
+
+        elif event.button.id == "btn-export-all-mgmt":
+            self.export_actions(export_all=True)
+            self.query_one(".dialog-title").focus()
+        
+        elif event.button.id == "btn-export-folder-mgmt":
+            self.export_actions(export_all=False)
+            self.query_one(".dialog-title").focus()
+        
+        elif event.button.id == "btn-import-mgmt":
+            self.import_actions()
+        
+        elif event.button.id == "btn-delete-category-mgmt":
+            self.delete_category()
+
+    def delete_category(self) -> None:
+        """Delete all actions in the currently selected category."""
+        try:
+            sel = self.query_one("#select-mgmt-filter", Select)
+            if sel.value == Select.BLANK:
+                self.app.notify("Please select a category filter first.", severity="warning")
+                return
+            
+            filter_cat = sel.value
+            
+            # Count actions in this category
+            actions_in_category = [
+                act for act in self.app.action_menu_data 
+                if act.get('category', 'Other') == filter_cat
+            ]
+            
+            if not actions_in_category:
+                self.app.notify(f"No actions found in category '{filter_cat}'.", severity="warning")
+                return
+            
+            count = len(actions_in_category)
+            
+            # Show confirmation modal
+            def on_confirm(confirmed: bool) -> None:
+                if confirmed:
+                    try:
+                        # Remove all actions in this category
+                        self.app.action_menu_data = [
+                            act for act in self.app.action_menu_data 
+                            if act.get('category', 'Other') != filter_cat
+                        ]
+                        
+                        # Don't save here - will be saved when Apply is clicked
+                        
+                        # Update UI
+                        self.update_filter_options()
+                        self.refresh_action_list()
+                        
+                        # Clear edit fields since category is gone
+                        self.current_data_idx = -1
+                        self.query_one("#input-action-name", Input).value = ""
+                        self.query_one("#input-action-prompt", TextArea).text = ""
+                        self.query_one("#select-action-type", Select).value = "false"
+                        
+                        self.app.notify(f"Deleted category '{filter_cat}' ({count} action(s) removed). Click Apply to save.", severity="success")
+                        self.query_one(".dialog-title").focus()
+                    except Exception as e:
+                        self.app.notify(f"Delete category error: {e}", severity="error")
+                        self.query_one(".dialog-title").focus()
+                else:
+                    # User cancelled - lose focus from button
+                    self.query_one(".dialog-title").focus()
+            
+            self.app.push_screen(
+                ConfirmationModal(
+                    title="Delete Category",
+                    message=f"Are you sure you want to delete category '{filter_cat}'?\nThis will permanently delete {count} action(s)."
+                ),
+                on_confirm
+            )
+            
+        except Exception as e:
+            self.app.notify(f"Delete category error: {e}", severity="error")
+
+    def export_actions(self, export_all: bool = True) -> None:
+        """Export actions to a JSON file in the export folder."""
+        try:
+            # Create export directory if it doesn't exist
+            export_dir = Path(__file__).parent / "export"
+            export_dir.mkdir(exist_ok=True)
+            
+            filter_cat = None
+            # Determine which actions to export
+            if export_all:
+                actions_to_export = self.app.action_menu_data.copy()
+                filename = "actions_all.json"
+            else:
+                # Export only actions from the currently selected category
+                try:
+                    sel = self.query_one("#select-mgmt-filter", Select)
+                    if sel.value == Select.BLANK:
+                        self.app.notify("Please select a category filter first.", severity="warning")
+                        return
+                    filter_cat = sel.value
+                except Exception:
+                    self.app.notify("Could not determine selected category.", severity="error")
+                    return
+                
+                actions_to_export = [
+                    act.copy() for act in self.app.action_menu_data 
+                    if act.get('category', 'Other') == filter_cat
+                ]
+                
+                if not actions_to_export:
+                    self.app.notify(f"No actions found in category '{filter_cat}'.", severity="warning")
+                    return
+                
+                # Sanitize category name for filename
+                safe_cat = "".join(c for c in filter_cat if c.isalnum() or c in (' ', '-', '_')).strip()
+                safe_cat = safe_cat.replace(' ', '_')
+                filename = f"actions_{safe_cat}.json"
+            
+            # Write to file
+            export_path = export_dir / filename
+            with open(export_path, "w", encoding="utf-8") as f:
+                json.dump(actions_to_export, f, indent=4, ensure_ascii=False)
+            
+            count = len(actions_to_export)
+            scope = "all actions" if export_all else f"category '{filter_cat}'"
+            self.app.notify(f"Exported {count} {scope} to {export_path.name}", severity="success")
+            
+        except Exception as e:
+            self.app.notify(f"Export error: {e}", severity="error")
+
+    def import_actions(self) -> None:
+        """Import actions from a JSON file."""
+        def on_file_selected(file_path: str) -> None:
+            if not file_path:
+                self.query_one(".dialog-title").focus()
+                return
+            
+            try:
+                import_path = Path(file_path)
+                if not import_path.exists():
+                    self.app.notify(f"File not found: {file_path}", severity="error")
+                    self.query_one(".dialog-title").focus()
+                    return
+                
+                # Read and parse JSON
+                with open(import_path, "r", encoding="utf-8") as f:
+                    imported_data = json.load(f)
+                
+                # Validate format
+                if not isinstance(imported_data, list):
+                    self.app.notify("Invalid format: Expected a JSON array.", severity="error")
+                    self.query_one(".dialog-title").focus()
+                    return
+                
+                # Validate each action has required fields
+                valid_actions = []
+                for idx, act in enumerate(imported_data):
+                    if not isinstance(act, dict):
+                        continue
+                    if 'name' not in act or 'prompt' not in act:
+                        continue
+                    # Ensure required fields exist
+                    if 'category' not in act:
+                        act['category'] = 'Other'
+                    if 'isSystem' not in act:
+                        act['isSystem'] = False
+                    valid_actions.append(act)
+                
+                if not valid_actions:
+                    self.app.notify("No valid actions found in file.", severity="warning")
+                    self.query_one(".dialog-title").focus()
+                    return
+                
+                # Merge with existing actions (avoid duplicates by name+category)
+                existing_names = {
+                    (act.get('name', ''), act.get('category', 'Other'))
+                    for act in self.app.action_menu_data
+                }
+                
+                added_count = 0
+                skipped_count = 0
+                for act in valid_actions:
+                    key = (act.get('name', ''), act.get('category', 'Other'))
+                    if key not in existing_names:
+                        self.app.action_menu_data.append(act)
+                        existing_names.add(key)
+                        added_count += 1
+                    else:
+                        skipped_count += 1
+                
+                # Sort after importing
+                self.app.action_menu_data.sort(key=lambda x: (x.get("category", "Other").lower(), x.get("name", "").lower()))
+                
+                # Don't save here - will be saved when Apply is clicked
+                
+                # Refresh UI
+                self.update_filter_options()
+                self.refresh_action_list()
+                
+                msg = f"Imported {added_count} action(s)"
+                if skipped_count > 0:
+                    msg += f", skipped {skipped_count} duplicate(s)"
+                msg += ". Click Apply to save."
+                self.app.notify(msg, severity="success")
+                self.query_one(".dialog-title").focus()
+                
+            except json.JSONDecodeError as e:
+                self.app.notify(f"Invalid JSON file: {e}", severity="error")
+                self.query_one(".dialog-title").focus()
+            except Exception as e:
+                self.app.notify(f"Import error: {e}", severity="error")
+                self.query_one(".dialog-title").focus()
+        
+        # Show file picker for export folder
+        export_dir = Path(__file__).parent / "export"
+        export_dir.mkdir(exist_ok=True)
+        
+        self.app.push_screen(
+            FilePickerModal(directory=export_dir, file_extension=".json"),
+            on_file_selected
+        )
 
 class PasswordPromptScreen(ModalScreen):
     """Modal for entering a password to decrypt a chat."""
@@ -2227,7 +2797,7 @@ class ChatManagerScreen(ModalScreen):
     """Screen for managing saved chats (loading/saving)."""
     def compose(self) -> ComposeResult:
         yield Vertical(
-            Label("Chat Manager - AES-256-GCM + Argon2id", classes="dialog-title"),
+            Label("Chat Manager", classes="dialog-title"),
             Horizontal(
                 Vertical(
                     Label("Saved Chats", classes="label"),
@@ -2235,23 +2805,16 @@ class ChatManagerScreen(ModalScreen):
                     classes="pane-left"
                 ),
                 Vertical(
-                    Label("Save Current Chat", classes="label"),
-                    Input(placeholder="Filename (optional)...", id="input-save-name"),
-                    Label("Password / Passphrase", classes="label"),
-                    Input(placeholder="Password / Passphrase (optional)..", id="input-save-password", password=False),
-                    Horizontal(
+                    ScrollableContainer(
                         Button("Save Current Chat", variant="default", id="btn-save-chat"),
-                        classes="buttons"
+                        Button("Load Selected", variant="default", id="btn-load-chat", disabled=True),
+                        Button("Delete", variant="default", id="btn-delete-chat", disabled=True),
+                        Button("Close", variant="default", id="btn-close-chat"),
+                        id="buttons-scroll"
                     ),
-                    classes="pane-right"
+                    classes="pane-buttons"
                 ),
                 id="management-split"
-            ),
-            Horizontal(
-                Button("Load Selected", variant="default", id="btn-load-chat", disabled=True),
-                Button("Delete", variant="default", id="btn-delete-chat", disabled=True),
-                Button("Close", variant="default", id="btn-close-chat"),
-                classes="buttons"
             ),
             id="chat-manager-dialog",
             classes="modal-dialog"
@@ -2302,40 +2865,54 @@ class ChatManagerScreen(ModalScreen):
         if event.list_view.id == "list-saved-chats":
             self.update_button_states()
 
+    def save_chat_callback(self, result) -> None:
+        """Handle the result from SaveChatPrompt modal."""
+        if not result:
+            # User cancelled - return focus to title
+            title = self.query_one(".dialog-title")
+            title.focus()
+            return
+        
+        save_name = result.get("filename", "").strip()
+        password = result.get("password", "")
+        
+        if not save_name:
+            import datetime
+            save_name = f"chat_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        if not save_name.endswith(".json"):
+            save_name += ".json"
+        
+        chats_dir = Path(self.app.root_path) / "chats"
+        file_path = chats_dir / save_name
+        
+        try:
+            # Save messages only (model settings are not saved with chats)
+            chat_data_json = json.dumps(self.app.messages, indent=2)
+            if password:
+                encrypted_data = encrypt_data(chat_data_json, password)
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(encrypted_data)
+                self.app.notify(f"Encrypted chat saved to {save_name}")
+            else:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(chat_data_json)
+                self.app.notify(f"Chat saved to {save_name}")
+            self.refresh_chat_list()
+            # Return focus to title after saving
+            title = self.query_one(".dialog-title")
+            title.focus()
+        except Exception as e:
+            self.app.notify(f"Error saving chat: {e}", severity="error")
+            # Return focus to title even on error
+            title = self.query_one(".dialog-title")
+            title.focus()
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-close-chat":
             self.dismiss()
         elif event.button.id == "btn-save-chat":
-            save_name = self.query_one("#input-save-name", Input).value.strip()
-            password = self.query_one("#input-save-password", Input).value
-            
-            if not save_name:
-                import datetime
-                save_name = f"chat_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            
-            if not save_name.endswith(".json"):
-                save_name += ".json"
-            
-            chats_dir = Path(self.app.root_path) / "chats"
-            file_path = chats_dir / save_name
-            
-            try:
-                # Save messages only (model settings are not saved with chats)
-                chat_data_json = json.dumps(self.app.messages, indent=2)
-                if password:
-                    encrypted_data = encrypt_data(chat_data_json, password)
-                    with open(file_path, "w", encoding="utf-8") as f:
-                        f.write(encrypted_data)
-                    self.app.notify(f"Encrypted chat saved to {save_name}")
-                else:
-                    with open(file_path, "w", encoding="utf-8") as f:
-                        f.write(chat_data_json)
-                    self.app.notify(f"Chat saved to {save_name}")
-                self.refresh_chat_list()
-                self.query_one("#input-save-password", Input).value = ""
-                self.query_one("#input-save-name").focus()
-            except Exception as e:
-                self.app.notify(f"Error saving chat: {e}", severity="error")
+            self.app.push_screen(SaveChatPrompt(), self.save_chat_callback)
 
         elif event.button.id == "btn-load-chat":
             selected = self.query_one("#list-saved-chats", ListView).highlighted_child
@@ -2398,6 +2975,10 @@ class ChatManagerScreen(ModalScreen):
                 # Fallback: treat as messages
                 messages = result
             self.dismiss({"action": "load", "messages": messages})
+        else:
+            # User cancelled the password prompt - return focus to title
+            title = self.query_one(".dialog-title")
+            title.focus()
 
 class VectorChatScreen(ModalScreen):
     """The modal for managing vector chats (RAG)."""
@@ -2408,26 +2989,27 @@ class VectorChatScreen(ModalScreen):
             yield Label("Manage your vector chat databases.", classes="dialog-subtitle")
             yield Label("Conversations are stored locally and retrieved based on similarity.", classes="dialog-subtitle")
             
-            with Horizontal(id="vector-input-container"):
-                yield Input(placeholder="New Vector Chat Name", id="input-vector-name")
-                yield Button("Create", id="btn-vector-create")
-            
-            yield Label("Password (Optional - for encryption):", classes="label")
-            yield Input(placeholder="Password / Passphrase", id="input-vector-password", password=False)
-            
-            yield Label("Existing Vector Chats:", classes="section-label")
-            yield ListView(id="list-vector-chats")
-            
-            with Horizontal(classes="buttons"):
-                yield Button("Load", id="btn-vector-load")
-                yield Button("Inspect", id="btn-vector-inspect")
-                yield Button("Duplicate", id="btn-vector-duplicate")
-                yield Button("Rename", id="btn-vector-rename")
-            
-            with Horizontal(classes="buttons"):
-                yield Button("Delete", id="btn-vector-delete")
-                yield Button("Disable Vector Chat", id="btn-vector-disable")
-                yield Button("Close", id="btn-close")
+            with Horizontal(id="management-split"):
+                with Vertical(classes="pane-left-vector"):
+                    with Horizontal(id="vector-input-container"):
+                        yield Input(placeholder="New Vector Chat Name", id="input-vector-name")
+                        yield Button("Create", id="btn-vector-create")
+                    
+                    yield Label("Password (Optional - for encryption):", classes="label")
+                    yield Input(placeholder="Password / Passphrase", id="input-vector-password", password=False)
+                    
+                    yield Label("Existing Vector Chats:", classes="section-label")
+                    yield ListView(id="list-vector-chats")
+                
+                with Vertical(classes="pane-buttons"):
+                    with ScrollableContainer(id="buttons-scroll"):
+                        yield Button("Load", variant="default", id="btn-vector-load", disabled=True)
+                        yield Button("Inspect", variant="default", id="btn-vector-inspect", disabled=True)
+                        yield Button("Duplicate", variant="default", id="btn-vector-duplicate", disabled=True)
+                        yield Button("Rename", variant="default", id="btn-vector-rename", disabled=True)
+                        yield Button("Delete", variant="default", id="btn-vector-delete", disabled=True)
+                        yield Button("Disable Vector Chat", variant="default", id="btn-vector-disable")
+                        yield Button("Close", variant="default", id="btn-close")
 
     def on_mount(self) -> None:
         title = self.query_one(".dialog-title")

@@ -677,17 +677,6 @@ class ActionsMixin:
             await self._stop_generation_unlocked()
         # Lock is released here, making buttons immediately responsive
 
-    def action_clear_history(self) -> None:
-        if self.current_character:
-            self.messages = create_initial_messages(self.current_character, self.user_name)
-        else:
-            style = self.query_one("#select-style").value
-            content = get_style_prompt(style)
-            self.messages = [{"role": "system", "content": content}]
-        
-        self.query_one("#chat-scroll").query("*").remove()
-        self.notify("History cleared.")
-
     async def action_reset_chat(self) -> None:
         # Serialize with actions lock to prevent race conditions from rapid clicking
         async with self._get_actions_lock():

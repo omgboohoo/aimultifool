@@ -1,4 +1,4 @@
-# System Reference Document: aiMultiFool v0.4.2
+# System Reference Document: aiMultiFool v0.4.3
 
 ## 1. Executive Summary
 aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox. It leverages **Textual** for a responsive, desktop-class TUI and supports dual inference modes: **llama-cpp-python** for high-performance local GPU inference and **Ollama API** for flexible model management. The architecture prioritizes separation of concerns via a Mixin pattern, enabling clean extensibility for theming, encryption, and complex character logic.
@@ -136,7 +136,7 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 
 ### 4.6 User Actions & System Prompts
 - **Action Menu System**: Right sidebar containing roleplay tools and system prompts.
-- **Action Manager**: Full in-app manager with real-time search, category filtering, and CRUD operations.
+- **Action Manager**: Full in-app manager with real-time search, category filtering, CRUD operations, export/import functionality, and category management. Export all actions or specific categories for backup and sharing.
 - **Default Actions**: Extensive library of default actions covering scene management, character interactions, and narrative control.
 - **System Prompts**: Actions can be marked as system prompts that modify the AI's behavior rather than user messages.
 
@@ -165,7 +165,7 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **ModelScreen**: Model selection, context size, GPU layer configuration (local mode), and Ollama server URL configuration (Ollama mode). Includes toggle button to switch between Local and Ollama inference modes. Automatically detects available models based on selected inference mode.
 - **ParametersScreen**: AI sampling parameter controls (Temperature, Top P, Top K, Repeat Penalty, Min P) with slider interfaces.
 - **CharactersScreen**: Character card browser with search, load, and unified metadata editor with AI-assisted editing.
-- **ActionsManagerScreen**: Unified action menu management with search, filtering, and category organization.
+- **ActionsManagerScreen**: Unified action menu management with search, filtering, category organization, export/import, and category deletion. Includes file picker modal for user-friendly import operations.
 - **ChatManagerScreen**: Save and load conversation histories with optional encryption.
 - **ThemeScreen**: Theme selection and speech styling options.
 - **MiscScreen**: About screen with links to website, Discord, and support. Also provides access to the Context Window Viewer.
@@ -262,6 +262,7 @@ Legacy format chats with `model_settings` are still supported for loading, but t
 - **`action_menu.json`**: User-defined actions and system prompts.
 - **`chats/*.json`**: Saved conversation histories (optionally encrypted).
 - **`characters/*.png`**: Character card files (optionally encrypted).
+- **`export/*.json`**: Exported action sets for backup and sharing (created automatically when exporting actions).
 
 ---
 
@@ -306,7 +307,7 @@ Legacy format chats with `model_settings` are still supported for loading, but t
 - **Analysis Tools**: The "Analysis" category contains comprehensive analysis actions including emotion analysis, character stats analysis, relationship mapping, power dynamics, character motivations, and more.
 - **Flexible Organization**: Actions are organized by category (Analysis, Scene Tools, Spawn Woman, Spawn Man, etc.) with pinned categories ("Analysis" and "Scene Tools") at the top for quick access.
 - **Search Functionality**: Real-time search across action names and prompts with auto-expanding categories that match the search query.
-- **Custom Actions**: Users can create, edit, duplicate, and delete actions through the Action Manager, providing unlimited extensibility.
+- **Custom Actions**: Users can create, edit, duplicate, delete, export, and import actions through the Action Manager, providing unlimited extensibility. Export functionality supports exporting all actions or category-specific exports for backup and sharing. Import uses a file picker to select from exported JSON files in the `export/` folder.
 - **System Prompts**: Actions can be marked as system prompts that modify the AI's behavior rather than user messages.
 - **Chat Window Integration**: Action results appear directly in the main chat window, providing full visibility and context.
 

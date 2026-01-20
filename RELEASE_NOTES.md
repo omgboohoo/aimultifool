@@ -1,5 +1,15 @@
 # Release Notes
 
+## v0.4.3: Action Management Enhancements & Export/Import & Games Category
+### 🎯 Action Menu Management Improvements
+- **Batch Editing**: Action menu edits are now batched - changes are only saved when clicking "Apply". The "Cancel" button discards all edits and restores the original state.
+- **Export/Import**: Export all actions or category-specific actions to JSON files, and import actions with automatic duplicate detection.
+- **Category Management**: Delete entire categories of actions with confirmation dialogs.
+- **Modal Layout**: Most modals are now laid out with right side buttons for improved consistency and user experience.
+
+### 🎮 New Feature: Games Category
+- **Games Category**: Added a new "Games" category to the action menu with 21 interactive games to play with AI, including Would You Rather, Truth or Dare, Two Truths and a Lie, Never Have I Ever, 20 Questions, Story Building Game, Word Association, Riddles, Trivia Challenge, and more.
+
 ## v0.4.2: RLM Chat Removal & Code Cleanup
 ### 🧹 Code Cleanup: Removed RLM Chat Feature
 - **RLM Chat Removal**: Removed RLM Chat feature from the application. Vector Chat (RAG) provides similar functionality with better performance and simpler implementation.

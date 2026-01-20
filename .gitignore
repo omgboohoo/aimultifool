@@ -86,6 +86,7 @@ model_cache.json
 settings.json
 *.gguf
 *.ggml
+export/
 
 # Logs
 *.log
