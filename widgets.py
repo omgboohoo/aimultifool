@@ -813,6 +813,10 @@ class ModelScreen(ModalScreen):
             ollama_url_container = self.query_one("#ollama-url-container", Container)
             model_dialog = self.query_one("#model-dialog", Vertical)
             connect_btn = self.query_one("#btn-connect", Button)
+            
+            # Check if CPU mode is enabled
+            cpu_mode = getattr(app, "cpu_mode", False)
+            
             if new_mode == "ollama":
                 gpu_container.display = False
                 ollama_url_container.display = True
@@ -828,7 +832,13 @@ class ModelScreen(ModalScreen):
                 except Exception:
                     self.query_one("#input-ollama-url").value = "127.0.0.1:11434"
             else:
-                gpu_container.display = True
+                # Hide GPU layers container if CPU mode is enabled
+                if cpu_mode:
+                    gpu_container.display = False
+                    # Force GPU layers to 0 in CPU mode
+                    app.gpu_layers = 0
+                else:
+                    gpu_container.display = True
                 ollama_url_container.display = False
                 model_dialog.remove_class("ollama-mode")
                 connect_btn.display = False
@@ -847,6 +857,10 @@ class ModelScreen(ModalScreen):
                 download_btn = self.query_one("#btn-download-models", Button)
                 download_btn.disabled = True
                 download_btn.label = "Downloading..."
+                
+                # Also disable the Ollama toggle button while downloading
+                toggle_btn = self.query_one("#btn-toggle-mode", Button)
+                toggle_btn.disabled = True
                 
                 # Start download (this is async, so we'll refresh when it completes)
                 app.download_default_model()
@@ -869,6 +883,20 @@ class ModelScreen(ModalScreen):
                         else:
                             download_btn.disabled = False
                         download_btn.label = "Download Default Models"
+                        
+                        # Restore GPU container visibility based on CPU mode (only in local mode)
+                        if inference_mode == "local":
+                            cpu_mode = getattr(app, "cpu_mode", False)
+                            gpu_container = self.query_one("#gpu-layers-container", Container)
+                            if cpu_mode:
+                                gpu_container.display = False
+                                # Force GPU layers to 0 in CPU mode
+                                app.gpu_layers = 0
+                            else:
+                                gpu_container.display = True
+                        
+                        # Re-enable the Ollama toggle button after download completes
+                        toggle_btn.disabled = False
                     else:
                         # Still downloading, check again in 0.5 seconds
                         self.set_timer(0.5, check_download_complete)
