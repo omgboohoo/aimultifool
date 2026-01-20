@@ -508,12 +508,11 @@ class ModelScreen(ModalScreen):
         else:
             toggle_btn.label = "Ollama Inference"
         
-        # Show/hide Download Models button (only in local mode)
+        # Show/hide Download Models button (only in local mode and if models don't exist)
         download_btn = self.query_one("#btn-download-models", Button)
         if inference_mode == "ollama":
             download_btn.display = False
         else:
-            download_btn.display = True
             # Check if default models already exist
             try:
                 from pathlib import Path
@@ -521,11 +520,13 @@ class ModelScreen(ModalScreen):
                 llm_path = models_dir / "L3-8B-Stheno-v3.2-Q4_K_M.gguf"
                 embed_path = models_dir / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
                 if llm_path.exists() and embed_path.exists():
-                    download_btn.disabled = True
+                    download_btn.display = False
                 else:
+                    download_btn.display = True
                     download_btn.disabled = False
             except Exception:
-                # If check fails, leave button enabled (fallback)
+                # If check fails, show button enabled (fallback)
+                download_btn.display = True
                 download_btn.disabled = False
         
         # Show/hide GPU Layers and Ollama URL based on inference mode
@@ -599,7 +600,7 @@ class ModelScreen(ModalScreen):
         
         self.app.update_ui_state()
         
-        # Check download button state after update_ui_state (to avoid reset)
+        # Check download button visibility after update_ui_state (to avoid reset)
         if inference_mode != "ollama":
             download_btn = self.query_one("#btn-download-models", Button)
             try:
@@ -608,10 +609,12 @@ class ModelScreen(ModalScreen):
                 llm_path = models_dir / "L3-8B-Stheno-v3.2-Q4_K_M.gguf"
                 embed_path = models_dir / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
                 if llm_path.exists() and embed_path.exists():
-                    download_btn.disabled = True
+                    download_btn.display = False
                 else:
+                    download_btn.display = True
                     download_btn.disabled = False
             except Exception:
+                download_btn.display = True
                 download_btn.disabled = False
         
         # Ensure mod switch button is always enabled
@@ -788,12 +791,11 @@ class ModelScreen(ModalScreen):
             # Mod switch button is always enabled
             toggle_btn.disabled = False
             
-            # Show/hide Download Models button (only in local mode)
+            # Show/hide Download Models button (only in local mode and if models don't exist)
             download_btn = self.query_one("#btn-download-models", Button)
             if new_mode == "ollama":
                 download_btn.display = False
             else:
-                download_btn.display = True
                 # Check if default models already exist
                 try:
                     from pathlib import Path
@@ -801,11 +803,13 @@ class ModelScreen(ModalScreen):
                     llm_path = models_dir / "L3-8B-Stheno-v3.2-Q4_K_M.gguf"
                     embed_path = models_dir / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
                     if llm_path.exists() and embed_path.exists():
-                        download_btn.disabled = True
+                        download_btn.display = False
                     else:
+                        download_btn.display = True
                         download_btn.disabled = False
                 except Exception:
-                    # If check fails, leave button enabled (fallback)
+                    # If check fails, show button enabled (fallback)
+                    download_btn.display = True
                     download_btn.disabled = False
             
             # Show/hide GPU Layers and Ollama URL based on inference mode
@@ -856,7 +860,6 @@ class ModelScreen(ModalScreen):
                 # Disable download button while downloading
                 download_btn = self.query_one("#btn-download-models", Button)
                 download_btn.disabled = True
-                download_btn.label = "Downloading..."
                 
                 # Also disable the Ollama toggle button while downloading
                 toggle_btn = self.query_one("#btn-toggle-mode", Button)
@@ -872,17 +875,16 @@ class ModelScreen(ModalScreen):
                         # Download completed, refresh model list
                         inference_mode = getattr(app, "inference_mode", "local")
                         self._populate_models(inference_mode)
-                        download_btn.label = "Download Models"
-                        # Check if models exist and disable if they do
+                        # Check if models exist and hide button if they do
                         from pathlib import Path
                         models_dir = Path(__file__).parent / "models"
                         llm_path = models_dir / "L3-8B-Stheno-v3.2-Q4_K_M.gguf"
                         embed_path = models_dir / "nomic-embed-text-v2-moe.Q4_K_M.gguf"
                         if llm_path.exists() and embed_path.exists():
-                            download_btn.disabled = True
+                            download_btn.display = False
                         else:
+                            download_btn.display = True
                             download_btn.disabled = False
-                        download_btn.label = "Download Default Models"
                         
                         # Restore GPU container visibility based on CPU mode (only in local mode)
                         if inference_mode == "local":
