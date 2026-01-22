@@ -67,12 +67,12 @@ GPU mode provides accelerated inference using your NVIDIA GPU. This requires CUD
 
 3. **Launch**:
    ```bash
-   chmod +x run_gpu.sh
-   ./run_gpu.sh
+   chmod +x run_linux_gpu.sh
+   ./run_linux_gpu.sh
    ```
 
 > [!TIP]
-> **GPU Acceleration**: On first launch, `run_gpu.sh` will automatically download a **Multi-Arch Wheel** (~339MB) to enable CUDA support across GTX 10-series through RTX 40-series GPUs.
+> **GPU Acceleration**: On first launch, `run_linux_gpu.sh` will automatically download a **Multi-Arch Wheel** (~339MB) to enable CUDA support across GTX 10-series through RTX 40-series GPUs.
 
 ### Windows (GPU Mode)
 
@@ -92,10 +92,10 @@ GPU mode provides accelerated inference using your NVIDIA GPU. This requires CUD
    - Open the extracted folder (`aimultifool-main`).
 
 3. **Launch**:
-   - Double-click `run_gpu.bat`
+   - Double-click `run_windows_gpu.bat`
 
 > [!TIP]
-> **GPU Acceleration**: On first launch, `run_gpu.bat` will automatically download a **Windows Multi-Arch Wheel** (~235MB) to enable CUDA support across GTX 10-series through RTX 40-series GPUs.
+> **GPU Acceleration**: On first launch, `run_windows_gpu.bat` will automatically download a **Windows Multi-Arch Wheel** (~235MB) to enable CUDA support across GTX 10-series through RTX 40-series GPUs.
 
 ---
 
@@ -115,8 +115,8 @@ CPU mode runs entirely on your CPU without requiring CUDA toolkit or NVIDIA driv
 
 3. **Launch**:
    ```bash
-   chmod +x run_cpu.sh
-   ./run_cpu.sh
+   chmod +x run_linux_cpu.sh
+   ./run_linux_cpu.sh
    ```
 
 > [!NOTE]
@@ -135,7 +135,7 @@ CPU mode runs entirely on your CPU without requiring CUDA toolkit or NVIDIA driv
    - Open the extracted folder (`aimultifool-main`).
 
 3. **Launch**:
-   - Double-click `run_cpu.bat`
+   - Double-click `run_windows_cpu.bat`
 
 > [!NOTE]
 > CPU mode will automatically install the CPU-only version of `llama-cpp-python` without any CUDA dependencies. This is perfect for systems without NVIDIA GPUs or when you want a simpler setup.
@@ -167,7 +167,7 @@ After installation, you can use **aiMultiFool** in two modes: **Local Inference*
 
 **Local Inference** runs models directly on your machine using `llama.cpp`, providing maximum privacy and control.
 
-1. **Launch the Application**: Run `./run_gpu.sh` or `./run_cpu.sh` (Linux) or `run_gpu.bat` / `run_cpu.bat` (Windows)
+1. **Launch the Application**: Run `./run_linux_gpu.sh` or `./run_linux_cpu.sh` (Linux) or `run_windows_gpu.bat` / `run_windows_cpu.bat` (Windows)
 2. **Download Default Models**: Click the **"Download Models"** button to automatically download:
    - **L3-8B-Stheno-v3.2-Q4_K_M** (Default LLM)
    - **nomic-embed-text-v2-moe.Q4_K_M** (Required for Vector Chat/RAG)
@@ -194,7 +194,7 @@ After installation, you can use **aiMultiFool** in two modes: **Local Inference*
    ollama pull nchapman/mn-12b-mag-mell-r1
    ```
 
-4. **Launch aiMultiFool**: Run `./run_gpu.sh` or `./run_cpu.sh` (Linux) or `run_gpu.bat` / `run_cpu.bat` (Windows)
+4. **Launch aiMultiFool**: Run `./run_linux_gpu.sh` or `./run_linux_cpu.sh` (Linux) or `run_windows_gpu.bat` / `run_windows_cpu.bat` (Windows)
 5. **Switch to Ollama Mode**: Click **"Ollama Inference"** to switch modes
 6. **Select Model**: Choose your downloaded Ollama model from the dropdown
 7. **Load Model**: Click **"Load Model"** and start chatting!

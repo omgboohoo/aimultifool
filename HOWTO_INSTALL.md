@@ -26,12 +26,12 @@ GPU mode provides accelerated inference using your NVIDIA GPU. This requires CUD
 
 3. **Launch**:
    ```bash
-   chmod +x run_gpu.sh
-   ./run_gpu.sh
+   chmod +x run_linux_gpu.sh
+   ./run_linux_gpu.sh
    ```
 
 > [!TIP]
-> **GPU Acceleration**: On first launch, `run_gpu.sh` will automatically download a **Multi-Arch Wheel** (~339MB) to enable CUDA support across GTX 10-series through RTX 40-series GPUs.
+> **GPU Acceleration**: On first launch, `run_linux_gpu.sh` will automatically download a **Multi-Arch Wheel** (~339MB) to enable CUDA support across GTX 10-series through RTX 40-series GPUs.
 
 ---
 
@@ -53,10 +53,10 @@ GPU mode provides accelerated inference using your NVIDIA GPU. This requires CUD
    - Open the extracted folder (`aimultifool-main`).
 
 3. **Launch**:
-   - Double-click `run_gpu.bat`
+   - Double-click `run_windows_gpu.bat`
 
 > [!TIP]
-> **GPU Acceleration**: On first launch, `run_gpu.bat` will automatically download a **Windows Multi-Arch Wheel** (~235MB) to enable CUDA support across GTX 10-series through RTX 40-series GPUs.
+> **GPU Acceleration**: On first launch, `run_windows_gpu.bat` will automatically download a **Windows Multi-Arch Wheel** (~235MB) to enable CUDA support across GTX 10-series through RTX 40-series GPUs.
 
 ---
 
@@ -76,8 +76,8 @@ CPU mode runs entirely on your CPU without requiring CUDA toolkit or NVIDIA driv
 
 3. **Launch**:
    ```bash
-   chmod +x run_cpu.sh
-   ./run_cpu.sh
+   chmod +x run_linux_cpu.sh
+   ./run_linux_cpu.sh
    ```
 
 > [!NOTE]
@@ -98,7 +98,7 @@ CPU mode runs entirely on your CPU without requiring CUDA toolkit or NVIDIA driv
    - Open the extracted folder (`aimultifool-main`).
 
 3. **Launch**:
-   - Double-click `run_cpu.bat`
+   - Double-click `run_windows_cpu.bat`
 
 > [!NOTE]
 > CPU mode will automatically install the CPU-only version of `llama-cpp-python` without any CUDA dependencies. This is perfect for systems without NVIDIA GPUs or when you want a simpler setup.
@@ -145,8 +145,8 @@ CPU mode runs entirely on your CPU without requiring CUDA toolkit or NVIDIA driv
 
 Each mode uses its own virtual environment (`venv_gpu` or `venv_cpu`) to avoid conflicts:
 
-- **GPU Mode**: Uses `run_gpu.sh` / `run_gpu.bat` → creates `venv_gpu`
-- **CPU Mode**: Uses `run_cpu.sh` / `run_cpu.bat` → creates `venv_cpu`
+- **GPU Mode**: Uses `run_linux_gpu.sh` / `run_windows_gpu.bat` → creates `venv_gpu`
+- **CPU Mode**: Uses `run_linux_cpu.sh` / `run_windows_cpu.bat` → creates `venv_cpu`
 
 You can have both environments installed simultaneously and switch between them by running the appropriate script.
 

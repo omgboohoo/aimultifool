@@ -2,7 +2,7 @@
 
 ## v0.4.4: GPU/CPU Mode Separation & Simplified Installation
 ### 🎮 GPU/CPU Mode Separation
-- **Separate Run Scripts**: Added dedicated `run_gpu.sh`/`run_gpu.bat` and `run_cpu.sh`/`run_cpu.bat` scripts for GPU and CPU modes respectively.
+- **Separate Run Scripts**: Added dedicated `run_linux_gpu.sh`/`run_windows_gpu.bat` and `run_linux_cpu.sh`/`run_windows_cpu.bat` scripts for GPU and CPU modes respectively.
 - **Independent Virtual Environments**: Each mode uses its own virtual environment (`venv_gpu` or `venv_cpu`) to prevent dependency conflicts.
 - **CPU Mode Simplification**: CPU mode no longer requires CUDA toolkit installation, making it perfect for systems without NVIDIA GPUs.
 - **CPU Mode Flag**: Added `--cpu` command-line flag to disable GPU layers control and model cache in CPU mode.
