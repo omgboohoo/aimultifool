@@ -5,7 +5,6 @@
 - **40 Engaging Scenarios**: Added a comprehensive "Scenarios" category to the action menu with 40 diverse roleplay scenarios covering adventure, fantasy, sci-fi, horror, thriller, and erotic genres.
 - **User Protagonist**: All scenarios use `{{user}}` placeholder that automatically replaces with the user's name, making them the protagonist of every story.
 - **Adventure Scenarios**: 20 exciting adventure scenarios including space exploration, fantasy quests, post-apocalyptic survival, cyberpunk heists, time loops, superhero origins, and more.
-- **Erotic Scenarios**: 20 engaging erotic scenarios featuring various romantic and intimate situations, all designed with female partners.
 - **Always Replace User**: Fixed `{{user}}` replacement to work regardless of character card loading status, ensuring scenarios work perfectly in all contexts.
 
 ### 🔧 Technical Improvements
