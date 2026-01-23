@@ -1,5 +1,17 @@
 # Release Notes
 
+## v0.4.5: Scenarios Category & Enhanced Roleplay Features
+### 🎭 New Feature: Scenarios Category
+- **40 Engaging Scenarios**: Added a comprehensive "Scenarios" category to the action menu with 40 diverse roleplay scenarios covering adventure, fantasy, sci-fi, horror, thriller, and erotic genres.
+- **User Protagonist**: All scenarios use `{{user}}` placeholder that automatically replaces with the user's name, making them the protagonist of every story.
+- **Adventure Scenarios**: 20 exciting adventure scenarios including space exploration, fantasy quests, post-apocalyptic survival, cyberpunk heists, time loops, superhero origins, and more.
+- **Erotic Scenarios**: 20 engaging erotic scenarios featuring various romantic and intimate situations, all designed with female partners.
+- **Always Replace User**: Fixed `{{user}}` replacement to work regardless of character card loading status, ensuring scenarios work perfectly in all contexts.
+
+### 🔧 Technical Improvements
+- **Universal User Replacement**: Updated action menu handler to always replace `{{user}}` with the username, not just when character cards are loaded.
+- **Roleplay Clarity**: All scenarios explicitly state "This is a roleplay scenario where..." to ensure clear context for the AI.
+
 ## v0.4.4: GPU/CPU Mode Separation & Simplified Installation
 ### 🎮 GPU/CPU Mode Separation
 - **Separate Run Scripts**: Added dedicated `run_linux_gpu.sh`/`run_windows_gpu.bat` and `run_linux_cpu.sh`/`run_windows_cpu.bat` scripts for GPU and CPU modes respectively.

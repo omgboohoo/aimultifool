@@ -55,7 +55,7 @@ def parse_args():
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.4.4"
+    TITLE = "aiMultiFool v0.4.5"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -204,7 +204,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.4.4", id="status-version")
+            yield Static("aiMultiFool v0.4.5", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -712,12 +712,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             # Wait for cleanup to finish if it's in progress
             await self._wait_for_cleanup_if_needed()
             
-            # Replace {{user}} with the user's name only when a character card is loaded
-            if self.current_character:
-                prompt = re.sub(r'\{\{user\}\}', self.user_name, prompt, flags=re.IGNORECASE)
-            else:
-                # When no character card is loaded, remove {{user}} references instead of replacing them
-                prompt = re.sub(r'\{\{user\}\}', '', prompt, flags=re.IGNORECASE)
+            # Always replace {{user}} with the user's name
+            prompt = re.sub(r'\{\{user\}\}', self.user_name, prompt, flags=re.IGNORECASE)
 
             if section_name == "System Prompts":
                 await self.set_system_prompt(prompt, item_name)
