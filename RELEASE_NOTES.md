@@ -2,9 +2,16 @@
 
 ## v0.4.5: Scenarios Category & Enhanced Roleplay Features
 ### 🎭 New Feature: Scenarios Category
-- **40 Engaging Scenarios**: Added a comprehensive "Scenarios" category to the action menu with 40 diverse roleplay scenarios covering adventure, fantasy, sci-fi, horror, thriller, and erotic genres.
+- **52 Engaging Scenarios**: Added a comprehensive "Scenarios" category to the action menu with 52 diverse roleplay scenarios covering adventure, fantasy, sci-fi, horror, thriller, and erotic genres.
 - **User Protagonist**: All scenarios use `{{user}}` placeholder that automatically replaces with the user's name, making them the protagonist of every story.
-- **Adventure Scenarios**: 20 exciting adventure scenarios including space exploration, fantasy quests, post-apocalyptic survival, cyberpunk heists, time loops, superhero origins, and more.
+- **40 Preset Scenarios**: Curated roleplay scenarios including:
+  - **Adventure & Sci-Fi**: Last Stand on Mars, Space Station Sabotage, Cyberpunk Heist, Parallel Universe Portal, Lost City of Atlantis
+  - **Fantasy & Magic**: Dragon's Last Egg, Ancient Curse Awakens, Urban Fantasy Awakening, Vampire's Masquerade, Steampunk Revolution
+  - **Thriller & Mystery**: Corporate Conspiracy, Haunted Mansion Mystery, Noir Detective Case, Psychological Thriller, Post-Apocalyptic Courier
+  - **Action & Survival**: Time Loop Paradox, Superhero Origin, Wild West Showdown, Survival Island, Zombie Outbreak Patient Zero, Medieval Tournament Champion
+  - **Romance & Erotic**: Forbidden Affair, Sensual Masquerade, Power Exchange, Tempting Roommate, Office Fantasy, Vampire's Seduction, Beach Encounter, Training Session, Stranger in the Bar, Neighbor's Secret, Fantasy Fulfillment, Reunion Passion, Sensual Massage, Dangerous Liaison, Awakening, Forced Proximity, Tempting Teacher, Midnight Encounter, Complete Surrender
+- **12 Random Scenario Generators**: Dynamic scenario generators that create unique roleplay scenarios on demand:
+  - Random Adventure Scenario, Random Fantasy Scenario, Random Sci-Fi Scenario, Random Horror Scenario, Random Mystery Scenario, Random Romance Scenario, Random Survival Scenario, Random Superhero Scenario, Random Historical Scenario, Random Modern Drama Scenario, Random Erotic Scenario, Random Completely Random Scenario
 - **Always Replace User**: Fixed `{{user}}` replacement to work regardless of character card loading status, ensuring scenarios work perfectly in all contexts.
 
 ### 🔧 Technical Improvements
