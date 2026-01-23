@@ -1,5 +1,21 @@
 # Release Notes
 
+## v0.4.7: Random Seed Management for Chat Variety
+### 🎲 New Feature: Automatic Seed Management
+- **Random Seed Generation**: Each new chat session now automatically generates a fresh random seed, ensuring different outputs even with identical prompts.
+- **Seed on New Chat**: Clicking "Restart" or "New" (Clear Chat) generates a new random seed for the session.
+- **Seed on Regenerate**: The "Regenerate" button now generates a new seed each time, ensuring varied regenerations without model reload.
+- **Seed on Card Load**: Loading a character card (or reloading the same card) generates a new random seed, ensuring variety in character interactions.
+- **Seed in AI Card Editor**: Each message sent to the AI card editor generates a new seed, providing varied AI responses for character card editing.
+- **No Model Reload Required**: Previously, users had to reload the model to get different outputs with the same prompt. Now seeds are managed automatically without the performance cost of model reloading.
+- **Cross-Backend Support**: Seed management works with both local llama.cpp inference and Ollama API inference.
+
+### 🔧 Technical Improvements
+- **Seed Parameter**: Added seed parameter support to `create_chat_completion` calls in both local and Ollama inference modes.
+- **Automatic Initialization**: Seed is automatically initialized with a random value on app startup.
+- **Session-Based Seeds**: Each chat session maintains its own seed, ensuring consistency within a conversation while allowing variety between sessions.
+- **Comprehensive Seed Coverage**: Seeds are now generated for all AI interaction points: new chats, regenerations, card loading, and AI card editor messages.
+
 ## v0.4.6: Portable Python Bundling & Simplified Installation
 ### 🐍 Portable Python Integration
 - **Automatic Python 3.12.12 Bundling**: All launch scripts now automatically download and use portable Python 3.12.12, eliminating the need for users to install Python separately.

@@ -1492,8 +1492,12 @@ class CharactersScreen(ModalScreen):
             
             import threading
             import queue as thread_queue
+            import random
             
             token_queue = thread_queue.Queue()
+            
+            # Generate new random seed for each AI edit request
+            self.app.seed = random.randint(0, 2**31 - 1)
             
             llm = self.app.llm
             params = {
@@ -1504,6 +1508,7 @@ class CharactersScreen(ModalScreen):
                 "min_p": self.app.minp,
                 "max_tokens": 4096,
                 "stream": True,
+                "seed": self.app.seed,
                 "stop": ["```\n", "}\n\n"] # Stop sequences to prevent trailing loop/gibberish
             }
             

@@ -62,6 +62,7 @@ class OllamaClient:
         top_k: int = 40,
         repeat_penalty: float = 1.0,
         min_p: float = 0.0,
+        seed: Optional[int] = None,
         **kwargs
     ) -> Generator[Dict[str, Any], None, None]:
         """
@@ -100,6 +101,9 @@ class OllamaClient:
         
         if max_tokens:
             payload["options"]["num_predict"] = max_tokens
+        
+        if seed is not None:
+            payload["options"]["seed"] = seed
         
         try:
             response = requests.post(

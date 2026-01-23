@@ -4,6 +4,7 @@ import asyncio
 import threading
 import uuid
 import json
+import random
 from pathlib import Path
 from textual import work
 from textual.widgets import Select
@@ -116,6 +117,9 @@ class InferenceMixin:
                 # Prune again *after* inserting retrieval snippets so the final prompt is safe.
                 messages_to_use = prune_messages_if_needed(self.llm, messages_to_use, self.context_size)
 
+                # Get current seed (or None if not set)
+                seed = getattr(self, "seed", None)
+                
                 stream = self.llm.create_chat_completion(
                     messages=messages_to_use,
                     max_tokens=self.context_size - 100,
@@ -124,6 +128,7 @@ class InferenceMixin:
                     top_k=self.topk,
                     repeat_penalty=self.repeat,
                     min_p=self.minp,
+                    seed=seed,
                     stream=True
                 )
                 
@@ -702,21 +707,24 @@ class ActionsMixin:
             except Exception:
                 pass
 
-            # 5. Reset messages
+            # 5. Generate new random seed for this chat session
+            self.seed = random.randint(0, 2**31 - 1)
+            
+            # 6. Reset messages
             if self.current_character:
                 self.messages = create_initial_messages(self.current_character, self.user_name)
             else:
                 self.messages = [{"role": "system", "content": ""}]
             
-            # 6. Clear chat window
+            # 7. Clear chat window
             self.query_one("#chat-scroll").query("*").remove()
             
-            # 7. Apply style and print instructions
+            # 8. Apply style and print instructions
             if hasattr(self, "update_system_prompt_style"):
                 # Suppress info message if restarting with a character card to keep it clean
                 await self.update_system_prompt_style(self.style, suppress_info=bool(self.current_character))
             
-            # 8. Restart the inference
+            # 9. Restart the inference
             # Final safety check before starting
             if not await self._can_start_inference():
                 await self._wait_for_cleanup_if_needed(max_wait_seconds=1.0)
@@ -801,6 +809,9 @@ class ActionsMixin:
             # Ensure all inference state flags are cleared after cleanup
             setattr(self, "_inference_starting", False)
             setattr(self, "_inference_worker", None)
+            
+            # Generate new random seed for this chat session
+            self.seed = random.randint(0, 2**31 - 1)
             
             self.current_character = None
             self.first_user_message = None
@@ -888,6 +899,9 @@ class ActionsMixin:
                 # Rebuild UI to match message state (avoids widget races/crashes)
                 if hasattr(self, "full_sync_chat_ui"):
                     await self.full_sync_chat_ui()
+
+                # Generate new random seed for regeneration to get different output
+                self.seed = random.randint(0, 2**31 - 1)
 
                 # Final safety check before starting inference
                 if not await self._can_start_inference():

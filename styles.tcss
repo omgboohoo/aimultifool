@@ -201,6 +201,14 @@ MessageWidget.-assistant {
     text-overflow: ellipsis;
 }
 
+#status-seed {
+    text-align: left;
+    width: auto;
+    min-width: 15;
+    margin-left: 1;
+    content-align: left middle;
+}
+
 #status-version {
     text-align: right;
     width: auto;

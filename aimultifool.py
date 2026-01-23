@@ -26,6 +26,7 @@ import asyncio
 import re
 import webbrowser
 import json
+import random
 from pathlib import Path
 
 from textual.app import App, ComposeResult
@@ -55,7 +56,7 @@ def parse_args():
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.4.6"
+    TITLE = "aiMultiFool v0.4.7"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -95,6 +96,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     enable_vector_chat = reactive(False)
     force_ai_speak_first = reactive(True)
     cpu_mode = reactive(False)
+    seed = reactive(None)  # Random seed for inference
     _inference_worker = None
     _last_action_list = None
 
@@ -205,7 +207,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
             python_version = f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-            yield Static(f"{python_version} | aiMultiFool v0.4.6", id="status-version")
+            yield Static("", id="status-seed")
+            yield Static(f"{python_version} | aiMultiFool v0.4.7", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -252,6 +255,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         self.watch_is_loading(self.is_loading)
         self.watch_is_downloading(self.is_downloading)
         self.watch_is_model_loading(self.is_model_loading)
+        self.watch_seed(self.seed)
         
         # Re-apply Focus styling for inputs (sometimes gets lost in dynamic CSS loading?)
         # Actually it's handled by CSS, but good to ensure everything mounted.
@@ -269,6 +273,9 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         self.messages = [{"role": "system", "content": new_content}]
         self.disable_character_list() # Start disabled
         self.show_footer = True
+        
+        # Initialize random seed for inference (will trigger watch_seed)
+        self.seed = random.randint(0, 2**31 - 1)
         
         self.push_screen(ModelScreen(), self.model_screen_callback)
 
@@ -312,6 +319,17 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                 btn.add_class("vector-active")
             else:
                 btn.remove_class("vector-active")
+        except Exception:
+            pass
+
+    def watch_seed(self, seed: int) -> None:
+        """Called when seed changes. Updates the status bar display."""
+        try:
+            seed_widget = self.query_one("#status-seed", Static)
+            if seed is not None:
+                seed_widget.update(f"Seed: {seed} | ")
+            else:
+                seed_widget.update("")
         except Exception:
             pass
 
@@ -682,6 +700,10 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                 if not chara_obj:
                     self.notify("Failed to process metadata!", severity="error")
                     return
+                
+                # Generate new random seed for this character session
+                self.seed = random.randint(0, 2**31 - 1)
+                
                 self.current_character = chara_obj
                 self.messages = create_initial_messages(chara_obj, self.user_name)
                 await self.update_system_prompt_style(self.style)
