@@ -1,4 +1,4 @@
-# System Reference Document: aiMultiFool v0.4.5
+# System Reference Document: aiMultiFool v0.4.6
 
 ## 1. Executive Summary
 aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox. It leverages **Textual** for a responsive, desktop-class TUI and supports dual inference modes: **llama-cpp-python** for high-performance local GPU inference and **Ollama API** for flexible model management. The architecture prioritizes separation of concerns via a Mixin pattern, enabling clean extensibility for theming, encryption, and complex character logic.

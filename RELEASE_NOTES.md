@@ -1,5 +1,29 @@
 # Release Notes
 
+## v0.4.6: Portable Python Bundling & Simplified Installation
+### 🐍 Portable Python Integration
+- **Automatic Python 3.12.12 Bundling**: All launch scripts now automatically download and use portable Python 3.12.12, eliminating the need for users to install Python separately.
+- **Zero Configuration**: Users no longer need to worry about Python installation, PATH configuration, or version compatibility issues.
+- **Cross-Platform Support**: 
+  - **Linux**: Downloads `cpython-3.12.12+20260114-x86_64-unknown-linux-gnu-install_only.tar.gz` (~50MB)
+  - **Windows**: Downloads `cpython-3.12.12+20260114-x86_64-pc-windows-msvc-install_only_stripped.tar.gz` (~50MB)
+- **Smart Fallback**: If portable Python download fails, scripts gracefully fall back to system Python.
+- **One-Time Download**: Portable Python is cached in `python_portable/` directory and reused on subsequent launches.
+
+### 🎨 UI Enhancements
+- **Python Version Display**: Status bar now shows the running Python version (e.g., "Python 3.12.12 | aiMultiFool v0.4.6") in the bottom-right corner.
+- **Version Visibility**: Users can easily verify which Python version is running the application.
+
+### 🔧 Technical Improvements
+- **Unified Launch Scripts**: All 4 launch scripts (`run_linux_gpu.sh`, `run_linux_cpu.sh`, `run_windows_gpu.bat`, `run_windows_cpu.bat`) now include portable Python setup logic.
+- **Automatic Extraction**: Scripts automatically extract the portable Python archive after download.
+- **Venv Integration**: Portable Python is used to create virtual environments, ensuring consistent Python version across all installations.
+- **Git Ignore**: Added `python_portable/` to `.gitignore` to keep repository clean.
+
+### 📚 Documentation Updates
+- **Simplified Installation**: Updated README.md and HOWTO_INSTALL.md to reflect that Python installation is no longer required.
+- **Version Updates**: All documentation files updated to v0.4.6.
+
 ## v0.4.5: Scenarios Category & Enhanced Roleplay Features
 ### 🎭 New Feature: Scenarios Category
 - **52 Engaging Scenarios**: Added a comprehensive "Scenarios" category to the action menu with 52 diverse roleplay scenarios covering adventure, fantasy, sci-fi, horror, thriller, and erotic genres.

@@ -6,10 +6,74 @@ setlocal enabledelayedexpansion
 set "SCRIPT_DIR=%~dp0"
 set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
 set "VENV_DIR=%SCRIPT_DIR%\venv_cpu"
+set "PYTHON_PORTABLE_DIR=%SCRIPT_DIR%\python_portable"
+set "PYTHON_PORTABLE_TAR=cpython-3.12.12+20260114-x86_64-pc-windows-msvc-install_only_stripped.tar.gz"
+set "PYTHON_PORTABLE_URL=https://aimultifool.com/%PYTHON_PORTABLE_TAR%"
+set "PYTHON_PORTABLE_TAR_PATH=%PYTHON_PORTABLE_DIR%\%PYTHON_PORTABLE_TAR%"
+set "PYTHON_CMD=py"
 
 echo ----------------------------------------------------------------
 echo   aiMultiFool Suite - CPU-Only Setup ^& Launch Script v0.1.9 (Windows)
 echo ----------------------------------------------------------------
+
+:: 0. Setup Portable Python
+if not exist "%PYTHON_PORTABLE_DIR%\python.exe" (
+    echo [PYTHON] Portable Python not found. Setting up...
+    
+    :: Create python_portable directory
+    if not exist "%PYTHON_PORTABLE_DIR%" mkdir "%PYTHON_PORTABLE_DIR%"
+    
+    :: Download portable Python if tar doesn't exist
+    if not exist "%PYTHON_PORTABLE_TAR_PATH%" (
+        echo [NETWORK] Downloading portable Python 3.12 ^(~50MB^)...
+        echo [SOURCE]  %PYTHON_PORTABLE_URL%
+        
+        :: Try curl first (available on Windows 10+), then PowerShell
+        where curl >nul 2>&1
+        if !errorlevel! equ 0 (
+            curl -L --progress-bar -o "%PYTHON_PORTABLE_TAR_PATH%" "%PYTHON_PORTABLE_URL%"
+            if !errorlevel! neq 0 (
+                echo [ERROR] Download failed with curl.
+                del "%PYTHON_PORTABLE_TAR_PATH%" 2>nul
+                echo [FALLBACK] Will use system Python instead.
+            )
+        ) else (
+            echo [INFO] Using PowerShell for download...
+            powershell -Command "& { $ProgressPreference = 'Continue'; Invoke-WebRequest -Uri '%PYTHON_PORTABLE_URL%' -OutFile '%PYTHON_PORTABLE_TAR_PATH%' }"
+            if !errorlevel! neq 0 (
+                echo [ERROR] Download failed with PowerShell.
+                del "%PYTHON_PORTABLE_TAR_PATH%" 2>nul
+                echo [FALLBACK] Will use system Python instead.
+            )
+        )
+    )
+    
+    :: Extract portable Python if tar exists
+    if exist "%PYTHON_PORTABLE_TAR_PATH%" (
+        echo [EXTRACT] Extracting portable Python...
+        :: Use tar (available on Windows 10+ 1803+)
+        where tar >nul 2>&1
+        if !errorlevel! equ 0 (
+            tar -xzf "%PYTHON_PORTABLE_TAR_PATH%" -C "%PYTHON_PORTABLE_DIR%" --strip-components=1
+            if !errorlevel! equ 0 (
+                if exist "%PYTHON_PORTABLE_DIR%\python.exe" (
+                    set "PYTHON_CMD=%PYTHON_PORTABLE_DIR%\python.exe"
+                    echo [SUCCESS] Portable Python ready!
+                ) else (
+                    echo [WARNING] Extraction completed but python.exe not found. Using system Python.
+                )
+            ) else (
+                echo [ERROR] Extraction failed. Using system Python instead.
+            )
+        ) else (
+            echo [ERROR] tar command not found ^(requires Windows 10 1803+^). Please install tar or use system Python.
+            echo [FALLBACK] Will use system Python instead.
+        )
+    )
+) else (
+    set "PYTHON_CMD=%PYTHON_PORTABLE_DIR%\python.exe"
+    echo [PYTHON] Using portable Python: %PYTHON_CMD%
+)
 
 :: Check if venv already exists
 if exist "%VENV_DIR%" (
@@ -31,7 +95,7 @@ if exist "%VENV_DIR%" (
 
 :: Create virtual environment
 echo [STEP 1/3] Creating fresh virtual environment ^(venv_cpu^)...
-py -m venv "%VENV_DIR%"
+"%PYTHON_CMD%" -m venv "%VENV_DIR%"
 
 :: Activate virtual environment
 echo [STEP 2/3] Activating environment...

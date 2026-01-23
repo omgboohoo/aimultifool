@@ -1,5 +1,5 @@
 # Security & Privacy Audit
-**Application**: aiMultiFool v0.4.5
+**Application**: aiMultiFool v0.4.6
 **Status**: ✅ Fully Private / Offline-Ready
 
 ## 1. Executive Summary
@@ -15,9 +15,12 @@ aiMultiFool is designed with a "Privacy First" architecture. All Large Language 
 - **Privacy**: No user-specific data, chat history, or identifiers are transmitted.
 
 ### ✅ Binary Delivery (First Launch)
-- **Action**: The `run.sh` script downloads a Universal Multi-Arch CUDA Wheel (~339MB) from `aimultifool.com`.
-- **Purpose**: Strictly for delivering the pre-compiled `llama-cpp-python` backend to ensure GPU acceleration.
-- **Privacy**: This is a direct file download with no telemetry attached.
+- **Portable Python**: The launch scripts download Python 3.12.12 (~50MB) from `aimultifool.com` on first launch.
+  - **Purpose**: Bundled Python distribution eliminates the need for users to install Python separately.
+  - **Privacy**: Direct file download with no telemetry attached. Python is cached locally in `python_portable/` directory.
+- **CUDA Wheel**: The launch scripts download a Universal Multi-Arch CUDA Wheel (~339MB for Linux, ~235MB for Windows) from `aimultifool.com`.
+  - **Purpose**: Pre-compiled `llama-cpp-python` backend to ensure GPU acceleration.
+  - **Privacy**: Direct file download with no telemetry attached.
 
 ### ✅ External Integration (Links)
 - **Action**: Clicking community links (Discord, Ko-fi, Website) opens the target URL in your **system's default web browser**.
@@ -37,6 +40,7 @@ aiMultiFool is designed with a "Privacy First" architecture. All Large Language 
 - **`model_cache.json`**: Maps model paths to successful GPU layer counts to speed up loading.
 - **`settings.json`**: Persists UI preferences (Username, Context Size, Sampling Params).
 - **`action_menu.json`**: Stores your custom roleplay prompts.
+- **`python_portable/`**: Contains the bundled Python 3.12.12 distribution (downloaded on first launch, cached locally).
 - **Git Protection**: These files are automatically ignored by Git to prevent accidental sharing of local settings.
 
 ### 🎭 Character Metadata (Local Only)
@@ -55,6 +59,7 @@ aiMultiFool is designed with a "Privacy First" architecture. All Large Language 
 ---
 
 ## 4. Dependencies Review
+- **Python 3.12.12**: Bundled portable Python distribution from [python-build-standalone](https://github.com/astral-sh/python-build-standalone) (MPL-2.0 license). Downloaded on first launch and cached locally.
 - **`llama-cpp-python`**: Local C++ bindings for inference.
 - **`textual` / `rich`**: TUI framework (Terminal-only).
 - **`requests`**: Only used for initiated model downloads.

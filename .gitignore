@@ -32,6 +32,9 @@ env.bak/
 venv.bak/
 .venv
 
+# Portable Python
+python_portable/
+
 # IDEs
 .vscode/
 .idea/

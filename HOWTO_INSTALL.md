@@ -1,4 +1,4 @@
-# How to Install aiMultiFool v0.4.5
+# How to Install aiMultiFool v0.4.6
 
 Follow these instructions to get **aiMultiFool** up and running on your system.
 
@@ -16,9 +16,9 @@ GPU mode provides accelerated inference using your NVIDIA GPU. This requires CUD
 ### Linux (GPU Mode)
 
 1. **Prerequisites**:
-   - **Python 3.12** is strictly required.
    - **CUDA Toolkit** (Required for GPU acceleration): `sudo apt install nvidia-cuda-toolkit-runtime`
    - **NVIDIA GPU** with compatible drivers
+   - *Python 3.12.12 is automatically bundled - no installation required!*
 
 2. **Download and Extract**:
    - [Download aiMultiFool (ZIP)](https://github.com/omgboohoo/aimultifool/archive/refs/heads/main.zip)
@@ -31,21 +31,22 @@ GPU mode provides accelerated inference using your NVIDIA GPU. This requires CUD
    ```
 
 > [!TIP]
-> **GPU Acceleration**: On first launch, `run_linux_gpu.sh` will automatically download a **Multi-Arch Wheel** (~339MB) to enable CUDA support across GTX 10-series through RTX 40-series GPUs.
+> **Automatic Setup**: On first launch, `run_linux_gpu.sh` will automatically:
+> - Download and extract **Portable Python 3.12.12** (~50MB)
+> - Download a **Multi-Arch Wheel** (~339MB) to enable CUDA support across GTX 10-series through RTX 40-series GPUs
 
 ---
 
 ### Windows (GPU Mode)
 
 > [!IMPORTANT]
-> Python 3.12 and a compatible CUDA 13.1 runtime are required for GPU mode on Windows.
+> A compatible CUDA 13.1 runtime is required for GPU mode on Windows.
 
 1. **Prerequisites**:
-   - **Python 3.12.10**: [Download Here](https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe)
-     - *DURING INSTALLATION: You **MUST** check the box that says **"Add python.exe to PATH"***
    - **CUDA Toolkit 13.1**: [Download Here](https://developer.download.nvidia.com/compute/cuda/13.1.0/local_installers/cuda_13.1.0_windows.exe)
      - *(Required for GPU acceleration)*
    - **NVIDIA GPU** with compatible drivers
+   - *Python 3.12.12 is automatically bundled - no installation required!*
 
 2. **Download and Extract**:
    - [Download aiMultiFool (ZIP)](https://github.com/omgboohoo/aimultifool/archive/refs/heads/main.zip)
@@ -56,7 +57,9 @@ GPU mode provides accelerated inference using your NVIDIA GPU. This requires CUD
    - Double-click `run_windows_gpu.bat`
 
 > [!TIP]
-> **GPU Acceleration**: On first launch, `run_windows_gpu.bat` will automatically download a **Windows Multi-Arch Wheel** (~235MB) to enable CUDA support across GTX 10-series through RTX 40-series GPUs.
+> **Automatic Setup**: On first launch, `run_windows_gpu.bat` will automatically:
+> - Download and extract **Portable Python 3.12.12** (~50MB)
+> - Download a **Windows Multi-Arch Wheel** (~235MB) to enable CUDA support across GTX 10-series through RTX 40-series GPUs
 
 ---
 
@@ -67,8 +70,8 @@ CPU mode runs entirely on your CPU without requiring CUDA toolkit or NVIDIA driv
 ### Linux (CPU Mode)
 
 1. **Prerequisites**:
-   - **Python 3.12** is strictly required.
    - *No CUDA toolkit required!*
+   - *Python 3.12.12 is automatically bundled - no installation required!*
 
 2. **Download and Extract**:
    - [Download aiMultiFool (ZIP)](https://github.com/omgboohoo/aimultifool/archive/refs/heads/main.zip)
@@ -81,16 +84,19 @@ CPU mode runs entirely on your CPU without requiring CUDA toolkit or NVIDIA driv
    ```
 
 > [!NOTE]
-> CPU mode will automatically install the CPU-only version of `llama-cpp-python` without any CUDA dependencies. This is perfect for systems without NVIDIA GPUs or when you want a simpler setup.
+> **Automatic Setup**: On first launch, `run_linux_cpu.sh` will automatically:
+> - Download and extract **Portable Python 3.12.12** (~50MB)
+> - Install the CPU-only version of `llama-cpp-python` without any CUDA dependencies
+> 
+> This is perfect for systems without NVIDIA GPUs or when you want a simpler setup.
 
 ---
 
 ### Windows (CPU Mode)
 
 1. **Prerequisites**:
-   - **Python 3.12.10**: [Download Here](https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe)
-     - *DURING INSTALLATION: You **MUST** check the box that says **"Add python.exe to PATH"***
    - *No CUDA toolkit required!*
+   - *Python 3.12.12 is automatically bundled - no installation required!*
 
 2. **Download and Extract**:
    - [Download aiMultiFool (ZIP)](https://github.com/omgboohoo/aimultifool/archive/refs/heads/main.zip)
@@ -101,14 +107,18 @@ CPU mode runs entirely on your CPU without requiring CUDA toolkit or NVIDIA driv
    - Double-click `run_windows_cpu.bat`
 
 > [!NOTE]
-> CPU mode will automatically install the CPU-only version of `llama-cpp-python` without any CUDA dependencies. This is perfect for systems without NVIDIA GPUs or when you want a simpler setup.
+> **Automatic Setup**: On first launch, `run_windows_cpu.bat` will automatically:
+> - Download and extract **Portable Python 3.12.12** (~50MB)
+> - Install the CPU-only version of `llama-cpp-python` without any CUDA dependencies
+> 
+> This is perfect for systems without NVIDIA GPUs or when you want a simpler setup.
 
 ---
 
 ## 🛠️ Requirements Summary
 
 ### GPU Mode Requirements
-- **Python 3.12+** (Version **3.12.x** is highly recommended for compatibility with pre-built GPU wheels)
+- **Python 3.12.12** (Automatically bundled - no installation required)
 - **Operating System**: 
   - **Linux** (Ubuntu/Debian/Mint recommended)
   - **Windows 10/11** (Windows 10+ recommended)
@@ -119,7 +129,7 @@ CPU mode runs entirely on your CPU without requiring CUDA toolkit or NVIDIA driv
 - **Models**: GGUF format (Auto-downloads **L3-8B-Stheno-v3.2** as default LLM and **nomic-embed-text-v2-moe** for Vector Chat)
 
 ### CPU Mode Requirements
-- **Python 3.12+** (Version **3.12.x** is recommended)
+- **Python 3.12.12** (Automatically bundled - no installation required)
 - **Operating System**: 
   - **Linux** (Ubuntu/Debian/Mint recommended)
   - **Windows 10/11** (Windows 10+ recommended)

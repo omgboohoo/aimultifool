@@ -55,7 +55,7 @@ def parse_args():
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.4.5"
+    TITLE = "aiMultiFool v0.4.6"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -204,7 +204,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         )
         with Horizontal(id="status-bar"):
             yield Static("Ready", id="status-text")
-            yield Static("aiMultiFool v0.4.5", id="status-version")
+            python_version = f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+            yield Static(f"{python_version} | aiMultiFool v0.4.6", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
