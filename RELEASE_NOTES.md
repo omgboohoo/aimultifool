@@ -51,7 +51,7 @@
   - **Action & Survival**: Time Loop Paradox, Superhero Origin, Wild West Showdown, Survival Island, Zombie Outbreak Patient Zero, Medieval Tournament Champion
   - **Romance & Erotic**: Forbidden Affair, Sensual Masquerade, Power Exchange, Tempting Roommate, Office Fantasy, Vampire's Seduction, Beach Encounter, Training Session, Stranger in the Bar, Neighbor's Secret, Fantasy Fulfillment, Reunion Passion, Sensual Massage, Dangerous Liaison, Awakening, Forced Proximity, Tempting Teacher, Midnight Encounter, Complete Surrender
 - **12 Random Scenario Generators**: Dynamic scenario generators that create unique roleplay scenarios on demand:
-  - Random Adventure Scenario, Random Fantasy Scenario, Random Sci-Fi Scenario, Random Horror Scenario, Random Mystery Scenario, Random Romance Scenario, Random Survival Scenario, Random Superhero Scenario, Random Historical Scenario, Random Modern Drama Scenario, Random Erotic Scenario, Random Completely Random Scenario
+  - Adventure, Fantasy, Sci-Fi, Horror, Mystery, Romance, Survival, Superhero, Historical, Modern Drama, Erotic, Completely Random
 - **Always Replace User**: Fixed `{{user}}` replacement to work regardless of character card loading status, ensuring scenarios work perfectly in all contexts.
 
 ### 🔧 Technical Improvements
