@@ -1,9 +1,9 @@
-# aiMultiFool v0.4.7
+# aiMultiFool v0.4.8
 
 **The Premium Cross-Platform Terminal-Based Sandbox for Private AI Roleplay.** 
 Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favorite SillyTavern character cards with zero lag and full privacy.
 
-*Vibe coded in Antigravity and Cursor using Linux Mint*
+*Vibe coded in Cursor using Linux Mint*
 
 ---
 
@@ -16,12 +16,11 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
 - **Narrative Styles**: Choose from **45 custom presets** covering a wide range of tones.
 - **On-Demand Encryption**: Secure individual character cards with **AES-256-GCM** encryption.
 - **Vector Chat (RAG)**: Enhance roleplay with long-term memory via local vector databases. Supports optional **AES-256-GCM** encryption for database payloads. Duplicate, rename, and manage multiple knowledge bases with ease.
+    > *Tip: Use Auto mode with Vector Chat to put the AI into a dream-like perpetuating state, continuously generating and storing content to build rich, interconnected narratives.*
 
 ### ⚡ AI & Performance
-- **Dual Inference Modes**: Support for both **Local GPU Inference** (via `llama.cpp`) and **Ollama API Inference** (via Ollama service). Seamlessly switch between modes without restarting the application.
 - **Local GPU Inference**: Direct `llama.cpp` integration for maximum privacy and control. Full GPU acceleration support with automatic layer optimization and caching.
 - **Ollama API Inference**: Use Ollama-managed models for flexible model management and access to models not available in GGUF format.
-- **Real-time Metrics**: Live TPS, Token counts, and Context % usage.
 - **Smart Pruning**: Automatically manages context window by trimming middle-history while preserving the System Prompt, first 3 exchanges (for early roleplay context), and the last message. Deletes messages one by one from the middle until reaching 60% context usage. Triggers at 85% context usage. Chat window automatically syncs to match the pruned context exactly.
 - **GPU/CPU Auto-Detection**: Optimized layer loading with configuration caching for faster subsequent loads.
 - **Advanced Parameters**: Precise control over Temperature, Top P, Top K, Repeat Penalty, and **Min P**.
@@ -33,11 +32,11 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
 
 ### 🛠️ Interface & Tools
 - **Minimalist TUI**: Pure Textual interface styled via external `.tcss` for fast, clean roleplay aesthetics.
-- **Theme Support**: Choose from 11 built-in themes including Textual Dark/Light, Catppuccin, Dracula, Gruvbox, Monokai, Nord, Solarized, Tokyo Night, and Flexoki. Themes apply consistently across the entire interface.
+- **Theme Support**: Choose from 11 built-in themes.
+- **Action Buttons**: Control chat interactions with Stop, Continue, Regenerate, Rewind, Suggest, Auto, Restart, and Clear buttons. **Suggest** generates AI-powered message suggestions based on context. **Auto** mode continuously generates and submits suggestions automatically, allowing stories to evolve hands-free until you press Stop. Auto mode is especially great for vector chat (RAG) as it automatically builds a vector database by generating and storing conversation exchanges continuously.
 - **Action Sidebar**: Right Sidebar containing roleplay tools and system prompts organized by category. Includes comprehensive analysis tools, scene management, character spawning, narrative control actions, and 40 engaging roleplay scenarios.
 - **Action Manager**: Full in-app manager with real-time search and category filtering. Create, edit, duplicate, delete, export, and import custom actions to build your perfect roleplay toolkit. Export all actions or specific categories for backup and sharing.
 - **Flexible Action System**: All roleplay tools are accessible through the unified action menu, including emotion analysis, character stats analysis, scene tools, and narrative controls. No dedicated buttons needed - everything is organized and searchable in one place.
-- **Context Window Viewer**: Inspect the raw JSON context and system prompts being sent to the LLM. Accessible via the About screen.
 
 ---
 
@@ -177,7 +176,7 @@ After installation, you can use **aiMultiFool** in two modes: **Local Inference*
 
 **Local Inference** runs models directly on your machine using `llama.cpp`, providing maximum privacy and control.
 
-1. **Launch the Application**: Run `./run_linux_gpu.sh` or `./run_linux_cpu.sh` (Linux) or `run_windows_gpu.bat` / `run_windows_cpu.bat` (Windows)
+1. **Launch the Application**
 2. **Download Default Models**: Click the **"Download Models"** button to automatically download:
    - **L3-8B-Stheno-v3.2-Q4_K_M** (Default LLM)
    - **nomic-embed-text-v2-moe.Q4_K_M** (Required for Vector Chat/RAG)
@@ -204,7 +203,7 @@ After installation, you can use **aiMultiFool** in two modes: **Local Inference*
    ollama pull nchapman/mn-12b-mag-mell-r1
    ```
 
-4. **Launch aiMultiFool**: Run `./run_linux_gpu.sh` or `./run_linux_cpu.sh` (Linux) or `run_windows_gpu.bat` / `run_windows_cpu.bat` (Windows)
+4. **Launch aiMultiFool**
 5. **Switch to Ollama Mode**: Click **"Ollama Inference"** to switch modes
 6. **Select Model**: Choose your downloaded Ollama model from the dropdown
 7. **Load Model**: Click **"Load Model"** and start chatting!

@@ -220,6 +220,10 @@ class InferenceMixin:
             self._inference_worker = None
             # Always release the lock
             _inference_lock.release()
+            # Check if auto mode is active and continue the cycle
+            if getattr(self, "_auto_mode_active", False):
+                # Schedule the next auto cycle using call_from_thread with a method that schedules async task
+                self.call_from_thread(self._schedule_auto_cycle)
 
     def load_model_task(self, model_path, context_size, requested_gpu_layers, inference_mode="local", needs_cleanup=False, old_llm=None):
         # Use manual threading with proper GIL release to prevent UI freezes on Windows
@@ -687,11 +691,19 @@ class ActionsMixin:
         # Use lock only to prevent concurrent stop calls, but release immediately
         async with self._get_actions_lock():
             await self._stop_generation_unlocked()
+            # Clear auto mode when stopping
+            was_auto_mode = getattr(self, "_auto_mode_active", False)
+            setattr(self, "_auto_mode_active", False)
+            # Update UI state if we were in auto mode
+            if was_auto_mode:
+                self.update_ui_state()
         # Lock is released here, making buttons immediately responsive
 
     async def action_reset_chat(self) -> None:
         # Serialize with actions lock to prevent race conditions from rapid clicking
         async with self._get_actions_lock():
+            # Clear auto mode
+            setattr(self, "_auto_mode_active", False)
             # 1. Stop the AI gracefully (same method as Clear/Wipe All)
             await self._stop_generation_unlocked()
             
@@ -800,9 +812,354 @@ class ActionsMixin:
             self.notify("Rewound last interaction.")
             self.focus_chat_input()
 
+    async def action_impersonate(self) -> None:
+        # Serialize with actions lock to prevent race conditions
+        async with self._get_actions_lock():
+            if self.is_loading:
+                await self._stop_generation_unlocked()
+                await self._wait_for_cleanup_if_needed()
+
+            # Wait for cleanup to finish if it's in progress
+            await self._wait_for_cleanup_if_needed()
+
+            # Final safety check before starting
+            if not await self._can_start_inference():
+                await self._wait_for_cleanup_if_needed(max_wait_seconds=1.0)
+                if not await self._can_start_inference():
+                    self.notify("Please wait for current operation to finish.", severity="warning")
+                    return
+
+            if not self.llm:
+                self.notify("Model not loaded! Load a model from the sidebar first.", severity="error")
+                return
+
+            # Set flag to prevent rapid clicking
+            if getattr(self, "_inference_starting", False):
+                return
+
+            setattr(self, "_inference_starting", True)
+            try:
+                # Start the impersonate generation in a worker thread
+                self.is_loading = True
+                self.status_text = "Generating suggestion..."
+                self._inference_worker = self._generate_user_message_suggestion()
+            finally:
+                await asyncio.sleep(0.1)
+                setattr(self, "_inference_starting", False)
+
+    def _schedule_auto_cycle(self) -> None:
+        """Schedule the next auto cycle. Called from main thread."""
+        try:
+            if getattr(self, "_auto_mode_active", False):
+                # Schedule async task using the app's event loop
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(self._auto_cycle())
+        except Exception:
+            pass
+
+    async def action_auto(self) -> None:
+        """Start auto mode: continuously generate suggestions and submit them automatically."""
+        # Serialize with actions lock to prevent race conditions
+        async with self._get_actions_lock():
+            if self.is_loading:
+                await self._stop_generation_unlocked()
+                await self._wait_for_cleanup_if_needed()
+
+            # Wait for cleanup to finish if it's in progress
+            await self._wait_for_cleanup_if_needed()
+
+            # Final safety check before starting
+            if not await self._can_start_inference():
+                await self._wait_for_cleanup_if_needed(max_wait_seconds=1.0)
+                if not await self._can_start_inference():
+                    self.notify("Please wait for current operation to finish.", severity="warning")
+                    return
+
+            if not self.llm:
+                self.notify("Model not loaded! Load a model from the sidebar first.", severity="error")
+                return
+
+            # Set auto mode flag
+            setattr(self, "_auto_mode_active", True)
+            self.notify("Auto mode started! Press Stop to end.", severity="information")
+            
+            # Update UI state to disable all buttons except Stop
+            self.update_ui_state()
+            
+            # Start the first auto cycle
+            await self._auto_cycle()
+
+    async def _auto_cycle(self) -> None:
+        """Generate a suggestion and auto-submit it. Called recursively if auto mode is active."""
+        # Small delay to avoid rapid-fire cycles
+        await asyncio.sleep(0.2)
+        
+        # Check if auto mode is still active
+        if not getattr(self, "_auto_mode_active", False):
+            return
+
+        # Set flag to prevent rapid clicking
+        if getattr(self, "_inference_starting", False):
+            return
+
+        setattr(self, "_inference_starting", True)
+        try:
+            # Start generating a suggestion that will auto-submit
+            self.is_loading = True
+            self.status_text = "Auto: Generating suggestion..."
+            self._inference_worker = self._generate_and_auto_submit_suggestion()
+        finally:
+            await asyncio.sleep(0.1)
+            setattr(self, "_inference_starting", False)
+
+    @work(exclusive=True, thread=True)
+    def _generate_user_message_suggestion(self):
+        """Generate a user message suggestion and populate it into the input box."""
+        try:
+            # Try to acquire the lock with a timeout
+            if not _inference_lock.acquire(timeout=5.0):
+                self.call_from_thread(self.notify, "Another inference is still running. Please wait.", severity="warning")
+                self.call_from_thread(setattr, self, "is_loading", False)
+                self.call_from_thread(setattr, self, "status_text", "Ready")
+                return
+
+            try:
+                if not self.llm:
+                    self.call_from_thread(self.notify, "Model not loaded!", severity="error")
+                    self.call_from_thread(setattr, self, "is_loading", False)
+                    self.call_from_thread(setattr, self, "status_text", "Ready")
+                    return
+
+                # Get current conversation context
+                messages_to_use = [msg.copy() for msg in self.messages]
+                
+                # Get user name
+                user_name = getattr(self, "user_name", "User")
+                
+                # Create a prompt asking the AI to generate what the user would say
+                impersonate_prompt = f"Generate a single message that {user_name} would say next in this roleplay conversation. Write only the message content, nothing else. Make it natural and appropriate for the current context."
+                
+                # Add the impersonate prompt as a user message (temporary)
+                messages_to_use.append({"role": "user", "content": impersonate_prompt})
+                
+                # Prune if needed
+                messages_to_use = prune_messages_if_needed(self.llm, messages_to_use, self.context_size)
+                
+                # Generate new random seed for each suggestion to get variety
+                seed = random.randint(0, 2**31 - 1)
+                
+                # Run inference with streaming to capture the response
+                stream = self.llm.create_chat_completion(
+                    messages=messages_to_use,
+                    max_tokens=min(200, self.context_size - 100),  # Limit to reasonable length
+                    temperature=self.temp,
+                    top_p=self.topp,
+                    top_k=self.topk,
+                    repeat_penalty=self.repeat,
+                    min_p=self.minp,
+                    seed=seed,
+                    stream=True
+                )
+                
+                # Collect the response
+                suggestion = ""
+                for output in stream:
+                    # Check for cancellation
+                    if self.is_loading == False:
+                        break
+                    
+                    text_chunk = output["choices"][0].get("delta", {}).get("content", "")
+                    if text_chunk:
+                        suggestion += text_chunk
+                
+                # Clean up the suggestion (remove any extra formatting)
+                suggestion = suggestion.strip()
+                
+                # Remove common prefixes/suffixes that might appear
+                suggestion = suggestion.replace(f"{user_name}:", "").strip()
+                suggestion = suggestion.replace('"', '').strip()
+                suggestion = suggestion.replace("'", "").strip()
+                
+                if suggestion:
+                    # Populate the input box with the suggestion
+                    def set_input_value():
+                        try:
+                            chat_input = self.query_one("#chat-input")
+                            chat_input.value = suggestion
+                            # Set cursor position to end of text (right side)
+                            chat_input.cursor_position = len(suggestion)
+                            self.focus_chat_input()
+                            self.notify("Suggestion generated! Edit and press Enter to send.", severity="information")
+                        except Exception as e:
+                            self.notify(f"Could not populate input: {e}", severity="warning")
+                    
+                    self.call_from_thread(set_input_value)
+                else:
+                    self.call_from_thread(self.notify, "Could not generate suggestion. Try again.", severity="warning")
+                    
+            except Exception as e:
+                self.call_from_thread(self.notify, f"Error generating suggestion: {e}", severity="error")
+            finally:
+                self.call_from_thread(setattr, self, "is_loading", False)
+                self.call_from_thread(setattr, self, "status_text", "Ready")
+                # Clear worker reference directly (like run_inference does)
+                self._inference_worker = None
+                _inference_lock.release()
+        except Exception as e:
+            self.call_from_thread(setattr, self, "is_loading", False)
+            self.call_from_thread(setattr, self, "status_text", "Ready")
+            # Clear worker reference on error too
+            self._inference_worker = None
+            self.call_from_thread(self.notify, f"Error: {e}", severity="error")
+
+    @work(exclusive=True, thread=True)
+    def _generate_and_auto_submit_suggestion(self):
+        """Generate a user message suggestion and automatically submit it."""
+        try:
+            # Try to acquire the lock with a timeout
+            if not _inference_lock.acquire(timeout=5.0):
+                self.call_from_thread(self.notify, "Another inference is still running. Please wait.", severity="warning")
+                self.call_from_thread(setattr, self, "is_loading", False)
+                self.call_from_thread(setattr, self, "status_text", "Ready")
+                return
+
+            try:
+                if not self.llm:
+                    self.call_from_thread(self.notify, "Model not loaded!", severity="error")
+                    self.call_from_thread(setattr, self, "is_loading", False)
+                    self.call_from_thread(setattr, self, "status_text", "Ready")
+                    return
+
+                # Get current conversation context
+                messages_to_use = [msg.copy() for msg in self.messages]
+                
+                # Get user name
+                user_name = getattr(self, "user_name", "User")
+                
+                # Create a prompt asking the AI to generate what the user would say
+                impersonate_prompt = f"Generate a single message that {user_name} would say next in this roleplay conversation. Write only the message content, nothing else. Make it natural and appropriate for the current context."
+                
+                # Add the impersonate prompt as a user message (temporary)
+                messages_to_use.append({"role": "user", "content": impersonate_prompt})
+                
+                # Prune if needed
+                messages_to_use = prune_messages_if_needed(self.llm, messages_to_use, self.context_size)
+                
+                # Generate new random seed for each suggestion to get variety
+                seed = random.randint(0, 2**31 - 1)
+                
+                # Run inference with streaming to capture the response
+                stream = self.llm.create_chat_completion(
+                    messages=messages_to_use,
+                    max_tokens=min(200, self.context_size - 100),  # Limit to reasonable length
+                    temperature=self.temp,
+                    top_p=self.topp,
+                    top_k=self.topk,
+                    repeat_penalty=self.repeat,
+                    min_p=self.minp,
+                    seed=seed,
+                    stream=True
+                )
+                
+                # Collect the response
+                suggestion = ""
+                for output in stream:
+                    # Check for cancellation and auto mode status
+                    if self.is_loading == False or not getattr(self, "_auto_mode_active", False):
+                        break
+                    
+                    text_chunk = output["choices"][0].get("delta", {}).get("content", "")
+                    if text_chunk:
+                        suggestion += text_chunk
+                
+                # Clean up the suggestion (remove any extra formatting)
+                suggestion = suggestion.strip()
+                
+                # Remove common prefixes/suffixes that might appear
+                suggestion = suggestion.replace(f"{user_name}:", "").strip()
+                suggestion = suggestion.replace('"', '').strip()
+                suggestion = suggestion.replace("'", "").strip()
+                
+                if suggestion and getattr(self, "_auto_mode_active", False):
+                    # Auto-submit the suggestion
+                    def auto_submit():
+                        try:
+                            # Check if auto mode is still active
+                            if not getattr(self, "_auto_mode_active", False):
+                                return
+                            
+                            # Schedule async submission
+                            loop = asyncio.get_event_loop()
+                            if loop.is_running():
+                                asyncio.create_task(self._auto_submit_message(suggestion))
+                        except Exception as e:
+                            self.notify(f"Could not auto-submit: {e}", severity="warning")
+                    
+                    self.call_from_thread(auto_submit)
+                else:
+                    if not getattr(self, "_auto_mode_active", False):
+                        self.call_from_thread(self.notify, "Auto mode stopped.", severity="information")
+                    else:
+                        self.call_from_thread(self.notify, "Could not generate suggestion. Auto mode stopped.", severity="warning")
+                        self.call_from_thread(setattr, self, "_auto_mode_active", False)
+                    
+            except Exception as e:
+                self.call_from_thread(self.notify, f"Error generating suggestion: {e}", severity="error")
+                self.call_from_thread(setattr, self, "_auto_mode_active", False)
+            finally:
+                self.call_from_thread(setattr, self, "is_loading", False)
+                self.call_from_thread(setattr, self, "status_text", "Ready")
+                # Clear worker reference directly (like run_inference does)
+                self._inference_worker = None
+                _inference_lock.release()
+        except Exception as e:
+            self.call_from_thread(setattr, self, "is_loading", False)
+            self.call_from_thread(setattr, self, "status_text", "Ready")
+            self.call_from_thread(setattr, self, "_auto_mode_active", False)
+            self.call_from_thread(self.notify, f"Error: {e}", severity="error")
+
+    async def _auto_submit_message(self, user_text: str) -> None:
+        """Submit a message automatically and start inference, then continue auto cycle if active."""
+        async with self._get_actions_lock():
+            # Wait for cleanup to finish if it's in progress
+            await self._wait_for_cleanup_if_needed()
+
+            # Final safety check before starting
+            if not await self._can_start_inference():
+                await self._wait_for_cleanup_if_needed(max_wait_seconds=1.0)
+                if not await self._can_start_inference():
+                    # If we can't start, stop auto mode
+                    self._auto_mode_active = False
+                    self.notify("Auto mode stopped: cannot start inference.", severity="warning")
+                    return
+
+            # Check if auto mode is still active
+            if not getattr(self, "_auto_mode_active", False):
+                return
+
+            # Set flag to prevent rapid submissions
+            if getattr(self, "_inference_starting", False):
+                return
+
+            setattr(self, "_inference_starting", True)
+            try:
+                # Add user message to conversation
+                await self.add_message("user", user_text)
+                
+                # Set loading state and start inference
+                self.is_loading = True
+                self.status_text = "Auto: AI responding..."
+                self._inference_worker = self.run_inference(user_text)
+            finally:
+                await asyncio.sleep(0.1)
+                setattr(self, "_inference_starting", False)
+
     async def action_wipe_all(self) -> None:
         # Serialize with actions lock to prevent race conditions from rapid clicking
         async with self._get_actions_lock():
+            # Clear auto mode
+            setattr(self, "_auto_mode_active", False)
             await self._stop_generation_unlocked()
             await self._wait_for_cleanup_if_needed()
             

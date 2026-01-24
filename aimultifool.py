@@ -56,7 +56,7 @@ def parse_args():
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.4.7"
+    TITLE = "aiMultiFool v0.4.8"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -99,6 +99,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     seed = reactive(None)  # Random seed for inference
     _inference_worker = None
     _last_action_list = None
+    _auto_mode_active = False  # Track if auto mode is active
 
     def notify(self, message: str, *, title: str = "", severity: str = "information", timeout: float = 1.5) -> None:
         """Override notify to halve the default display time."""
@@ -128,6 +129,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                         Button("Continue", id="btn-continue", variant="default"),
                         Button("Regenerate", id="btn-regenerate", variant="default"),
                         Button("Rewind", id="btn-rewind", variant="default"),
+                        Button("Suggest", id="btn-impersonate", variant="default"),
+                        Button("Auto", id="btn-auto", variant="default"),
                         Button("Restart", id="btn-restart", variant="default"),
                         Button("New", id="btn-clear-chat", variant="default"),
                         Button("Buy Coffee", id="btn-buy-coffee", variant="default"),
@@ -208,7 +211,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             yield Static("Ready", id="status-text")
             python_version = f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
             yield Static("", id="status-seed")
-            yield Static(f"{python_version} | aiMultiFool v0.4.7", id="status-version")
+            yield Static(f"{python_version} | aiMultiFool v0.4.8", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -281,14 +284,22 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
 
     def watch_is_loading(self, is_loading: bool) -> None:
         """Called when is_loading (inference) changes."""
-        # Allow typing while loading
-        self.query_one("#chat-input").disabled = False
-        self.query_one("#btn-stop").disabled = not is_loading
+        # Allow typing while loading (unless in auto mode)
+        is_auto_mode = getattr(self, "_auto_mode_active", False)
+        if not is_auto_mode:
+            self.query_one("#chat-input").disabled = False
+        else:
+            # Disable input during auto mode
+            self.query_one("#chat-input").disabled = True
+        
+        # Stop button should be enabled if loading OR if auto mode is active
+        self.query_one("#btn-stop").disabled = not (is_loading or is_auto_mode)
         
         # Sync visibility
         try:
-            self.query_one("#btn-stop").display = is_loading
-            self.query_one("#btn-continue").display = not is_loading
+            self.query_one("#btn-stop").display = is_loading or is_auto_mode
+            # Hide Continue button during auto mode, otherwise show when not loading
+            self.query_one("#btn-continue").display = not is_loading and not is_auto_mode
             # Regenerate button stays visible during generation so user can stop and regen
             self.query_one("#btn-regenerate").display = True
         except Exception:
@@ -343,6 +354,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         is_busy = self.is_model_loading or self.is_downloading
         # Also disable action menu while AI is actively generating
         is_ai_generating = self.is_loading
+        # Check if auto mode is active
+        is_auto_mode = getattr(self, "_auto_mode_active", False)
         
         # Query both the main app and the active screen to ensure modals are covered
         all_buttons = list(self.query(Button))
@@ -377,12 +390,20 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             if btn.id == "btn-download-models":
                 continue
 
+            # During auto mode, only Stop button should be enabled
+            if is_auto_mode:
+                if btn.id == "btn-stop":
+                    btn.disabled = False  # Stop button always enabled during auto mode
+                else:
+                    btn.disabled = True  # All other buttons disabled during auto mode
+                continue
+
             # Disable top menu buttons when AI is generating
             if btn.id in ["btn-file", "btn-misc", "btn-theme", "btn-cards", "btn-parameters", "btn-model-settings", "btn-manage-actions", "btn-vector-chat", "btn-toggle-sidebar"]:
                 btn.disabled = is_ai_generating
-            elif btn.id in ["btn-continue", "btn-regenerate", "btn-rewind", "btn-restart", "btn-clear-chat"]:
+            elif btn.id in ["btn-continue", "btn-regenerate", "btn-rewind", "btn-impersonate", "btn-auto", "btn-restart", "btn-clear-chat"]:
                 # Disable if busy OR if no model is loaded OR if AI is generating
-                # Regenerate and rewind are always disabled while AI is speaking
+                # Regenerate, rewind, suggest, and auto are always disabled while AI is generating
                 btn.disabled = is_busy or not self.llm or is_ai_generating
             elif btn.id == "btn-clear-search":
                 # Only enabled if there is text in the search box
@@ -398,7 +419,11 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         if self.screen:
             all_selects.extend(list(self.screen.query(Select)))
         for select in all_selects:
-            select.disabled = is_busy
+            if select.id == "select-style":
+                # Disable style select during auto mode or when busy
+                select.disabled = is_busy or is_auto_mode
+            else:
+                select.disabled = is_busy
             
         all_inputs = list(self.query(Input))
         if self.screen:
@@ -406,10 +431,14 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         for inp in all_inputs:
             if inp.id == "chat-input":
                 # Disable chat input while busy or no model loaded (but NOT during normal AI generation)
-                inp.disabled = is_busy or not self.llm
+                # Also disable during auto mode
+                inp.disabled = is_busy or not self.llm or is_auto_mode
             elif inp.id == "input-username":
-                # Disable username field while AI is generating
-                inp.disabled = is_busy or is_ai_generating
+                # Disable username field while AI is generating or during auto mode
+                inp.disabled = is_busy or is_ai_generating or is_auto_mode
+            elif inp.id == "input-action-search":
+                # Disable action menu search during auto mode
+                inp.disabled = is_busy or is_auto_mode
             else:
                 inp.disabled = is_busy
             
@@ -427,12 +456,12 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             pass
 
         # Action lists and collapsibles on both
-        # Disable action menu while AI is actively generating to prevent conflicts
+        # Disable action menu while AI is actively generating or during auto mode to prevent conflicts
         for root in [self, self.screen]:
             for lv in root.query(".action-list"):
-                lv.disabled = is_busy or not self.llm or is_ai_generating
+                lv.disabled = is_busy or not self.llm or is_ai_generating or is_auto_mode
             for collapsible in root.query(Collapsible):
-                collapsible.disabled = is_busy or is_ai_generating
+                collapsible.disabled = is_busy or is_ai_generating or is_auto_mode
 
     def update_model_list(self):
         """Update model list on the active ModelScreen if it's open."""
@@ -928,6 +957,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
              self.push_screen(ModelScreen(), self.model_screen_callback)
         elif event.button.id == "btn-restart": await self.action_reset_chat()
         elif event.button.id == "btn-rewind": await self.action_rewind()
+        elif event.button.id == "btn-impersonate": await self.action_impersonate()
+        elif event.button.id == "btn-auto": await self.action_auto()
         elif event.button.id == "btn-clear-chat": await self.action_wipe_all()
         elif event.button.id == "btn-buy-coffee": webbrowser.open("https://ko-fi.com/aimultifool")
         elif event.button.id == "btn-manage-actions":

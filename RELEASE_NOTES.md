@@ -1,5 +1,28 @@
 # Release Notes
 
+## v0.4.8: AI-Powered Message Suggestions & Auto Mode
+### 💡 New Feature: Suggest Button
+- **AI Message Suggestions**: Added a "Suggest" button next to the Rewind button that generates AI-powered message suggestions for the user in the current roleplay context.
+- **Smart Context Awareness**: Suggestions are generated based on the full conversation history, ensuring they fit naturally into the ongoing roleplay.
+- **Random Seed Variety**: Each suggestion uses a random seed, ensuring different suggestions each time you press the button.
+- **Seamless Integration**: Generated suggestions are automatically populated into the chat input box with the cursor positioned at the end, ready to edit or send.
+- **User Control**: Users can press Suggest multiple times to get different suggestions, edit them as needed, or send them directly.
+
+### 🤖 New Feature: Auto Mode
+- **Automatic Story Evolution**: Added an "Auto" button that continuously generates user message suggestions and automatically submits them, allowing the story to evolve automatically without manual intervention.
+- **Continuous Cycle**: Auto mode generates a suggestion, submits it to the AI, waits for the AI response, then generates another suggestion in an endless cycle.
+- **Stop Control**: Auto mode only stops when the user presses the Stop button, giving full control over when to pause the automatic story progression.
+- **Random Seed Variety**: Each auto-generated suggestion uses a random seed, ensuring varied and natural story progression.
+- **Vector Chat Integration**: Auto mode is especially great for vector chat (RAG) as it automatically builds a vector database by generating and storing conversation exchanges continuously, creating a rich knowledge base for future roleplay sessions.
+- **Dream-Like Perpetuating State**: Combine Auto mode with Vector Chat to create a dream-like perpetuating state where the AI continuously generates and stores interconnected content, building rich, evolving narratives that reference and build upon previous exchanges stored in the vector database.
+- **UI Lockdown**: During auto mode, all buttons except Stop are disabled, and the action menu, style selector, and username field are also disabled to prevent interference.
+
+### 🔧 Technical Improvements
+- **Thread-Safe Generation**: Suggestion generation runs in a separate worker thread with proper locking to prevent race conditions.
+- **Proper State Management**: Suggest and Auto buttons follow the same disable logic as other action buttons (disabled when AI is generating).
+- **Clean Text Processing**: Suggestions are automatically cleaned of formatting artifacts like quotes and user name prefixes.
+- **Auto Mode State Management**: Comprehensive UI state management ensures all interactive elements are properly disabled during auto mode to prevent conflicts.
+
 ## v0.4.7: Random Seed Management for Chat Variety
 ### 🎲 New Feature: Automatic Seed Management
 - **Random Seed Generation**: Each new chat session now automatically generates a fresh random seed, ensuring different outputs even with identical prompts.

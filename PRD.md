@@ -1,4 +1,4 @@
-# System Reference Document: aiMultiFool v0.4.7
+# System Reference Document: aiMultiFool v0.4.8
 
 ## 1. Executive Summary
 aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox. It leverages **Textual** for a responsive, desktop-class TUI and supports dual inference modes: **llama-cpp-python** for high-performance local GPU inference and **Ollama API** for flexible model management. The architecture prioritizes separation of concerns via a Mixin pattern, enabling clean extensibility for theming, encryption, and complex character logic.
@@ -157,7 +157,7 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **Chat Scroll Area**: Displays conversation history with role-based styling (user messages bold, assistant messages normal).
 - **Status Bar**: Shows current model name, generation status, TPS, token counts, and context usage.
 - **Top Menu Bar**: Provides access to all major features via buttons.
-- **Action Buttons**: Located below the chat input, includes Stop, Continue, Regenerate, Rewind, Restart, and Clear buttons for controlling chat interactions.
+- **Action Buttons**: Located below the chat input, includes Stop, Continue, Regenerate, Rewind, Suggest, Auto, Restart, and Clear buttons for controlling chat interactions. Suggest generates AI-powered message suggestions, while Auto continuously generates and submits suggestions automatically.
 - **Right Sidebar**: Contains user settings (username, style) and action menu with search. The action menu provides access to all roleplay tools including emotion analysis, character stats analysis, scene management, and narrative controls.
 
 ### 5.2 Modal Screens
@@ -268,10 +268,12 @@ Legacy format chats with `model_settings` are still supported for loading, but t
 ## 7. Actions & Features
 
 ### 7.1 Core Actions
-- **Stop Generation**: Gracefully stops ongoing AI generation.
+- **Stop Generation**: Gracefully stops ongoing AI generation. Also stops auto mode if active.
 - **Continue**: Triggers AI to continue from where it left off.
 - **Regenerate**: Removes the last assistant message and re-runs inference with the same user prompt.
 - **Rewind**: Undoes the last user/assistant exchange, restoring previous state.
+- **Suggest**: Generates AI-powered message suggestions for the user based on current roleplay context. Suggestions are populated into the input box for editing or sending.
+- **Auto**: Continuously generates user message suggestions and automatically submits them, allowing the story to evolve automatically. Only stops when the user presses Stop. During auto mode, all UI elements except Stop are disabled to prevent interference.
 - **Restart**: Restarts conversation from the beginning while preserving character and style settings.
 - **New**: Clears context window and starts new chat.
 
