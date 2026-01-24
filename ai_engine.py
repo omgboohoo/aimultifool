@@ -44,34 +44,6 @@ def get_models(inference_mode: str = "local") -> List[Union[Path, str]]:
         model_files = [m for m in models_dir.glob("*.gguf") if "nomic" not in m.name.lower() and "embed" not in m.name.lower()]
         return sorted(model_files)
 
-def get_model_cache_path():
-    """Get path to model configuration cache file"""
-    return Path(__file__).parent / "model_cache.json"
-
-def load_model_cache():
-    """Load model configuration cache"""
-    cache_path = get_model_cache_path()
-    if cache_path.exists():
-        try:
-            with open(cache_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            return {}
-    return {}
-
-def save_model_cache(cache):
-    """Save model configuration cache"""
-    cache_path = get_model_cache_path()
-    try:
-        with open(cache_path, 'w', encoding='utf-8') as f:
-            json.dump(cache, f, indent=2)
-    except IOError:
-        pass
-
-def get_cache_key(model_path, context_size):
-    """Generate cache key for model path and context size"""
-    return f"{model_path}:{context_size}"
-
 def count_tokens_in_messages(llm, messages):
     """Count total tokens in message history"""
     if not llm:

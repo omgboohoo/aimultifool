@@ -50,13 +50,13 @@ from widgets import MessageWidget, CharactersScreen, ParametersScreen, MiscScree
 def parse_args():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description="aiMultiFool - Textual TUI chat app")
-    parser.add_argument("--cpu", action="store_true", help="Run in CPU-only mode (disables GPU layers and model cache)")
+    parser.add_argument("--cpu", action="store_true", help="Run in CPU-only mode (disables GPU layers)")
     return parser.parse_args()
 
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.4.8"
+    TITLE = "aiMultiFool v0.4.9"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -95,6 +95,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     vector_chat_name = reactive(None)
     enable_vector_chat = reactive(False)
     force_ai_speak_first = reactive(True)
+    user_text_color = reactive("green")
     cpu_mode = reactive(False)
     seed = reactive(None)  # Random seed for inference
     _inference_worker = None
@@ -211,7 +212,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             yield Static("Ready", id="status-text")
             python_version = f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
             yield Static("", id="status-seed")
-            yield Static(f"{python_version} | aiMultiFool v0.4.8", id="status-version")
+            yield Static(f"{python_version} | aiMultiFool v0.4.9", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
@@ -235,6 +236,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         self.ollama_url = ollama_url_setting if ollama_url_setting and ollama_url_setting.strip() else "127.0.0.1:11434"
         self.theme = settings.get("theme", "textual-dark")
         self.speech_styling = settings.get("speech_styling", "highlight")
+        self.user_text_color = settings.get("user_text_color", "green")
         self.force_ai_speak_first = settings.get("force_ai_speak_first", True)
         
         # Defer character list update until Cards screen is opened
@@ -528,7 +530,8 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             "inference_mode": getattr(self, "inference_mode", "local"),
             "ollama_url": getattr(self, "ollama_url", "127.0.0.1:11434"),
             "theme": self.theme,
-            "speech_styling": self.speech_styling
+            "speech_styling": self.speech_styling,
+            "user_text_color": self.user_text_color
         }
         save_settings(settings)
 

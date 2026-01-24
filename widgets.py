@@ -389,7 +389,10 @@ class MessageWidget(Static):
 
     def render(self):
         if self.role == "user":
-            return Text(self.content, style="bold")
+            # Get user text color setting from app
+            user_text_color = getattr(self.app, "user_text_color", "green")
+            # Always apply bold, then add the color
+            return Text(self.content, style=f"bold {user_text_color}")
         elif self.role == "system":
             return Text(self.content, style="italic")
         else:
@@ -2033,6 +2036,13 @@ class ThemeScreen(ModalScreen):
             self.query_one("#select-speech-styling").value = speech_styling
         except Exception:
             pass
+        
+        # Set current user text color in the selector
+        user_text_color = getattr(self.app, "user_text_color", "green")
+        try:
+            self.query_one("#select-user-text-color").value = user_text_color
+        except Exception:
+            pass
 
     def compose(self) -> ComposeResult:
         # All built-in Textual themes
@@ -2070,6 +2080,27 @@ class ThemeScreen(ModalScreen):
                     allow_blank=False
                 ),
                 classes="sidebar-setting-group"
+            ),
+            Container(
+                Label("User Text Color", classes="sidebar-label"),
+                Select(
+                    [
+                        ("White", "white"),
+                        ("Green", "green"),
+                        ("Yellow", "yellow"),
+                        ("Blue", "blue"),
+                        ("Cyan", "cyan"),
+                        ("Magenta", "magenta"),
+                        ("Red", "red"),
+                        ("Orange", "orange"),
+                        ("Purple", "purple"),
+                        ("Pink", "pink"),
+                    ],
+                    id="select-user-text-color",
+                    value=getattr(self.app, "user_text_color", "green"),
+                    allow_blank=False
+                ),
+                classes="sidebar-setting-group user-text-color-group"
             ),
             Horizontal(
                 Button("Close", variant="default", id="btn-close-theme"),
@@ -2110,6 +2141,24 @@ class ThemeScreen(ModalScreen):
                     pass
             except Exception as e:
                 self.app.notify(f"Error saving speech styling: {e}", severity="error")
+        elif event.select.id == "select-user-text-color":
+            try:
+                user_text_color = event.value
+                if hasattr(self.app, 'user_text_color'):
+                    self.app.user_text_color = user_text_color
+                # Save to settings
+                if hasattr(self.app, 'save_user_settings'):
+                    self.app.save_user_settings()
+                # Refresh message widgets to apply new color
+                try:
+                    chat_scroll = self.app.query_one("#chat-scroll")
+                    for widget in chat_scroll.query(MessageWidget):
+                        if widget.role == "user":
+                            widget.refresh()
+                except Exception:
+                    pass
+            except Exception as e:
+                self.app.notify(f"Error saving user text color: {e}", severity="error")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-close-theme":

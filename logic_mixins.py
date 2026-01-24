@@ -13,7 +13,6 @@ import sys
 
 # Imports for functional logic
 from ai_engine import (
-    load_model_cache, save_model_cache, get_cache_key, 
     count_tokens_in_messages, prune_messages_if_needed,
     get_models
 )
@@ -303,36 +302,26 @@ class InferenceMixin:
         cpu_mode = getattr(self, "cpu_mode", False)
         
         if requested_gpu_layers == 0 or cpu_mode:
-            # CPU mode: only try 0 layers, skip cache
+            # CPU mode: only try 0 layers
             layers_to_try = [0]
         else:
-            # GPU mode: use cache if available
-            cache = load_model_cache()
-            cache_key = get_cache_key(model_path_str, context_size)
-            
-            cached_layers = None
-            if cache_key in cache:
-                cached_layers = cache[cache_key].get("gpu_layers")
-            
-            layers_to_try = []
-            if cached_layers is not None:
-                layers_to_try = [cached_layers]
-                if cached_layers != requested_gpu_layers:
-                    layers_to_try.append(requested_gpu_layers)
-            else:
-                layers_to_try = [requested_gpu_layers]
+            # GPU mode: start with requested layers and work down if needed
+            layers_to_try = [requested_gpu_layers]
             
             if requested_gpu_layers == -1:
+                # For -1 (all layers), try from 64 down to 0 in steps of 4
                 fallback = list(range(64, -1, -4))
                 for layer in fallback:
                     if layer not in layers_to_try:
                         layers_to_try.append(layer)
             else:
+                # For specific layer count, step down by 4 until we get to 0
                 current = requested_gpu_layers
-                while current > 4:
-                    current = current // 2
+                while current > 0:
+                    current = max(0, current - 4)
                     if current not in layers_to_try:
                         layers_to_try.append(current)
+                # Ensure 0 is always included as final fallback
                 if 0 not in layers_to_try:
                     layers_to_try.append(0)
 
@@ -380,14 +369,6 @@ class InferenceMixin:
                             verbose=False,
                         )
                         actual_layers = int(layers)
-                        
-                        # Cache the successful result (only if not in CPU mode)
-                        cpu_mode = getattr(self, "cpu_mode", False)
-                        if not cpu_mode:
-                            cache = load_model_cache()
-                            cache_key = get_cache_key(model_path_str, context_size)
-                            cache[cache_key] = {"gpu_layers": layers, "model_path": model_path_str, "context_size": int(context_size)}
-                            save_model_cache(cache)
                         break
                     except Exception as e:
                         last_err = e

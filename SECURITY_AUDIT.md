@@ -1,5 +1,5 @@
 # Security & Privacy Audit
-**Application**: aiMultiFool v0.4.8
+**Application**: aiMultiFool v0.4.9
 **Status**: ✅ Fully Private / Offline-Ready
 
 ## 1. Executive Summary
@@ -37,7 +37,6 @@ aiMultiFool is designed with a "Privacy First" architecture. All Large Language 
 ## 3. Data Persistence & Storage
 
 ### 📁 Technical Config (Local Only)
-- **`model_cache.json`**: Maps model paths to successful GPU layer counts to speed up loading.
 - **`settings.json`**: Persists UI preferences (Username, Context Size, Sampling Params).
 - **`action_menu.json`**: Stores your custom roleplay prompts.
 - **`python_portable/`**: Contains the bundled Python 3.12.12 distribution (downloaded on first launch, cached locally).

@@ -428,6 +428,10 @@ ActionsManagerScreen {
     margin-bottom: 1;
 }
 
+#theme-dialog .user-text-color-group {
+    margin-top: 1;
+}
+
 .about-buttons-list {
     margin: 1 0;
     height: auto;

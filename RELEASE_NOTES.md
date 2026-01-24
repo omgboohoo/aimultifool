@@ -1,5 +1,18 @@
 # Release Notes
 
+## v0.4.9: User Text Color Customization & Model Cache Removal
+### 🎨 New Feature: User Text Color Selection
+- **Customizable User Text Color**: Added a "User Text Color" dropdown in the Theme Settings modal, allowing users to customize the color of their messages in the chat window.
+- **Color Options**: Choose from White, Green, Yellow, Blue, Cyan, Magenta, Red, Orange, Purple, or Pink.
+- **Persistent Settings**: User text color preference is saved to `settings.json` and persists across app restarts.
+- **Default Color**: Defaults to green if no setting is saved.
+- **Always Bold**: User messages remain bold regardless of color selection.
+
+### 🔧 Technical Improvements
+- **Removed Model Cache**: Completely removed the `model_cache.json` system to eliminate race condition risks when running multiple instances.
+- **Simplified GPU Layer Fallback**: GPU layer selection now always starts from the user's manually chosen layer count and works down automatically if needed.
+- **Improved Fallback Steps**: GPU layer fallback now steps down by 4 layers at a time (e.g., 40 → 36 → 32 → 28...) instead of halving, providing finer-grained fallback behavior.
+
 ## v0.4.8: AI-Powered Message Suggestions & Auto Mode
 ### 💡 New Feature: Suggest Button
 - **AI Message Suggestions**: Added a "Suggest" button next to the Rewind button that generates AI-powered message suggestions for the user in the current roleplay context.
@@ -86,11 +99,10 @@
 - **Separate Run Scripts**: Added dedicated `run_linux_gpu.sh`/`run_windows_gpu.bat` and `run_linux_cpu.sh`/`run_windows_cpu.bat` scripts for GPU and CPU modes respectively.
 - **Independent Virtual Environments**: Each mode uses its own virtual environment (`venv_gpu` or `venv_cpu`) to prevent dependency conflicts.
 - **CPU Mode Simplification**: CPU mode no longer requires CUDA toolkit installation, making it perfect for systems without NVIDIA GPUs.
-- **CPU Mode Flag**: Added `--cpu` command-line flag to disable GPU layers control and model cache in CPU mode.
+- **CPU Mode Flag**: Added `--cpu` command-line flag to disable GPU layers control in CPU mode.
 
 ### 🔧 Technical Improvements
 - **CPU Mode Detection**: App automatically detects CPU mode and hides GPU layers control in Model Settings modal.
-- **Model Cache Disabled**: Model cache is completely disabled in CPU mode (no reading or writing).
 - **GPU Layers Default**: GPU mode now defaults to -1 (all GPU layers) instead of 0 (CPU only).
 - **Settings Management**: GPU layers automatically reset to -1 when switching from CPU mode to GPU mode.
 

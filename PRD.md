@@ -1,4 +1,4 @@
-# System Reference Document: aiMultiFool v0.4.8
+# System Reference Document: aiMultiFool v0.4.9
 
 ## 1. Executive Summary
 aiMultiFool is a **hackable, modular, and privacy-centric** AI Roleplay Sandbox. It leverages **Textual** for a responsive, desktop-class TUI and supports dual inference modes: **llama-cpp-python** for high-performance local GPU inference and **Ollama API** for flexible model management. The architecture prioritizes separation of concerns via a Mixin pattern, enabling clean extensibility for theming, encryption, and complex character logic.
@@ -119,7 +119,7 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
     2. The first 3 exchanges (3 user prompts + 3 AI replies, indices 1-6) - Always preserved to maintain early roleplay context
     3. The last message - Always preserved to maintain conversation flow
 - **Pruning Strategy**: Messages are deleted one by one from index 7 (right after the preserved section) until the token count reaches 60% of context_size or below. This simple approach ensures early scene setup and character introductions remain intact while maintaining recent conversation flow. The chat window UI is automatically rebuilt to match the pruned context window exactly.
-- **Caching**: The system caches successful GPU layer configurations in `model_cache.json` to speed up subsequent loads of the same model.
+- **GPU Layer Fallback**: The system automatically steps down from the user's manually chosen GPU layer count in increments of 4 if the selected count doesn't fit in available GPU memory (e.g., 40 → 36 → 32 → 28... down to 0).
 
 ### 4.4 Character Cards (V2 Spec)
 - **Format**: SillyTavern-compatible PNGs.
@@ -257,7 +257,6 @@ Legacy format chats with `model_settings` are still supported for loading, but t
 
 ### 6.4 Data Files
 - **`settings.json`**: User preferences and model configuration.
-- **`model_cache.json`**: Cached GPU layer configurations for faster model loading.
 - **`action_menu.json`**: User-defined actions and system prompts.
 - **`chats/*.json`**: Saved conversation histories (optionally encrypted).
 - **`characters/*.png`**: Character card files (optionally encrypted).
@@ -280,8 +279,7 @@ Legacy format chats with `model_settings` are still supported for loading, but t
 ### 7.2 Model Management
 - **Dual Inference Modes**: Support for both Local GPU inference and Ollama API inference with seamless switching.
 - **Local Mode**: 
-  - Automatic GPU layer detection with fallback strategies
-  - Model caching: Successful GPU layer configurations are cached for faster subsequent loads
+  - Automatic GPU layer detection with fallback strategies (steps down by 4 layers if selected count doesn't fit)
   - Proper cleanup of old models before loading new ones to prevent CUDA errors
 - **Ollama Mode**:
   - Automatic detection of Ollama service availability
