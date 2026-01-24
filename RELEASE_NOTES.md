@@ -11,7 +11,7 @@
 ### 🔧 Technical Improvements
 - **Removed Model Cache**: Completely removed the `model_cache.json` system to eliminate race condition risks when running multiple instances.
 - **Simplified GPU Layer Fallback**: GPU layer selection now always starts from the user's manually chosen layer count and works down automatically if needed.
-- **Improved Fallback Steps**: GPU layer fallback now steps down by 4 layers at a time (e.g., 40 → 36 → 32 → 28...) instead of halving, providing finer-grained fallback behavior.
+- **Improved Fallback Steps**: GPU layer fallback now steps down by 4 layers at a time (e.g., 40 → 36 → 32 → 28...)
 
 ## v0.4.8: AI-Powered Message Suggestions & Auto Mode
 ### 💡 New Feature: Suggest Button
