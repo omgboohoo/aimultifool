@@ -29,6 +29,7 @@ classDiagram
     InferenceMixin <|-- AiMultiFoolApp
     ActionsMixin <|-- AiMultiFoolApp
     UIMixin <|-- AiMultiFoolApp
+    VectorMixin <|-- AiMultiFoolApp
     
     class AiMultiFoolApp {
         +run()
@@ -45,6 +46,10 @@ classDiagram
     class UIMixin {
         +sync_chat_ui()
         +update_status()
+    }
+    class VectorMixin {
+        +vector_chat_enabled()
+        +save_vector_context()
     }
 ```
 
@@ -166,7 +171,7 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **CharactersScreen**: Character card browser with search, load, and unified metadata editor with AI-assisted editing.
 - **ActionsManagerScreen**: Unified action menu management with search, filtering, category organization, export/import, and category deletion. Includes file picker modal for user-friendly import operations.
 - **ChatManagerScreen**: Save and load conversation histories with optional encryption.
-- **ThemeScreen**: Theme selection and speech styling options.
+- **ThemeScreen**: Theme selection, speech styling options, and user text color customization. Provides dropdown selectors for all three settings with real-time preview updates.
 - **MiscScreen**: About screen with links to website, Discord, and support. Also provides access to the Context Window Viewer.
 - **ContextWindowScreen**: Inspect the raw JSON context and system prompts being sent to the LLM. Accessible via the About (Misc) screen.
 
@@ -178,10 +183,11 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **Ctrl+Shift+W**: Clear chat history completely
 - **Ctrl+Q**: Quit Application
 
-### 5.4 Speech Styling
-- **Modes**: Three speech styling options (None, Inversed, Highlight) for quoted text and dialogue in AI responses.
-- **Real-time Updates**: Speech styling changes apply immediately to existing messages without requiring a restart.
-- **Persistence**: Speech styling preference is saved to `settings.json`.
+### 5.4 Speech Styling & User Text Color
+- **Speech Styling Modes**: Three speech styling options (None, Inversed, Highlight) for quoted text and dialogue in AI responses.
+- **User Text Color**: Customizable color for user messages in the chat window. Options include White, Green, Yellow, Blue, Cyan, Magenta, Red, Orange, Purple, and Pink. User messages remain bold regardless of color selection.
+- **Real-time Updates**: Both speech styling and user text color changes apply immediately to existing messages without requiring a restart.
+- **Persistence**: Speech styling and user text color preferences are saved to `settings.json`.
 
 ---
 
@@ -220,7 +226,9 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
     "repeat": 1.0,
     "minp": 0.0,
     "theme": "textual-dark",
-    "speech_styling": "highlight"
+    "speech_styling": "highlight",
+    "user_text_color": "green",
+    "force_ai_speak_first": true
 }
 ```
 
@@ -228,7 +236,9 @@ The application uses Textual's CSS system with theme variables (`$primary`, `$ac
 - **`inference_mode`**: Either `"local"` or `"ollama"` - determines which inference backend to use
 - **`ollama_url`**: Ollama server URL (default: `"127.0.0.1:11434"`) - only used when `inference_mode` is `"ollama"`
 - **`selected_model`**: Model path (local mode) or Ollama model name (Ollama mode)
-- **`gpu_layers`**: Only applicable in local mode - number of GPU layers to offload
+- **`gpu_layers`**: Only applicable in local mode - number of GPU layers to offload (-1 for all layers, 0 for CPU only)
+- **`user_text_color`**: Color for user messages in chat (options: white, green, yellow, blue, cyan, magenta, red, orange, purple, pink)
+- **`force_ai_speak_first`**: Boolean controlling whether AI generates first message automatically when loading a character card
 
 ### 6.2 Saved Chat Format
 **Current Format**:
@@ -278,9 +288,11 @@ Legacy format chats with `model_settings` are still supported for loading, but t
 
 ### 7.2 Model Management
 - **Dual Inference Modes**: Support for both Local GPU inference and Ollama API inference with seamless switching.
+- **CPU Mode Support**: The application supports CPU-only mode via command-line flag (`--cpu`), which disables GPU layer controls and forces CPU-only inference. Useful for systems without NVIDIA GPUs or when GPU acceleration is not desired.
 - **Local Mode**: 
-  - Automatic GPU layer detection with fallback strategies (steps down by 4 layers if selected count doesn't fit)
+  - Manual GPU layer selection with automatic fallback strategies (steps down by 4 layers if selected count doesn't fit)
   - Proper cleanup of old models before loading new ones to prevent CUDA errors
+  - GPU layer options: -1 (try all layers with fallback), 0 (CPU only), or specific layer count (8-128 in steps of 8)
 - **Ollama Mode**:
   - Automatic detection of Ollama service availability
   - Dynamic model listing from Ollama API
@@ -291,10 +303,10 @@ Legacy format chats with `model_settings` are still supported for loading, but t
 
 ### 7.3 Character Management
 - **Character Loading**: Load SillyTavern PNG cards with automatic metadata extraction.
-- **Auto-First Response**: When loading a character card, users can choose whether the AI generates the first message automatically. Two separate buttons are available in the CharactersScreen: "Play (AI Speak First)" and "Play (User Speak First)".
-- **Character Editing**: Full metadata editor with AI-assisted generation and modification.
-- **Character Encryption**: Encrypt character cards with password protection.
-- **Character Browser**: Search and filter character cards by name.
+- **Auto-First Response**: When loading a character card, users can choose whether the AI generates the first message automatically. Two separate buttons are available in the CharactersScreen: "Play (AI Speak First)" and "Play (User Speak First)". The default behavior is controlled by the `force_ai_speak_first` setting in `settings.json`.
+- **Character Editing**: Full metadata editor with AI-assisted generation and modification. Supports real-time streaming AI assistance for generating and modifying character data.
+- **Character Encryption**: Encrypt character cards with password protection using AES-256-GCM encryption.
+- **Character Browser**: Search and filter character cards by name with real-time filtering.
 
 ### 7.4 Narrative Styles
 - **45 Presets**: Extensive library of narrative style presets covering various tones and genres (including "Default").
@@ -311,9 +323,3 @@ Legacy format chats with `model_settings` are still supported for loading, but t
 - **Chat Window Integration**: Action results appear directly in the main chat window, providing full visibility and context.
 
 ---
-
-
-
-
-
-

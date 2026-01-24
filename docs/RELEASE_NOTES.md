@@ -73,7 +73,7 @@
 - **Git Ignore**: Added `python_portable/` to `.gitignore` to keep repository clean.
 
 ### 📚 Documentation Updates
-- **Simplified Installation**: Updated README.md and HOWTO_INSTALL.md to reflect that Python installation is no longer required.
+- **Simplified Installation**: Updated README.md and docs/HOWTO_INSTALL.md to reflect that Python installation is no longer required.
 - **Version Updates**: All documentation files updated to v0.4.6.
 
 ## v0.4.5: Scenarios Category & Enhanced Roleplay Features
@@ -107,7 +107,7 @@
 - **Settings Management**: GPU layers automatically reset to -1 when switching from CPU mode to GPU mode.
 
 ### 📚 Documentation Updates
-- **Updated Installation Guides**: Both README.md and HOWTO_INSTALL.md now include separate sections for GPU and CPU installation.
+- **Updated Installation Guides**: Both README.md and docs/HOWTO_INSTALL.md now include separate sections for GPU and CPU installation.
 - **Clear Requirements**: Requirements are now clearly separated into GPU Mode and CPU Mode sections.
 - **Installation Simplification**: CPU mode installation instructions omit CUDA toolkit requirements.
 
@@ -126,7 +126,7 @@
 - **RLM Chat Removal**: Removed RLM Chat feature from the application. Vector Chat (RAG) provides similar functionality with better performance and simpler implementation.
 - **Code Simplification**: Removed `RLMMixin` class and all RLM-related code from `logic_mixins.py`, reducing codebase complexity.
 - **UI Cleanup**: Removed RLM Chat button from the top menu bar and all related UI components (`RLMChatScreen`, `RLMInspectScreen`).
-- **Documentation Updates**: Updated PRD.md, README.md, and SECURITY_AUDIT.md to reflect the removal of RLM Chat functionality.
+- **Documentation Updates**: Updated docs/PRD.md, README.md, and docs/SECURITY_AUDIT.md to reflect the removal of RLM Chat functionality.
 - **CSS Cleanup**: Removed all RLM-related CSS styles from `styles.tcss`.
 
 ### 📝 Technical Changes

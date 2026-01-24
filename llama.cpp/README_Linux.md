@@ -42,7 +42,8 @@ This script will:
 After building, you can run the app with:
 
 ```bash
-./run.sh
+chmod +x run_linux_gpu.sh
+./run_linux_gpu.sh
 ```
 
 The launcher will automatically detect and use the CUDA-enabled wheel. Because this build is "Multi-Arch," you can share the resulting `.whl` file across different Linux machines with different NVIDIA GPUs (from the 10-series to 40-series) and it will work without crashing.

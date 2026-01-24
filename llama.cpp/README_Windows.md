@@ -55,17 +55,19 @@ This script will:
 After building, you can run the app with:
 
 ```cmd
-python aimultifool.py
+run_windows_gpu.bat
 ```
+
+Or simply double-click `run_windows_gpu.bat` in Windows Explorer.
 
 The app will automatically detect and use the CUDA-enabled wheel. Because this build is "Multi-Arch," you can share the resulting `.whl` file across different Windows machines with different NVIDIA GPUs (from the 10-series to 40-series) and it will work without crashing.
 
 ## GPU Acceleration
 
 The app uses GPU acceleration by default when a CUDA-enabled wheel is installed. You can configure the number of GPU layers in the app settings:
-- `-1` = Auto-detect (tries to use all layers, falls back if needed)
+- `-1` = Try all layers (starts from 64 and steps down by 4 if needed, falls back to CPU if necessary)
 - `0` = CPU only
-- `N` = Use N layers on GPU
+- `N` = Use N layers on GPU (steps down by 4 if the selected count doesn't fit)
 
 ## Troubleshooting
 

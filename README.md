@@ -19,22 +19,21 @@ Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favor
     > *Tip: Use Auto mode with Vector Chat to put the AI into a dream-like perpetuating state, continuously generating and storing content to build rich, interconnected narratives.*
 
 ### ⚡ AI & Performance
-- **Local GPU Inference**: Direct `llama.cpp` integration for maximum privacy and control. Full GPU acceleration support with automatic layer optimization and caching.
+- **Local GPU Inference**: Direct `llama.cpp` integration for maximum privacy and control. Full GPU acceleration support with configurable layer offloading.
 - **Ollama API Inference**: Use Ollama-managed models for flexible model management and access to models not available in GGUF format.
 - **Smart Pruning**: Automatically manages context window by trimming middle-history while preserving the System Prompt, first 3 exchanges (for early roleplay context), and the last message. Deletes messages one by one from the middle until reaching 60% context usage. Triggers at 85% context usage. Chat window automatically syncs to match the pruned context exactly.
-- **GPU/CPU Auto-Detection**: Optimized layer loading with configuration caching for faster subsequent loads.
+- **GPU Layer Fallback**: Automatic fallback mechanism that tries lower GPU layer counts if the requested configuration fails to load.
 - **Advanced Parameters**: Precise control over Temperature, Top P, Top K, Repeat Penalty, and **Min P**.
 
 ### 🔒 Privacy & Security
 - **Secure Chats**: **File** menu to save and load conversation histories with optional **AES-256-GCM** encryption and **Argon2id** key derivation.
-- **Transparent Passphrases**: Password fields are visible by default to prevent entry errors.
 - **Private Roleplay**: 100% local inference with zero data leakage.
 
 ### 🛠️ Interface & Tools
 - **Minimalist TUI**: Pure Textual interface styled via external `.tcss` for fast, clean roleplay aesthetics.
 - **Theme Support**: Choose from 11 built-in themes.
 - **Action Buttons**: Control chat interactions with Stop, Continue, Regenerate, Rewind, Suggest, Auto, Restart, and Clear buttons. **Suggest** generates AI-powered message suggestions based on context. **Auto** mode continuously generates and submits suggestions automatically, allowing stories to evolve hands-free until you press Stop. Auto mode is especially great for vector chat (RAG) as it automatically builds a vector database by generating and storing conversation exchanges continuously.
-- **Action Sidebar**: Right Sidebar containing roleplay tools and system prompts organized by category. Includes comprehensive analysis tools, scene management, character spawning, narrative control actions, and 40 engaging roleplay scenarios.
+- **Action Sidebar**: Right Sidebar containing roleplay tools and system prompts organized by category. Includes comprehensive analysis tools, scene management, character spawning, narrative control actions, and engaging roleplay scenarios.
 - **Action Manager**: Full in-app manager with real-time search and category filtering. Create, edit, duplicate, delete, export, and import custom actions to build your perfect roleplay toolkit. Export all actions or specific categories for backup and sharing.
 - **Flexible Action System**: All roleplay tools are accessible through the unified action menu, including emotion analysis, character stats analysis, scene tools, and narrative controls. No dedicated buttons needed - everything is organized and searchable in one place.
 
@@ -302,6 +301,16 @@ Developer tool for inspecting vector database encryption status. Scans the `vect
 **Usage**: Run `python devtools/inspect_vectors.py` from the project root directory.
 
 ---
+
+## 📚 Additional Documentation
+
+Additional documentation is available in the `docs/` folder:
+
+- **[PRD.md](docs/PRD.md)**: System Reference Document - Complete technical documentation of the application architecture, features, and implementation details.
+- **[RELEASE_NOTES.md](docs/RELEASE_NOTES.md)**: Detailed release notes and changelog for all versions.
+- **[SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md)**: Security and privacy audit documentation.
+- **[HOWTO_INSTALL.md](docs/HOWTO_INSTALL.md)**: Detailed installation guide with step-by-step instructions.
+- **[DISCLAIMER.md](docs/DISCLAIMER.md)**: Legal disclaimer, warranty information, and terms of use.
 
 ---
 
