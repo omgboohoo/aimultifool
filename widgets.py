@@ -2276,8 +2276,8 @@ class ActionsManagerScreen(ModalScreen):
                         Button("Export All", variant="default", id="btn-export-all-mgmt"),
                         Button("Export Folder", variant="default", id="btn-export-folder-mgmt"),
                         Button("Import", variant="default", id="btn-import-mgmt"),
-                        Button("Cancel", variant="default", id="btn-cancel-action-mgmt"),
-                        Button("Apply Changes", variant="default", id="btn-apply-action-mgmt"),
+                        Button("Save Changes", variant="default", id="btn-apply-action-mgmt"),
+                        Button("Close", variant="default", id="btn-cancel-action-mgmt"),
                         id="buttons-scroll"
                     ),
                     classes="pane-buttons"
