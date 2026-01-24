@@ -678,6 +678,15 @@ class ActionsMixin:
             # Update UI state if we were in auto mode
             if was_auto_mode:
                 self.update_ui_state()
+                # Update button visibility after clearing auto mode
+                # This ensures Stop button switches back to Continue when auto mode stops
+                try:
+                    is_loading = self.is_loading
+                    is_auto_mode = getattr(self, "_auto_mode_active", False)
+                    self.query_one("#btn-stop").display = is_loading or is_auto_mode
+                    self.query_one("#btn-continue").display = not is_loading and not is_auto_mode
+                except Exception:
+                    pass
         # Lock is released here, making buttons immediately responsive
 
     async def action_reset_chat(self) -> None:
