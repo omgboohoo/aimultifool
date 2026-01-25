@@ -633,8 +633,7 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
                         break
 
             # Collapse if no filter and not the highlighted category
-            # Exception: "Analysis" category is expanded by default
-            is_collapsed = not bool(filter_text) and not is_highlighted_cat and cat != "Analysis"
+            is_collapsed = not bool(filter_text) and not is_highlighted_cat
             collapsible = Collapsible(list_view, title=cat, collapsed=is_collapsed)
             action_sections.mount(collapsible)
             
