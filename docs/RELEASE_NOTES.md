@@ -10,6 +10,8 @@
 ### 🔧 Technical Improvements
 - **Removed Redundant Settings**: Removed top-level parameter values and GPU layers from `settings.json` as they are no longer needed.
 
+> 💡 Feature suggested by **Phoynix** on our Discord — thanks!
+
 ## v0.4.9: User Text Color Customization & Model Cache Removal
 ### 🎨 New Feature: User Text Color Selection
 - **Customizable User Text Color**: Added a "User Text Color" dropdown in the Theme Settings modal, allowing users to customize the color of their messages in the chat window.
