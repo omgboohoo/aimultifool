@@ -3,7 +3,7 @@
 **The Premium Cross-Platform Terminal-Based Sandbox for Private AI Roleplay.** 
 Powered by `llama.cpp` and `Textual`. Chat with local AI models using your favorite SillyTavern character cards with zero lag and full privacy.
 
-*Vibe coded in Cursor using Linux Mint*
+*Coded in Claude Code using Linux Mint*
 
 ---
 
