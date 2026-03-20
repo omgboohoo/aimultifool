@@ -414,7 +414,11 @@ class InferenceMixin:
                         self.context_size = self.context_size  # Keep current
                         self.gpu_layers = actual_layers
                         layer_display = "all" if actual_layers == -1 else str(actual_layers)
-                        self.notify(f"Model loaded successfully with {layer_display} GPU layers!")
+                        # Apply saved per-model parameters if they exist
+                        if hasattr(self, "apply_model_parameters") and self.apply_model_parameters():
+                            self.notify(f"Model loaded with {layer_display} GPU layers. Saved parameters restored.")
+                        else:
+                            self.notify(f"Model loaded successfully with {layer_display} GPU layers!")
                         self.enable_character_list()
                         # Get model name based on inference mode
                         inference_mode = getattr(self, "inference_mode", "local")
@@ -1265,18 +1269,17 @@ class ActionsMixin:
                 self._regen_in_progress = False
 
     def save_user_settings(self):
+        # Load existing settings to preserve model_parameters
+        existing = load_settings()
+        model_params = existing.get("model_parameters", {})
+
         settings = {
             "user_name": self.user_name,
             "context_size": self.context_size,
-            "gpu_layers": self.gpu_layers,
             "selected_model": self.selected_model,
             "inference_mode": getattr(self, "inference_mode", "local"),
-            "temp": self.temp,
-            "topp": self.topp,
-            "topk": self.topk,
-            "repeat": self.repeat,
-            "minp": self.minp,
-            "style": self.style
+            "style": self.style,
+            "model_parameters": model_params
         }
         save_settings(settings)
 

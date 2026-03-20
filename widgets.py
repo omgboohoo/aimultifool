@@ -2006,8 +2006,8 @@ class ParametersScreen(ModalScreen):
                 except Exception:
                     pass
             
-            if hasattr(self.app, "save_user_settings"):
-                self.app.save_user_settings()
+            if hasattr(self.app, "save_model_parameters"):
+                self.app.save_model_parameters()
             self.app.notify("Parameters applied and saved.")
             self.dismiss()
 

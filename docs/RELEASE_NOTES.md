@@ -1,5 +1,15 @@
 # Release Notes
 
+## v0.4.10: Per-Model Parameter Profiles
+### 🎛️ New Feature: Per-Model Parameter Saving
+- **Model-Specific Parameters**: AI generation parameters (Temperature, Top P, Top K, Repeat Penalty, Min P) are now saved per model in `settings.json`.
+- **Automatic Restore**: When loading a model that has previously saved parameters, those parameters are automatically restored.
+- **Default Fallback**: Models with no saved parameters start with sensible defaults (Temp 0.8, Top P 0.9, Top K 40, Repeat 1.0, Min P 0.0).
+- **Seamless Switching**: Switch between models without losing your preferred parameter tuning for each one.
+
+### 🔧 Technical Improvements
+- **Removed Redundant Settings**: Removed top-level parameter values and GPU layers from `settings.json` as they are no longer needed.
+
 ## v0.4.9: User Text Color Customization & Model Cache Removal
 ### 🎨 New Feature: User Text Color Selection
 - **Customizable User Text Color**: Added a "User Text Color" dropdown in the Theme Settings modal, allowing users to customize the color of their messages in the chat window.

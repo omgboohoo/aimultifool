@@ -56,7 +56,7 @@ def parse_args():
 class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
     """The main aiMultiFool application."""
     
-    TITLE = "aiMultiFool v0.4.9"
+    TITLE = "aiMultiFool v0.4.10"
     
     # Load CSS from external file (absolute path to prevent 'File Not Found' errors)
     CSS_PATH = str(Path(__file__).parent / "styles.tcss")
@@ -212,23 +212,14 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
             yield Static("Ready", id="status-text")
             python_version = f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
             yield Static("", id="status-seed")
-            yield Static(f"{python_version} | aiMultiFool v0.4.9", id="status-version")
+            yield Static(f"{python_version} | aiMultiFool v0.4.10", id="status-version")
 
     async def on_mount(self) -> None:
         # Load persisted settings
         settings = load_settings()
         self.user_name = settings.get("user_name", "User")
         self.context_size = settings.get("context_size", 8192)
-        self.gpu_layers = settings.get("gpu_layers", -1)
-        # If not in CPU mode and gpu_layers is 0, default to -1 (all GPU layers)
-        if not self.cpu_mode and self.gpu_layers == 0:
-            self.gpu_layers = -1
         self.style = settings.get("style", "descriptive")
-        self.temp = settings.get("temp", 0.8)
-        self.topp = settings.get("topp", 0.9)
-        self.topk = settings.get("topk", 40)
-        self.repeat = settings.get("repeat", 1.0)
-        self.minp = settings.get("minp", 0.0)
         self.selected_model = settings.get("selected_model", "")
         self.inference_mode = settings.get("inference_mode", "local")
         ollama_url_setting = settings.get("ollama_url", "127.0.0.1:11434")
@@ -515,25 +506,65 @@ class AiMultiFoolApp(App, InferenceMixin, ActionsMixin, UIMixin, VectorMixin):
         except Exception:
             pass
 
+    def _get_model_key(self):
+        """Get a key name for the current model (stem for local, raw name for Ollama)."""
+        if not self.selected_model:
+            return ""
+        inference_mode = getattr(self, "inference_mode", "local")
+        if inference_mode == "ollama":
+            return self.selected_model
+        return Path(self.selected_model).stem
+
     def save_user_settings(self):
+        # Load existing settings to preserve model_parameters
+        existing = load_settings()
+        model_params = existing.get("model_parameters", {})
+
         settings = {
             "user_name": self.user_name,
             "context_size": self.context_size,
-            "gpu_layers": self.gpu_layers,
             "style": self.style,
-            "temp": self.temp,
-            "topp": self.topp,
-            "topk": self.topk,
-            "repeat": self.repeat,
-            "minp": self.minp,
             "selected_model": self.selected_model,
             "inference_mode": getattr(self, "inference_mode", "local"),
             "ollama_url": getattr(self, "ollama_url", "127.0.0.1:11434"),
             "theme": self.theme,
             "speech_styling": self.speech_styling,
-            "user_text_color": self.user_text_color
+            "user_text_color": self.user_text_color,
+            "model_parameters": model_params
         }
         save_settings(settings)
+
+    def save_model_parameters(self):
+        """Save current parameters keyed by the active model name."""
+        model_key = self._get_model_key()
+        if not model_key:
+            return
+        existing = load_settings()
+        model_params = existing.get("model_parameters", {})
+        model_params[model_key] = {
+            "temp": self.temp,
+            "topp": self.topp,
+            "topk": self.topk,
+            "repeat": self.repeat,
+            "minp": self.minp,
+        }
+        existing["model_parameters"] = model_params
+        save_settings(existing)
+
+    def apply_model_parameters(self):
+        """Load saved parameters for the current model, or defaults if none saved."""
+        defaults = {"temp": 0.8, "topp": 0.9, "topk": 40, "repeat": 1.0, "minp": 0.0}
+        model_key = self._get_model_key()
+        if not model_key:
+            return False
+        settings = load_settings()
+        model_params = settings.get("model_parameters", {}).get(model_key, defaults)
+        self.temp = model_params.get("temp", defaults["temp"])
+        self.topp = model_params.get("topp", defaults["topp"])
+        self.topk = model_params.get("topk", defaults["topk"])
+        self.repeat = model_params.get("repeat", defaults["repeat"])
+        self.minp = model_params.get("minp", defaults["minp"])
+        return model_key in settings.get("model_parameters", {})
 
     def populate_right_sidebar(self, filter_text="", highlight_item_name=None):
         filter_text = filter_text.lower()
